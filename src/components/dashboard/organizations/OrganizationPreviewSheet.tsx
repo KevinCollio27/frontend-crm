@@ -19,9 +19,6 @@ import type { Organization } from "./OrganizationsTable"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const getInitials = (name: string) =>
-  name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
-
 const getFlag = (code: string) =>
   code.toUpperCase().split("").map((c) => String.fromCodePoint(c.charCodeAt(0) + 127397)).join("")
 
@@ -81,10 +78,10 @@ export function OrganizationPreviewSheet({ organization, open, onOpenChange }: P
 
         {/* Identity */}
         <div className="flex shrink-0 items-center gap-4 border-b px-5 py-4">
-          <Avatar className="size-16 shrink-0 border">
-            <AvatarImage src="https://github.com/shadcn.png" alt={organization.name} />
+          <Avatar className="size-16 shrink-0">
+            <AvatarImage src="/images/avatar-org.svg" alt={organization.name} />
             <AvatarFallback className="text-base font-medium">
-              {getInitials(organization.name)}
+              {organization.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)}
             </AvatarFallback>
           </Avatar>
           <div className="flex min-w-0 flex-col gap-1">

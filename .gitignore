@@ -19,7 +19,7 @@
 
 # production
 /build
-
+/mockups
 # misc
 .DS_Store
 *.pem

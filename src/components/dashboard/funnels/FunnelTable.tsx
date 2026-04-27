@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useRouter } from "next/navigation"
 import {
   type ColumnDef,
   type ColumnFiltersState,
@@ -21,6 +22,7 @@ import {
   ArrowUpIcon,
   CalendarIcon,
   ChevronDownIcon,
+  ExternalLinkIcon,
   MoreHorizontalIcon,
   PencilIcon,
   SearchIcon,
@@ -96,7 +98,7 @@ const COLUMN_LABELS: Record<string, string> = {
 
 // ─── Column definitions ──────────────────────────────────────────────────────
 
-function getColumns(onPreview: (deal: Deal) => void): ColumnDef<Deal>[] {
+function getColumns(onPreview: (deal: Deal) => void, onDetail: (deal: Deal) => void): ColumnDef<Deal>[] {
   return [
   {
     id: "select",
@@ -271,9 +273,13 @@ function getColumns(onPreview: (deal: Deal) => void): ColumnDef<Deal>[] {
           <DropdownMenuContent align="end" className="min-w-48">
             <DropdownMenuGroup>
               <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => onDetail(deal)}>
+                <ExternalLinkIcon />
+                Ver Detalles
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onPreview(deal)}>
                 <UserIcon />
-                Ver Perfil
+                Vista Previa
               </DropdownMenuItem>
               <DropdownMenuItem>
                 <PencilIcon />
@@ -311,6 +317,7 @@ interface FunnelTableProps {
 }
 
 export function FunnelTable({ deals }: FunnelTableProps) {
+  const router = useRouter()
   const [sorting, setSorting]               = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters]   = React.useState<ColumnFiltersState>([])
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
@@ -318,9 +325,12 @@ export function FunnelTable({ deals }: FunnelTableProps) {
   const [selectedDeal, setSelectedDeal]     = React.useState<Deal | null>(null)
   const [sheetOpen, setSheetOpen]           = React.useState(false)
 
-const columns = React.useMemo(
-    () => getColumns((deal) => { setSelectedDeal(deal); setSheetOpen(true); }),
-    []
+  const columns = React.useMemo(
+    () => getColumns(
+      (deal) => { setSelectedDeal(deal); setSheetOpen(true) },
+      (deal) => router.push(`/crm/funnels/${deal.id}`)
+    ),
+    [router]
   );
 
   const table = useReactTable({

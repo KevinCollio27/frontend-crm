@@ -23,9 +23,6 @@ import type { Contact } from "./ContactsTable"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const getInitials = (name: string) =>
-  name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
-
 const getFlag = (code: string) =>
   code.toUpperCase().split("").map((c) => String.fromCodePoint(c.charCodeAt(0) + 127397)).join("")
 
@@ -102,10 +99,10 @@ export function ContactPreviewSheet({ contact, open, onOpenChange }: Props) {
 
         {/* Identity */}
         <div className="flex shrink-0 items-center gap-4 border-b px-5 py-4">
-          <Avatar className="size-16 shrink-0 border">
-            <AvatarImage src="https://github.com/shadcn.png" alt={contact.name} />
+          <Avatar className="size-16 shrink-0">
+            <AvatarImage src="/images/avatar-contact.svg" alt={contact.name} />
             <AvatarFallback className="text-base font-medium">
-              {getInitials(contact.name)}
+              {contact.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)}
             </AvatarFallback>
           </Avatar>
           <div className="flex min-w-0 flex-col gap-1">
@@ -195,7 +192,7 @@ export function ContactPreviewSheet({ contact, open, onOpenChange }: Props) {
             {hasOrg ? (
               <div className="flex items-center gap-2.5 px-3 py-2 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition-colors">
                 <Avatar className="size-7 shrink-0 rounded-md">
-                  <AvatarImage src="https://github.com/shadcn.png" alt={contact.org} />
+                  <AvatarImage src="/images/avatar-contact.svg" alt={contact.org} />
                   <AvatarFallback className="rounded-md text-[10px] font-medium">
                     {contact.org.slice(0, 2).toUpperCase()}
                   </AvatarFallback>

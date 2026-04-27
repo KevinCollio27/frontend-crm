@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useRouter } from "next/navigation"
 import {
   DndContext,
   DragOverlay,
@@ -22,6 +23,7 @@ import {
 import { CSS } from "@dnd-kit/utilities"
 import {
   ActivityIcon,
+  ArrowUpRightIcon,
   CalendarIcon,
   EyeIcon,
   FileTextIcon,
@@ -159,10 +161,11 @@ interface DealCardProps {
   deal: Deal
   onMove: (stageId: string) => void
   onPreview: () => void
+  onViewDetail: () => void
   isDragging?: boolean
 }
 
-const DealCard = React.memo(function DealCard({ deal, onMove, onPreview, isDragging }: DealCardProps) {
+const DealCard = React.memo(function DealCard({ deal, onMove, onPreview, onViewDetail, isDragging }: DealCardProps) {
   const priority  = PRIORITY_CONFIG[deal.priority]
   const statusCfg = deal.status !== "open" ? STATUS_CONFIG[deal.status] : null
 
@@ -189,6 +192,10 @@ const DealCard = React.memo(function DealCard({ deal, onMove, onPreview, isDragg
               <DropdownMenuItem onClick={onPreview}>
                 <EyeIcon />
                 Vista Previa
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onViewDetail}>
+                <ArrowUpRightIcon />
+                Ver detalles
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
@@ -272,18 +279,21 @@ function SortableCard({
   deal,
   onMove,
   onPreview,
+  onViewDetail,
 }: {
   deal: Deal
   onMove: (dealId: string, stageId: string) => void
   onPreview: (deal: Deal) => void
+  onViewDetail: (deal: Deal) => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: deal.id,
     data: { stageId: deal.stageId },
   })
 
-  const handleMove    = React.useCallback((stageId: string) => onMove(deal.id, stageId), [deal.id, onMove])
-  const handlePreview = React.useCallback(() => onPreview(deal), [deal, onPreview])
+  const handleMove       = React.useCallback((stageId: string) => onMove(deal.id, stageId), [deal.id, onMove])
+  const handlePreview    = React.useCallback(() => onPreview(deal), [deal, onPreview])
+  const handleViewDetail = React.useCallback(() => onViewDetail(deal), [deal, onViewDetail])
 
   return (
     <div
@@ -296,7 +306,7 @@ function SortableCard({
       {...attributes}
       {...listeners}
     >
-      <DealCard deal={deal} onMove={handleMove} onPreview={handlePreview} />
+      <DealCard deal={deal} onMove={handleMove} onPreview={handlePreview} onViewDetail={handleViewDetail} />
     </div>
   )
 }
@@ -309,6 +319,7 @@ interface DroppableColumnProps {
   statsDeals: Deal[]
   onMove: (dealId: string, stageId: string) => void
   onPreview: (deal: Deal) => void
+  onViewDetail: (deal: Deal) => void
 }
 
 function DroppableColumn({
@@ -317,6 +328,7 @@ function DroppableColumn({
   statsDeals,
   onMove,
   onPreview,
+  onViewDetail,
 }: DroppableColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: stage.id })
 
@@ -343,6 +355,7 @@ function DroppableColumn({
             deal={deal}
             onMove={onMove}
             onPreview={onPreview}
+            onViewDetail={onViewDetail}
           />
         ))}
       </SortableContext>
@@ -359,10 +372,16 @@ export function FunnelKanban() {
   const [previewDeal, setPreviewDeal]   = React.useState<Deal | null>(null)
   const [sheetOpen, setSheetOpen]       = React.useState(false)
 
+  const router = useRouter()
+
   const handlePreview = React.useCallback((deal: Deal) => {
     setPreviewDeal(deal)
     setSheetOpen(true)
   }, [])
+
+  const handleViewDetail = React.useCallback((deal: Deal) => {
+    router.push(`/crm/funnels/${deal.id}`)
+  }, [router])
 
   const [search, setSearch]                       = React.useState("")
   const [funnelId, setFunnelId]                   = React.useState("default")
@@ -606,12 +625,13 @@ export function FunnelKanban() {
                 statsDeals={statsDeals}
                 onMove={moveDeal}
                 onPreview={handlePreview}
+                onViewDetail={handleViewDetail}
               />
             ))}
           </KanbanBoard>
 
           <DragOverlay dropAnimation={{ duration: 160, easing: "ease" }}>
-            {activeDeal && <DealCard deal={activeDeal} onMove={() => {}} onPreview={() => {}} isDragging />}
+            {activeDeal && <DealCard deal={activeDeal} onMove={() => {}} onPreview={() => {}} onViewDetail={() => {}} isDragging />}
           </DragOverlay>
         </DndContext>
       )}

@@ -18,7 +18,7 @@ import { ArrowDownIcon, ArrowUpDown, ArrowUpIcon, ChevronDown, MoreHorizontal, P
 import { OrganizationPreviewSheet } from "./OrganizationPreviewSheet";
 import * as React from "react";
 
-import BoringAvatar from "boring-avatars";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -231,12 +231,10 @@ function getColumns(onPreview: (org: Organization) => void): ColumnDef<Organizat
       const taxId: string = row.original.taxId;
       return (
         <div className="flex items-center gap-2.5">
-          <BoringAvatar
-              name={name}
-              colors={["#d0dccb", "#d7c7be", "#b3c5ba", "#88c3b5", "#95888f"]}
-              variant="bauhaus"
-              size={32}
-            />
+          <Avatar size="default">
+            <AvatarImage src="/images/avatar-org.svg" alt={name} />
+            <AvatarFallback>{name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)}</AvatarFallback>
+          </Avatar>
           <div className="leading-tight">
             <div className="text-sm font-medium">{name}</div>
             <div className="text-xs text-muted-foreground">{taxId}</div>
