@@ -14,7 +14,8 @@ import {
   useReactTable,
   type VisibilityState,
 } from "@tanstack/react-table";
-import { ArrowDownIcon, ArrowUpDown, ArrowUpIcon, ChevronDown, MoreHorizontal, PencilIcon, PlusIcon, Trash2Icon, UserIcon, XIcon } from "lucide-react";
+import { ArrowDownIcon, ArrowUpDown, ArrowUpIcon, ChevronDown, ExternalLinkIcon, MoreHorizontal, PencilIcon, PlusIcon, Trash2Icon, UserIcon, XIcon } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { OrganizationPreviewSheet } from "./OrganizationPreviewSheet";
 import * as React from "react";
 
@@ -176,7 +177,7 @@ const columnLabels: Record<string, string> = {
   createdAt: "Creado",
 };
 
-function getColumns(onPreview: (org: Organization) => void): ColumnDef<Organization>[] {
+function getColumns(onPreview: (org: Organization) => void, onDetail: (org: Organization) => void): ColumnDef<Organization>[] {
   return [
   {
     id: "select",
@@ -349,6 +350,10 @@ function getColumns(onPreview: (org: Organization) => void): ColumnDef<Organizat
           <DropdownMenuContent align="end" className="min-w-48">
             <DropdownMenuGroup>
               <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => onDetail(org)}>
+                <ExternalLinkIcon />
+                Ver Detalles
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onPreview(org)}>
                 <UserIcon />
                 Vista Previa
@@ -372,6 +377,7 @@ function getColumns(onPreview: (org: Organization) => void): ColumnDef<Organizat
 }
 
 export function OrganizationsTable() {
+  const router = useRouter();
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
@@ -380,7 +386,11 @@ export function OrganizationsTable() {
   const [sheetOpen, setSheetOpen] = React.useState(false);
 
   const columns = React.useMemo(
-    () => getColumns((org) => { setSelectedOrg(org); setSheetOpen(true); }),
+    () => getColumns(
+      (org) => { setSelectedOrg(org); setSheetOpen(true); },
+      (org) => router.push(`/crm/organizations/${org.id}`),
+    ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   );
 

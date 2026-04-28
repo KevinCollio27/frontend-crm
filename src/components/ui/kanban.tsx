@@ -20,7 +20,7 @@ interface KanbanColumnProps {
 
 export function KanbanBoard({ children, className }: KanbanBoardProps) {
   return (
-    <div className={cn("flex h-full gap-3 overflow-x-auto p-4", className)}>
+    <div className={cn("flex flex-1 min-h-0 min-w-0 gap-3 overflow-x-auto p-4", className)}>
       {children}
     </div>
   )

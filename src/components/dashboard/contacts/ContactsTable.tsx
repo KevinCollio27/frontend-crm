@@ -14,8 +14,9 @@ import {
   useReactTable,
   type VisibilityState,
 } from "@tanstack/react-table";
-import { ArrowDownIcon, ArrowUpDown, ArrowUpIcon, ChevronDown, MailIcon, MoreHorizontal, PencilIcon, PhoneIcon, PlusIcon, Trash2Icon, UserIcon, XIcon } from "lucide-react";
+import { ArrowDownIcon, ArrowUpDown, ArrowUpIcon, ChevronDown, MailIcon, MoreHorizontal, PencilIcon, PhoneIcon, PlusIcon, Trash2Icon, UserIcon, XIcon, ExternalLinkIcon} from "lucide-react";
 import * as React from "react";
+import { useRouter } from "next/navigation";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -176,7 +177,7 @@ const columnLabels: Record<string, string> = {
   createdAt: "Creado",
 };
 
-function getColumns(onPreview: (contact: Contact) => void): ColumnDef<Contact>[] {
+function getColumns(onPreview: (contact: Contact) => void, onDetail: (contact: Contact) => void): ColumnDef<Contact>[] {
   return [
     {
       id: "select",
@@ -308,6 +309,10 @@ function getColumns(onPreview: (contact: Contact) => void): ColumnDef<Contact>[]
             <DropdownMenuContent align="end" className="min-w-48">
               <DropdownMenuGroup>
                 <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                <DropdownMenuItem onClick={() => onDetail(contact)}>
+                  <ExternalLinkIcon />
+                  Ver Detalles
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => onPreview(contact)}>
                   <UserIcon />
                   Vista Previa
@@ -343,6 +348,7 @@ function getColumns(onPreview: (contact: Contact) => void): ColumnDef<Contact>[]
 }
 
 export function ContactsTable() {
+  const router = useRouter();
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
@@ -351,8 +357,11 @@ export function ContactsTable() {
   const [sheetOpen, setSheetOpen] = React.useState(false);
 
   const columns = React.useMemo(
-    () => getColumns((contact) => { setSelectedContact(contact); setSheetOpen(true); }),
-    []
+    () => getColumns(
+      (contact) => { setSelectedContact(contact); setSheetOpen(true); },
+      (contact) => router.push(`/crm/contacts/${contact.id}`)
+    ),
+    [router]
   );
 
   const table = useReactTable({

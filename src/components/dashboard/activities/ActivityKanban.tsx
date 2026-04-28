@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useRouter } from "next/navigation"
 import {
   DndContext,
   DragOverlay,
@@ -22,6 +23,7 @@ import {
 import { CSS } from "@dnd-kit/utilities"
 import {
   ActivityIcon,
+  ArrowUpRightIcon,
   CalendarIcon,
   EyeIcon,
   KanbanSquareIcon,
@@ -160,6 +162,7 @@ interface ActivityCardProps {
   activity: Activity
   onMove: (stageId: string) => void
   onPreview: () => void
+  onViewDetail: () => void
   isDragging?: boolean
 }
 
@@ -167,6 +170,7 @@ const ActivityCard = React.memo(function ActivityCard({
   activity,
   onMove,
   onPreview,
+  onViewDetail,
   isDragging,
 }: ActivityCardProps) {
   const priority  = PRIORITY_CONFIG[activity.priority]
@@ -201,6 +205,10 @@ const ActivityCard = React.memo(function ActivityCard({
               <DropdownMenuItem onClick={onPreview}>
                 <EyeIcon />
                 Vista Previa
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onViewDetail}>
+                <ArrowUpRightIcon />
+                Ver detalles
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
@@ -273,18 +281,21 @@ function SortableCard({
   activity,
   onMove,
   onPreview,
+  onViewDetail,
 }: {
   activity: Activity
   onMove: (activityId: string, stageId: string) => void
   onPreview: (activity: Activity) => void
+  onViewDetail: (activity: Activity) => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: activity.id,
     data: { stageId: activity.stageId },
   })
 
-  const handleMove    = React.useCallback((stageId: string) => onMove(activity.id, stageId), [activity.id, onMove])
-  const handlePreview = React.useCallback(() => onPreview(activity), [activity, onPreview])
+  const handleMove       = React.useCallback((stageId: string) => onMove(activity.id, stageId), [activity.id, onMove])
+  const handlePreview    = React.useCallback(() => onPreview(activity), [activity, onPreview])
+  const handleViewDetail = React.useCallback(() => onViewDetail(activity), [activity, onViewDetail])
 
   return (
     <div
@@ -297,7 +308,7 @@ function SortableCard({
       {...attributes}
       {...listeners}
     >
-      <ActivityCard activity={activity} onMove={handleMove} onPreview={handlePreview} />
+      <ActivityCard activity={activity} onMove={handleMove} onPreview={handlePreview} onViewDetail={handleViewDetail} />
     </div>
   )
 }
@@ -315,9 +326,10 @@ interface DroppableColumnProps {
   statsActivities: Activity[]
   onMove: (activityId: string, stageId: string) => void
   onPreview: (activity: Activity) => void
+  onViewDetail: (activity: Activity) => void
 }
 
-function DroppableColumn({ stage, activities, statsActivities, onMove, onPreview }: DroppableColumnProps) {
+function DroppableColumn({ stage, activities, statsActivities, onMove, onPreview, onViewDetail }: DroppableColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: stage.id })
 
   const stageActivities = activities.filter((a) => a.stageId === stage.id)
@@ -342,6 +354,7 @@ function DroppableColumn({ stage, activities, statsActivities, onMove, onPreview
             activity={activity}
             onMove={onMove}
             onPreview={onPreview}
+            onViewDetail={onViewDetail}
           />
         ))}
       </SortableContext>
@@ -352,6 +365,8 @@ function DroppableColumn({ stage, activities, statsActivities, onMove, onPreview
 // ─── ActivityKanban ─────────────────────────────────────────────────────────
 
 export function ActivityKanban() {
+  const router = useRouter()
+
   const [view, setView]               = React.useState<"board" | "lista">("board")
   const [activities, setActivities]   = React.useState(ACTIVITIES)
   const [activeActivity, setActiveActivity] = React.useState<Activity | null>(null)
@@ -362,6 +377,10 @@ export function ActivityKanban() {
     setPreviewActivity(activity)
     setSheetOpen(true)
   }, [])
+
+  const handleViewDetail = React.useCallback((activity: Activity) => {
+    router.push(`/crm/activities/${activity.id}`)
+  }, [router])
 
   const [search, setSearch]                       = React.useState("")
   const [typeFilter, setTypeFilter]               = React.useState<string[]>([])
@@ -590,13 +609,14 @@ export function ActivityKanban() {
                 statsActivities={statsActivities}
                 onMove={moveActivity}
                 onPreview={handlePreview}
+                onViewDetail={handleViewDetail}
               />
             ))}
           </KanbanBoard>
 
           <DragOverlay dropAnimation={{ duration: 160, easing: "ease" }}>
             {activeActivity && (
-              <ActivityCard activity={activeActivity} onMove={() => {}} onPreview={() => {}} isDragging />
+              <ActivityCard activity={activeActivity} onMove={() => {}} onPreview={() => {}} onViewDetail={() => {}} isDragging />
             )}
           </DragOverlay>
         </DndContext>

@@ -37,6 +37,75 @@ export const ACTIVITY_TYPES = [
   "Visita",
 ] as const
 
+// ─── Historial ────────────────────────────────────────────────────────────────
+
+export type ActivityHistorialType =
+  | "created"
+  | "updated"
+  | "note"
+  | "status_changed"
+  | "assigned"
+
+export interface ActivityHistorialEntry {
+  id: string
+  type: ActivityHistorialType
+  actor: string
+  date: string
+  month: string
+  title: string
+  content?: string
+}
+
+// ─── Notas ────────────────────────────────────────────────────────────────────
+
+export interface ActivityNote {
+  id: string
+  title: string
+  content: string
+  author: string
+  tags?: string[]
+  created_at: string
+}
+
+// ─── Detail ───────────────────────────────────────────────────────────────────
+
+export interface ActivityDetail extends Activity {
+  ubicacion?: string
+  historial: ActivityHistorialEntry[]
+  notes: ActivityNote[]
+  contact?: { id: string; name: string; position?: string }
+  organization?: { id: string; name: string; industry?: string }
+}
+
+export const ACTIVITY_DETAILS: Record<string, ActivityDetail> = {
+  "1": {
+    id: "1",
+    title: "Reunión con CEO Transportes del Norte",
+    type: "Reunión",
+    priority: "alta",
+    startDate: "2026-03-10",
+    endDate: "2026-03-15",
+    stageId: "pendiente",
+    createdAt: "2026-03-01",
+    responsible: { name: "Kevin Collio", initials: "KC", avatar: "https://github.com/shadcn.png" },
+    opportunityName: "Propuesta logística Q2",
+    funnelName: "Flujo Predeterminado",
+    ubicacion: "Oficina del cliente",
+    contact: { id: "1", name: "Juan Pérez", position: "Gerente de Operaciones" },
+    organization: { id: "1", name: "Transportes del Norte", industry: "Transporte y Logística" },
+    historial: [
+      { id: "ah3", type: "note",           actor: "Kevin Collio", date: "12 mar 2026 · 09:00", month: "Marzo 2026", title: "Nota agregada: «Puntos clave»",  content: "Discutir la integración GPS avanzada y mostrar el módulo de flotas refrigeradas." },
+      { id: "ah2", type: "status_changed", actor: "Kevin Collio", date: "05 mar 2026 · 14:30", month: "Marzo 2026", title: "Estado cambiado a Pendiente" },
+      { id: "ah1", type: "created",        actor: "Kevin Collio", date: "01 mar 2026 · 08:00", month: "Marzo 2026", title: "Actividad creada" },
+    ],
+    notes: [
+      { id: "an1", title: "Puntos clave", content: "Discutir la integración GPS avanzada y mostrar el módulo de flotas refrigeradas.\n\nPresentar casos de éxito similares en el sector transporte.", author: "Kevin Collio", tags: ["Reunión", "GPS"], created_at: "12 mar. 2026 · 09:00" },
+    ],
+  },
+}
+
+// ─── Lista ────────────────────────────────────────────────────────────────────
+
 export const ACTIVITIES: Activity[] = [
   {
     id: "1",

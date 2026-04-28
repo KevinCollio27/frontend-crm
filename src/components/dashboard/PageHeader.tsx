@@ -1,7 +1,9 @@
-import { type LucideIcon, BellIcon, PlusIcon, SearchIcon, SparklesIcon } from "lucide-react";
+import { type LucideIcon, SearchIcon } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
-import { Button } from "@/components/ui/button";
+import { AIAssistantToggle } from "@/components/dashboard/ai/AIAssistantToggle";
+import { BellButton } from "@/components/dashboard/BellButton";
+import { CreateQuickMenu } from "@/components/dashboard/CreateQuickMenu";
 
 interface PageHeaderProps {
   icon: LucideIcon;
@@ -31,21 +33,9 @@ export function PageHeader({ icon: Icon, title, description }: PageHeaderProps) 
           <SearchIcon className="size-3.5" />
           <span>Buscar en CRM</span>
         </div>
-        <Button variant="outline" size="icon" className="rounded-full">
-          <PlusIcon className="size-4" />
-        </Button>
-        <Button
-          size="icon"
-          className="rounded-full bg-linear-to-br from-purple-500 to-violet-600 text-white shadow-sm hover:from-purple-600 hover:to-violet-700 border-0"
-        >
-          <SparklesIcon className="size-4" />
-        </Button>
-        <Button
-          size="icon"
-          className="rounded-full bg-amber-50 text-amber-500 border border-amber-200 shadow-sm hover:bg-amber-100 hover:text-amber-600"
-        >
-          <BellIcon className="size-4" />
-        </Button>
+        <CreateQuickMenu />
+        <AIAssistantToggle />
+        <BellButton />
       </div>
     </header>
   );

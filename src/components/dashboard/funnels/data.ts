@@ -46,6 +46,8 @@ export type HistorialType = "note" | "activity" | "stage_change" | "created" | "
 export type ActivityDetailStatus = "pendiente" | "en_progreso" | "completada" | "cancelada"
 export type QuotationStatus = "borrador" | "enviada" | "aceptada" | "rechazada"
 export type EmailStatus = "enviado" | "recibido"
+export type InvoiceStatus = "borrador" | "emitida" | "pagada" | "vencida" | "anulada"
+export type InvoiceUnitOfMeasure = "dias" | "semanas" | "meses" | "años"
 
 export interface HistorialEntry {
   id: string
@@ -112,6 +114,18 @@ export interface DealQuotation {
   items_count: number
 }
 
+export interface DealInvoice {
+  id: string
+  invoice_number: string
+  quotation_id: string
+  unit_of_measure: InvoiceUnitOfMeasure
+  period: number
+  amount: number
+  issue_date: string
+  due_date: string
+  status: InvoiceStatus
+}
+
 export interface DealEmail {
   id: string
   subject: string
@@ -143,6 +157,7 @@ export interface DealDetail extends Deal {
   activities: DealActivity[]
   documents: DealDocument[]
   quotations: DealQuotation[]
+  invoices: DealInvoice[]
   emails: DealEmail[]
 }
 
@@ -230,6 +245,11 @@ export const DEAL_DETAILS: Record<string, DealDetail> = {
       { id: "q2", name: "Propuesta ajustada Q2",   amount: 5800000, status: "borrador",  type: "sale",     valid_until: "31/05/2026", apply_discounts: false, created_by: { name: "Rodrigo V.",   initials: "RV", avatar: "https://github.com/shadcn.png" }, created_at: "22/04/2026", items_count: 2 },
       { id: "q3", name: "Cotización GPS avanzado", amount: 1800000, status: "aceptada",  type: "purchase", valid_until: "15/05/2026", apply_discounts: false, created_by: { name: "Kevin Collio", initials: "KC", avatar: "https://github.com/shadcn.png" }, created_at: "15/03/2026", items_count: 3 },
       { id: "q4", name: "Propuesta extendida Q3",  amount: 8500000, status: "rechazada", type: "sale",     valid_until: "31/07/2026", apply_discounts: true,  created_by: { name: "Kevin Collio", initials: "KC", avatar: "https://github.com/shadcn.png" }, created_at: "01/04/2026", items_count: 4 },
+    ],
+    invoices: [
+      { id: "inv1", invoice_number: "F-2026-001", quotation_id: "q1", unit_of_measure: "meses", period: 12, amount: 6300000, issue_date: "01/05/2026", due_date: "01/06/2026", status: "emitida"  },
+      { id: "inv2", invoice_number: "F-2026-002", quotation_id: "q3", unit_of_measure: "meses", period: 6,  amount: 1800000, issue_date: "15/03/2026", due_date: "15/04/2026", status: "pagada"   },
+      { id: "inv3", invoice_number: "F-2026-003", quotation_id: "q1", unit_of_measure: "años",  period: 1,  amount: 4500000, issue_date: "10/02/2026", due_date: "10/03/2026", status: "vencida"  },
     ],
     emails: [
       { id: "e1", subject: "Propuesta inicial CamionGO Pro", to: "juan.perez@transportesnorte.cl", from: "kevin.collio@goxt.io",         preview: "Estimado Juan, adjunto encontrará nuestra propuesta detallada para la implementación de CamionGO Pro...", sentAt: "23 abr 2026 · 09:45", status: "enviado"   },

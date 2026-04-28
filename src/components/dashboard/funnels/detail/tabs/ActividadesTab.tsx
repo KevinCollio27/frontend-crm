@@ -79,6 +79,7 @@ const TYPE_ICON: Record<string, React.ReactNode> = {
 }
 
 const columnLabels: Record<string, string> = {
+  id:          "ID",
   title:       "Título",
   type:        "Tipo",
   date_from:   "Fecha inicio",
@@ -118,6 +119,13 @@ function getColumns(): ColumnDef<DealActivity>[] {
       ),
       enableSorting: false,
       enableHiding: false,
+    },
+    {
+      accessorKey: "id",
+      header: "ID",
+      cell: ({ row }) => (
+        <span className="font-mono text-xs text-muted-foreground">{row.getValue("id")}</span>
+      ),
     },
     {
       accessorKey: "title",
@@ -272,7 +280,12 @@ export function ActividadesTab({ deal }: Props) {
   const [sorting, setSorting]               = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters]   = React.useState<ColumnFiltersState>([])
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({
-    type: false, date_from: false, date_to: false, ubication: false, created_at: false,
+    type: false, 
+    date_from: false, 
+    date_to: false, 
+    ubication: false, 
+    created_at: false,
+    status: false,
   })
   const [rowSelection, setRowSelection] = React.useState({})
 

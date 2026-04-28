@@ -19,17 +19,15 @@ import {
   ArrowUpDown,
   ArrowUpIcon,
   ChevronDown,
-  DownloadIcon,
-  FileTextIcon,
   MoreHorizontal,
   PencilIcon,
   PlusIcon,
+  ReceiptIcon,
   Trash2Icon,
   XIcon,
 } from "lucide-react"
 import * as React from "react"
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -55,48 +53,54 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { cn } from "@/lib/utils"
-import type { DealDetail, DealDocument } from "../../data"
+import type { DealDetail, DealInvoice, InvoiceStatus, InvoiceUnitOfMeasure } from "../../data"
 
 // ─── Configs ──────────────────────────────────────────────────────────────────
 
-function formatBytes(bytes: number): string {
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+function formatCLP(value: number) {
+  return new Intl.NumberFormat("es-CL", {
+    style: "currency",
+    currency: "CLP",
+    maximumFractionDigits: 0,
+  }).format(value)
 }
 
-const FILE_TYPE_STYLE: Record<string, { bg: string; color: string }> = {
-  pdf:  { bg: "bg-red-100",    color: "text-red-600"    },
-  docx: { bg: "bg-blue-100",   color: "text-blue-600"   },
-  xlsx: { bg: "bg-emerald-100", color: "text-emerald-600" },
-  pptx: { bg: "bg-orange-100", color: "text-orange-600" },
+const STATUS_CONFIG: Record<InvoiceStatus, { label: string; className: string }> = {
+  borrador: { label: "Borrador", className: "bg-muted text-muted-foreground border-border"             },
+  emitida:  { label: "Emitida",  className: "bg-blue-50 text-blue-700 border-blue-200"                 },
+  pagada:   { label: "Pagada",   className: "bg-emerald-50 text-emerald-700 border-emerald-200"         },
+  vencida:  { label: "Vencida",  className: "bg-red-50 text-red-600 border-red-200"                    },
+  anulada:  { label: "Anulada",  className: "bg-orange-50 text-orange-700 border-orange-200"            },
 }
 
-const CATEGORY_CONFIG: Record<string, { label: string; className: string }> = {
-  contrato:     { label: "Contrato",     className: "bg-blue-50 text-blue-700 border-blue-200"           },
-  factura:      { label: "Factura",      className: "bg-amber-50 text-amber-700 border-amber-200"         },
-  presentacion: { label: "Presentación", className: "bg-violet-50 text-violet-700 border-violet-200"      },
-  manual:       { label: "Manual",       className: "bg-emerald-50 text-emerald-700 border-emerald-200"   },
-  otro:         { label: "Otro",         className: "bg-muted text-muted-foreground border-border"        },
+const UM_CONFIG: Record<InvoiceUnitOfMeasure, string> = {
+  dias:    "Días",
+  semanas: "Semanas",
+  meses:   "Meses",
+  años:    "Años",
 }
 
 const columnLabels: Record<string, string> = {
-  id:          "ID",
-  name:        "Nombre",
-  category:    "Categoría",
-  file_size:   "Tamaño",
-  uploaded_by: "Subido por",
-  created_at:  "Creado",
+  id:              "ID",
+  invoice_number:  "N° Factura",
+  quotation_id:    "Cotización",
+  unit_of_measure: "Unidad",
+  period:          "Periodo",
+  amount:          "Monto",
+  issue_date:      "Emisión",
+  due_date:        "Vencimiento",
+  status:          "Estado",
 }
 
 const getSortIcon = (sorted: false | "asc" | "desc") => {
-  if (sorted === "asc")  return <ArrowUpIcon   className="ml-2 size-3.5" />
-  if (sorted === "desc") return <ArrowDownIcon  className="ml-2 size-3.5" />
+  if (sorted === "asc")  return <ArrowUpIcon  className="ml-2 size-3.5" />
+  if (sorted === "desc") return <ArrowDownIcon className="ml-2 size-3.5" />
   return <ArrowUpDown className="ml-2 size-3.5" />
 }
 
 // ─── Columns ──────────────────────────────────────────────────────────────────
 
-function getColumns(): ColumnDef<DealDocument>[] {
+function getColumns(): ColumnDef<DealInvoice>[] {
   return [
     {
       id: "select",
@@ -126,33 +130,97 @@ function getColumns(): ColumnDef<DealDocument>[] {
       ),
     },
     {
-      accessorKey: "name",
+      accessorKey: "invoice_number",
       header: ({ column }) => (
         <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
-          Nombre {getSortIcon(column.getIsSorted())}
+          N° Factura {getSortIcon(column.getIsSorted())}
         </Button>
       ),
       cell: ({ row }) => {
-        const doc = row.original
-        const style = FILE_TYPE_STYLE[doc.file_type] ?? { bg: "bg-muted", color: "text-muted-foreground" }
+        const inv = row.original
         return (
           <div className="flex items-center gap-2.5">
-            <div className={cn("flex size-7 shrink-0 items-center justify-center rounded-lg", style.bg)}>
-              <FileTextIcon className={cn("size-3.5", style.color)} />
+            <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
+              <ReceiptIcon className="size-3.5" />
             </div>
-            <div className="leading-tight">
-              <div className="text-sm font-medium">{doc.name}</div>
-              <div className="text-xs text-muted-foreground uppercase">{doc.file_type}</div>
-            </div>
+            <span className="text-sm font-medium">{inv.invoice_number}</span>
           </div>
         )
       },
     },
     {
-      accessorKey: "category",
-      header: "Categoría",
+      accessorKey: "quotation_id",
+      header: "Cotización",
+      cell: ({ row }) => (
+        <span className="font-mono text-xs text-muted-foreground">{row.getValue("quotation_id")}</span>
+      ),
+    },
+    {
+      accessorKey: "unit_of_measure",
+      header: "Unidad",
       cell: ({ row }) => {
-        const conf = CATEGORY_CONFIG[row.getValue("category") as string] ?? CATEGORY_CONFIG.otro
+        const um = row.getValue("unit_of_measure") as InvoiceUnitOfMeasure
+        return <span className="text-sm text-muted-foreground">{UM_CONFIG[um]}</span>
+      },
+      filterFn: (row, id, value: string[]) => value.includes(row.getValue(id)),
+    },
+    {
+      accessorKey: "period",
+      header: ({ column }) => (
+        <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
+          Periodo {getSortIcon(column.getIsSorted())}
+        </Button>
+      ),
+      cell: ({ row }) => {
+        const period = row.getValue("period") as number
+        const um     = row.original.unit_of_measure
+        return (
+          <span className="text-sm tabular-nums">
+            {period} {UM_CONFIG[um].toLowerCase()}
+          </span>
+        )
+      },
+    },
+    {
+      accessorKey: "amount",
+      header: ({ column }) => (
+        <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
+          Monto {getSortIcon(column.getIsSorted())}
+        </Button>
+      ),
+      cell: ({ row }) => (
+        <span className="text-sm font-semibold tabular-nums text-emerald-600">
+          {formatCLP(row.getValue("amount"))}
+        </span>
+      ),
+    },
+    {
+      accessorKey: "issue_date",
+      header: ({ column }) => (
+        <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
+          Emisión {getSortIcon(column.getIsSorted())}
+        </Button>
+      ),
+      cell: ({ row }) => (
+        <span className="text-sm text-muted-foreground">{row.getValue("issue_date")}</span>
+      ),
+    },
+    {
+      accessorKey: "due_date",
+      header: ({ column }) => (
+        <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
+          Vencimiento {getSortIcon(column.getIsSorted())}
+        </Button>
+      ),
+      cell: ({ row }) => (
+        <span className="text-sm text-muted-foreground">{row.getValue("due_date")}</span>
+      ),
+    },
+    {
+      accessorKey: "status",
+      header: "Estado",
+      cell: ({ row }) => {
+        const conf = STATUS_CONFIG[row.getValue("status") as InvoiceStatus]
         return (
           <Badge className={cn("rounded-full border px-2.5 py-0.5 text-xs", conf.className)}>
             {conf.label}
@@ -160,51 +228,6 @@ function getColumns(): ColumnDef<DealDocument>[] {
         )
       },
       filterFn: (row, id, value: string[]) => value.includes(row.getValue(id)),
-    },
-    {
-      accessorKey: "file_size",
-      header: ({ column }) => (
-        <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
-          Tamaño {getSortIcon(column.getIsSorted())}
-        </Button>
-      ),
-      cell: ({ row }) => (
-        <div className="text-sm text-muted-foreground tabular-nums">
-          {formatBytes(row.getValue("file_size"))}
-        </div>
-      ),
-    },
-    {
-      id: "uploaded_by",
-      accessorFn: (row) => row.uploaded_by.name,
-      header: ({ column }) => (
-        <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
-          Subido por {getSortIcon(column.getIsSorted())}
-        </Button>
-      ),
-      cell: ({ row }) => {
-        const u = row.original.uploaded_by
-        return (
-          <div className="flex items-center gap-2">
-            <Avatar className="size-6 shrink-0">
-              <AvatarImage src={u.avatar} alt={u.name} />
-              <AvatarFallback className="text-[9px] font-semibold">{u.initials}</AvatarFallback>
-            </Avatar>
-            <span className="text-sm">{u.name}</span>
-          </div>
-        )
-      },
-    },
-    {
-      accessorKey: "created_at",
-      header: ({ column }) => (
-        <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
-          Creado {getSortIcon(column.getIsSorted())}
-        </Button>
-      ),
-      cell: ({ row }) => (
-        <div className="text-sm text-muted-foreground">{row.getValue("created_at")}</div>
-      ),
     },
     {
       id: "actions",
@@ -218,8 +241,7 @@ function getColumns(): ColumnDef<DealDocument>[] {
           <DropdownMenuContent align="end" className="min-w-44">
             <DropdownMenuGroup>
               <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-              <DropdownMenuItem><DownloadIcon /> Descargar</DropdownMenuItem>
-              <DropdownMenuItem><PencilIcon />   Editar</DropdownMenuItem>
+              <DropdownMenuItem><PencilIcon /> Editar</DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="text-destructive focus:text-destructive">
@@ -234,12 +256,19 @@ function getColumns(): ColumnDef<DealDocument>[] {
 
 // ─── Filter options ────────────────────────────────────────────────────────────
 
-const CATEGORY_OPTIONS = [
-  { label: "Contrato",     value: "contrato"     },
-  { label: "Factura",      value: "factura"      },
-  { label: "Presentación", value: "presentacion" },
-  { label: "Manual",       value: "manual"       },
-  { label: "Otro",         value: "otro"         },
+const STATUS_OPTIONS = [
+  { label: "Borrador", value: "borrador" },
+  { label: "Emitida",  value: "emitida"  },
+  { label: "Pagada",   value: "pagada"   },
+  { label: "Vencida",  value: "vencida"  },
+  { label: "Anulada",  value: "anulada"  },
+]
+
+const UM_OPTIONS = [
+  { label: "Días",    value: "dias"    },
+  { label: "Semanas", value: "semanas" },
+  { label: "Meses",   value: "meses"   },
+  { label: "Años",    value: "años"    },
 ]
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -248,29 +277,32 @@ interface Props {
   deal: DealDetail
 }
 
-export function DocumentosTab({ deal }: Props) {
-  const [sorting, setSorting]                   = React.useState<SortingState>([])
-  const [columnFilters, setColumnFilters]        = React.useState<ColumnFiltersState>([])
-  const [columnVisibility, setColumnVisibility]  = React.useState<VisibilityState>({
-    uploaded_by: false, created_at: false,
+export function FacturasTab({ deal }: Props) {
+  const [sorting, setSorting]                  = React.useState<SortingState>([])
+  const [columnFilters, setColumnFilters]       = React.useState<ColumnFiltersState>([])
+  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({
+    id:              false,
+    unit_of_measure: false,
+    issue_date:      false,
+    due_date:         false,
   })
   const [rowSelection, setRowSelection] = React.useState({})
 
   const columns = React.useMemo(() => getColumns(), [])
 
   const table = useReactTable({
-    data: deal.documents,
+    data: deal.invoices,
     columns,
-    onSortingChange:           setSorting,
-    onColumnFiltersChange:     setColumnFilters,
-    onColumnVisibilityChange:  setColumnVisibility,
-    onRowSelectionChange:      setRowSelection,
-    getCoreRowModel:           getCoreRowModel(),
-    getPaginationRowModel:     getPaginationRowModel(),
-    getSortedRowModel:         getSortedRowModel(),
-    getFilteredRowModel:       getFilteredRowModel(),
-    getFacetedRowModel:        getFacetedRowModel(),
-    getFacetedUniqueValues:    getFacetedUniqueValues(),
+    onSortingChange:          setSorting,
+    onColumnFiltersChange:    setColumnFilters,
+    onColumnVisibilityChange: setColumnVisibility,
+    onRowSelectionChange:     setRowSelection,
+    getCoreRowModel:          getCoreRowModel(),
+    getPaginationRowModel:    getPaginationRowModel(),
+    getSortedRowModel:        getSortedRowModel(),
+    getFilteredRowModel:      getFilteredRowModel(),
+    getFacetedRowModel:       getFacetedRowModel(),
+    getFacetedUniqueValues:   getFacetedUniqueValues(),
     state: { sorting, columnFilters, columnVisibility, rowSelection },
   })
 
@@ -281,11 +313,12 @@ export function DocumentosTab({ deal }: Props) {
       <div className="flex flex-wrap items-center gap-2 pb-4">
         <Input
           className="h-8 max-w-45 text-sm"
-          placeholder="Filtrar por nombre..."
-          value={(table.getColumn("name")?.getFilterValue() as string) ?? ""}
-          onChange={(e) => table.getColumn("name")?.setFilterValue(e.target.value)}
+          placeholder="Filtrar por N° factura..."
+          value={(table.getColumn("invoice_number")?.getFilterValue() as string) ?? ""}
+          onChange={(e) => table.getColumn("invoice_number")?.setFilterValue(e.target.value)}
         />
-        <DataTableFacetedFilter column={table.getColumn("category")!} title="Categoría" options={CATEGORY_OPTIONS} />
+        <DataTableFacetedFilter column={table.getColumn("status")!}          title="Estado"  options={STATUS_OPTIONS} />
+        <DataTableFacetedFilter column={table.getColumn("unit_of_measure")!} title="Unidad"  options={UM_OPTIONS}     />
         {table.getState().columnFilters.length > 0 && (
           <Button variant="ghost" size="sm" className="h-8" onClick={() => table.resetColumnFilters()}>
             Reset <XIcon className="ml-1 size-4" />
@@ -293,7 +326,7 @@ export function DocumentosTab({ deal }: Props) {
         )}
         <div className="ml-auto flex items-center gap-2">
           <span className="text-sm text-muted-foreground">
-            {table.getFilteredRowModel().rows.length} documento(s)
+            {table.getFilteredRowModel().rows.length} factura(s)
           </span>
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8 text-xs" />}>
@@ -312,7 +345,7 @@ export function DocumentosTab({ deal }: Props) {
             </DropdownMenuContent>
           </DropdownMenu>
           <Button size="sm" className="h-8 gap-1.5 text-xs">
-            <PlusIcon className="size-3.5" /> Documento
+            <PlusIcon className="size-3.5" /> Factura
           </Button>
         </div>
       </div>

@@ -8,6 +8,7 @@ import { ActividadesTab } from "./tabs/ActividadesTab"
 import { CorreoTab } from "./tabs/CorreoTab"
 import { CotizacionesTab } from "./tabs/CotizacionesTab"
 import { DocumentosTab } from "./tabs/DocumentosTab"
+import { FacturasTab } from "./tabs/FacturasTab"
 import { HistorialTab } from "./tabs/HistorialTab"
 import { NotasTab } from "./tabs/NotasTab"
 
@@ -17,6 +18,7 @@ const TABS = [
   { value: "actividades",  label: "Actividades"  },
   { value: "documentos",   label: "Documentos"   },
   { value: "cotizaciones", label: "Cotizaciones" },
+  { value: "facturas",     label: "Facturas"     },
   { value: "correo",       label: "Correo"       },
 ]
 
@@ -63,6 +65,7 @@ export function Col2Tabs({ deal }: Props) {
           <TabsPrimitive.Panel value="actividades"  className="outline-none"><ActividadesTab  deal={deal} /></TabsPrimitive.Panel>
           <TabsPrimitive.Panel value="documentos"   className="outline-none"><DocumentosTab   deal={deal} /></TabsPrimitive.Panel>
           <TabsPrimitive.Panel value="cotizaciones" className="outline-none"><CotizacionesTab deal={deal} /></TabsPrimitive.Panel>
+          <TabsPrimitive.Panel value="facturas"     className="outline-none"><FacturasTab     deal={deal} /></TabsPrimitive.Panel>
           <TabsPrimitive.Panel value="correo"       className="outline-none"><CorreoTab       deal={deal} /></TabsPrimitive.Panel>
         </div>
       </TabsPrimitive.Root>

@@ -21,7 +21,7 @@ import {
   ArrowUpIcon,
   ArrowUpRightIcon,
   ChevronDown,
-  EyeIcon,
+  ExternalLinkIcon,
   MinusIcon,
   MoreHorizontal,
   PencilIcon,
@@ -29,8 +29,9 @@ import {
   UserIcon,
   XIcon,
 } from "lucide-react"
-import * as React from "react";
+import * as React from "react"
 
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -56,6 +57,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { ActivityPreviewSheet } from "./ActivityPreviewSheet"
+import { useRouter } from "next/navigation";
 import { STAGES, ACTIVITY_TYPES, type Activity, type ActivityPriority } from "./data"
 
 // ─── Configs ────────────────────────────────────────────────────────────────
@@ -76,12 +78,13 @@ const STAGE_CONFIG: Record<string, { dot: string; badge: string }> = {
 }
 
 const columnLabels: Record<string, string> = {
-  id:        "ID",
-  title:     "Título",
-  type:      "Tipo",
-  startDate: "Período",
-  stageId:   "Estado / Prioridad",
-  createdAt: "Creada",
+  id:          "ID",
+  title:       "Título",
+  type:        "Tipo",
+  startDate:   "Período",
+  stageId:     "Estado / Prioridad",
+  responsible: "Responsable",
+  createdAt:   "Creada",
 }
 
 const getSortIcon = (sorted: false | "asc" | "desc") => {
@@ -92,7 +95,7 @@ const getSortIcon = (sorted: false | "asc" | "desc") => {
 
 // ─── Columns ─────────────────────────────────────────────────────────────────
 
-function getColumns(onPreview: (activity: Activity) => void): ColumnDef<Activity>[] {
+function getColumns(onPreview: (activity: Activity) => void, onDetail: (activity: Activity) => void): ColumnDef<Activity>[] {
   return [
   {
     id: "select",
@@ -215,10 +218,31 @@ function getColumns(onPreview: (activity: Activity) => void): ColumnDef<Activity
     filterFn: (row, id, value: string[]) => value.includes(row.getValue(id)),
   },
   {
+    id: "responsible",
+    accessorFn: (row) => row.responsible.name,
+    header: ({ column }) => (
+      <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
+        Responsable {getSortIcon(column.getIsSorted())}
+      </Button>
+    ),
+    cell: ({ row }) => {
+      const r = row.original.responsible
+      return (
+        <div className="flex items-center gap-2">
+          <Avatar className="size-6 shrink-0">
+            <AvatarImage src={r.avatar} alt={r.name} />
+            <AvatarFallback className="text-[9px] font-semibold">{r.initials}</AvatarFallback>
+          </Avatar>
+          <span className="text-sm">{r.name}</span>
+        </div>
+      )
+    },
+  },
+  {
     accessorKey: "createdAt",
     header: ({ column }) => (
       <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
-        Creado {getSortIcon(column.getIsSorted())}
+        Creada {getSortIcon(column.getIsSorted())}
       </Button>
     ),
     cell: ({ row }) => (
@@ -239,13 +263,13 @@ function getColumns(onPreview: (activity: Activity) => void): ColumnDef<Activity
           <DropdownMenuContent align="end" className="min-w-48">
             <DropdownMenuGroup>
               <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => onDetail(activity)}>
+                <ExternalLinkIcon />
+                Ver Detalles
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onPreview(activity)}>
                 <UserIcon />
                 Vista Previa
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <EyeIcon />
-                Ver detalle
               </DropdownMenuItem>
               <DropdownMenuItem>
                 <PencilIcon />
@@ -278,10 +302,14 @@ export function ActivitiesTable({ activities }: ActivitiesTableProps) {
   const [rowSelection, setRowSelection]     = React.useState({})
   const [selectedActivity, setSelectedActivity] = React.useState<Activity | null>(null);
   const [sheetOpen, setSheetOpen] = React.useState(false);
+  const router = useRouter();
 
   const columns = React.useMemo(
-    () => getColumns((activity) => { setSelectedActivity(activity); setSheetOpen(true); }),
-    []
+    () => getColumns(
+      (activity) => { setSelectedActivity(activity); setSheetOpen(true); },
+      (activity) => router.push(`/crm/activities/${activity.id}`)
+    ),
+    [router]
   );
 
   const table = useReactTable({

@@ -1,4 +1,5 @@
 import { AppSidebar } from "@/components/dashboard/AppSidebar";
+import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 
 export default function DashboardLayout({
@@ -9,7 +10,9 @@ export default function DashboardLayout({
   return (
     <SidebarProvider className="h-svh overflow-hidden">
       <AppSidebar />
-      <SidebarInset className="overflow-hidden">{children}</SidebarInset>
+      <SidebarInset className="overflow-hidden">
+        <DashboardShell>{children}</DashboardShell>
+      </SidebarInset>
     </SidebarProvider>
   );
 }

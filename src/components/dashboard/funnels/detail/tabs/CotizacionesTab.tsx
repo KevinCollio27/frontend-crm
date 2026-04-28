@@ -55,6 +55,7 @@ import {
 } from "@/components/ui/table"
 import { cn } from "@/lib/utils"
 import type { DealDetail, DealQuotation, QuotationStatus } from "../../data"
+import { id } from "date-fns/locale"
 
 // ─── Configs ──────────────────────────────────────────────────────────────────
 
@@ -79,6 +80,7 @@ const TYPE_CONFIG: Record<"sale" | "purchase", { label: string; className: strin
 }
 
 const columnLabels: Record<string, string> = {
+  id:           "ID",
   name:         "Nombre",
   type:         "Tipo",
   status:       "Estado",
@@ -118,6 +120,13 @@ function getColumns(): ColumnDef<DealQuotation>[] {
       ),
       enableSorting: false,
       enableHiding: false,
+    },
+    {
+      accessorKey: "id",
+      header: "ID",
+      cell: ({ row }) => (
+        <span className="font-mono text-xs text-muted-foreground">{row.getValue("id")}</span>
+      ),
     },
     {
       accessorKey: "name",
@@ -274,7 +283,11 @@ export function CotizacionesTab({ deal }: Props) {
   const [sorting, setSorting]                   = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters]        = React.useState<ColumnFiltersState>([])
   const [columnVisibility, setColumnVisibility]  = React.useState<VisibilityState>({
-    type: false, created_by: false, created_at: false,
+    id: false,
+    type: false, 
+    created_by: false, 
+    created_at: false,
+    valid_until: false,
   })
   const [rowSelection, setRowSelection] = React.useState({})
 

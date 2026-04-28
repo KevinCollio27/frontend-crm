@@ -19,8 +19,6 @@ import {
   ArrowUpDown,
   ArrowUpIcon,
   ChevronDown,
-  DownloadIcon,
-  FileTextIcon,
   MoreHorizontal,
   PencilIcon,
   PlusIcon,
@@ -30,7 +28,6 @@ import {
 import * as React from "react"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { DataTableFacetedFilter } from "@/components/ui/data-table-faceted-filter"
@@ -54,38 +51,20 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { cn } from "@/lib/utils"
-import type { DealDetail, DealDocument } from "../../data"
+import type { OrgContact, OrganizationDetail } from "../../data"
 
-// ─── Configs ──────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function formatBytes(bytes: number): string {
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
-
-const FILE_TYPE_STYLE: Record<string, { bg: string; color: string }> = {
-  pdf:  { bg: "bg-red-100",    color: "text-red-600"    },
-  docx: { bg: "bg-blue-100",   color: "text-blue-600"   },
-  xlsx: { bg: "bg-emerald-100", color: "text-emerald-600" },
-  pptx: { bg: "bg-orange-100", color: "text-orange-600" },
-}
-
-const CATEGORY_CONFIG: Record<string, { label: string; className: string }> = {
-  contrato:     { label: "Contrato",     className: "bg-blue-50 text-blue-700 border-blue-200"           },
-  factura:      { label: "Factura",      className: "bg-amber-50 text-amber-700 border-amber-200"         },
-  presentacion: { label: "Presentación", className: "bg-violet-50 text-violet-700 border-violet-200"      },
-  manual:       { label: "Manual",       className: "bg-emerald-50 text-emerald-700 border-emerald-200"   },
-  otro:         { label: "Otro",         className: "bg-muted text-muted-foreground border-border"        },
-}
+const getFlag = (code: string) =>
+  code.toUpperCase().split("").map((c) => String.fromCodePoint(c.charCodeAt(0) + 127397)).join("")
 
 const columnLabels: Record<string, string> = {
-  id:          "ID",
-  name:        "Nombre",
-  category:    "Categoría",
-  file_size:   "Tamaño",
-  uploaded_by: "Subido por",
-  created_at:  "Creado",
+  id:                "ID",
+  name:              "Nombre",
+  phone:             "Teléfono",
+  country_code:      "País",
+  origin:            "Origen",
+  created_at:        "Creado",
 }
 
 const getSortIcon = (sorted: false | "asc" | "desc") => {
@@ -96,7 +75,7 @@ const getSortIcon = (sorted: false | "asc" | "desc") => {
 
 // ─── Columns ──────────────────────────────────────────────────────────────────
 
-function getColumns(): ColumnDef<DealDocument>[] {
+function getColumns(): ColumnDef<OrgContact>[] {
   return [
     {
       id: "select",
@@ -133,67 +112,51 @@ function getColumns(): ColumnDef<DealDocument>[] {
         </Button>
       ),
       cell: ({ row }) => {
-        const doc = row.original
-        const style = FILE_TYPE_STYLE[doc.file_type] ?? { bg: "bg-muted", color: "text-muted-foreground" }
+        const name: string = row.getValue("name")
+        const email        = row.original.email
+        const position     = row.original.internal_position
         return (
           <div className="flex items-center gap-2.5">
-            <div className={cn("flex size-7 shrink-0 items-center justify-center rounded-lg", style.bg)}>
-              <FileTextIcon className={cn("size-3.5", style.color)} />
-            </div>
+            <Avatar className="size-7 shrink-0">
+              <AvatarImage src="/images/avatar-contact.svg" alt={name} />
+              <AvatarFallback className="text-[10px] font-semibold">
+                {name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)}
+              </AvatarFallback>
+            </Avatar>
             <div className="leading-tight">
-              <div className="text-sm font-medium">{doc.name}</div>
-              <div className="text-xs text-muted-foreground uppercase">{doc.file_type}</div>
+              <div className="text-sm font-medium">{name}</div>
+              <div className="text-xs text-muted-foreground">{position ?? email}</div>
             </div>
           </div>
         )
       },
     },
     {
-      accessorKey: "category",
-      header: "Categoría",
+      accessorKey: "phone",
+      header: "Teléfono",
+      cell: ({ row }) => (
+        <div className="text-sm text-muted-foreground">{(row.getValue("phone") as string) ?? "—"}</div>
+      ),
+    },
+    {
+      accessorKey: "country_code",
+      header: "País",
       cell: ({ row }) => {
-        const conf = CATEGORY_CONFIG[row.getValue("category") as string] ?? CATEGORY_CONFIG.otro
+        const code: string = row.getValue("country_code")
         return (
-          <Badge className={cn("rounded-full border px-2.5 py-0.5 text-xs", conf.className)}>
-            {conf.label}
-          </Badge>
+          <div className="flex items-center gap-1.5 text-sm">
+            <span>{getFlag(code)}</span>
+            <span>{code}</span>
+          </div>
         )
       },
       filterFn: (row, id, value: string[]) => value.includes(row.getValue(id)),
     },
     {
-      accessorKey: "file_size",
-      header: ({ column }) => (
-        <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
-          Tamaño {getSortIcon(column.getIsSorted())}
-        </Button>
-      ),
-      cell: ({ row }) => (
-        <div className="text-sm text-muted-foreground tabular-nums">
-          {formatBytes(row.getValue("file_size"))}
-        </div>
-      ),
-    },
-    {
-      id: "uploaded_by",
-      accessorFn: (row) => row.uploaded_by.name,
-      header: ({ column }) => (
-        <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
-          Subido por {getSortIcon(column.getIsSorted())}
-        </Button>
-      ),
-      cell: ({ row }) => {
-        const u = row.original.uploaded_by
-        return (
-          <div className="flex items-center gap-2">
-            <Avatar className="size-6 shrink-0">
-              <AvatarImage src={u.avatar} alt={u.name} />
-              <AvatarFallback className="text-[9px] font-semibold">{u.initials}</AvatarFallback>
-            </Avatar>
-            <span className="text-sm">{u.name}</span>
-          </div>
-        )
-      },
+      accessorKey: "origin",
+      header: "Origen",
+      cell: ({ row }) => <div className="text-sm">{row.getValue("origin")}</div>,
+      filterFn: (row, id, value: string[]) => value.includes(row.getValue(id)),
     },
     {
       accessorKey: "created_at",
@@ -209,7 +172,7 @@ function getColumns(): ColumnDef<DealDocument>[] {
     {
       id: "actions",
       enableHiding: false,
-      cell: () => (
+      cell: ({ row: _row }) => (
         <DropdownMenu>
           <DropdownMenuTrigger render={<Button variant="ghost" className="h-8 w-8 p-0" />}>
             <span className="sr-only">Abrir menú</span>
@@ -218,8 +181,7 @@ function getColumns(): ColumnDef<DealDocument>[] {
           <DropdownMenuContent align="end" className="min-w-44">
             <DropdownMenuGroup>
               <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-              <DropdownMenuItem><DownloadIcon /> Descargar</DropdownMenuItem>
-              <DropdownMenuItem><PencilIcon />   Editar</DropdownMenuItem>
+              <DropdownMenuItem><PencilIcon /> Editar</DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="text-destructive focus:text-destructive">
@@ -232,45 +194,43 @@ function getColumns(): ColumnDef<DealDocument>[] {
   ]
 }
 
-// ─── Filter options ────────────────────────────────────────────────────────────
+// ─── Options ──────────────────────────────────────────────────────────────────
 
-const CATEGORY_OPTIONS = [
-  { label: "Contrato",     value: "contrato"     },
-  { label: "Factura",      value: "factura"      },
-  { label: "Presentación", value: "presentacion" },
-  { label: "Manual",       value: "manual"       },
-  { label: "Otro",         value: "otro"         },
+const ORIGIN_OPTIONS = [
+  { label: "CRM", value: "CRM" },
+  { label: "Web", value: "Web" },
 ]
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 interface Props {
-  deal: DealDetail
+  organization: OrganizationDetail
 }
 
-export function DocumentosTab({ deal }: Props) {
-  const [sorting, setSorting]                   = React.useState<SortingState>([])
-  const [columnFilters, setColumnFilters]        = React.useState<ColumnFiltersState>([])
-  const [columnVisibility, setColumnVisibility]  = React.useState<VisibilityState>({
-    uploaded_by: false, created_at: false,
+export function ContactosTab({ organization }: Props) {
+  const [sorting, setSorting]             = React.useState<SortingState>([])
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
+  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({
+    phone:      false,
+    created_at: false,
   })
   const [rowSelection, setRowSelection] = React.useState({})
 
   const columns = React.useMemo(() => getColumns(), [])
 
   const table = useReactTable({
-    data: deal.documents,
+    data: organization.contacts,
     columns,
-    onSortingChange:           setSorting,
-    onColumnFiltersChange:     setColumnFilters,
-    onColumnVisibilityChange:  setColumnVisibility,
-    onRowSelectionChange:      setRowSelection,
-    getCoreRowModel:           getCoreRowModel(),
-    getPaginationRowModel:     getPaginationRowModel(),
-    getSortedRowModel:         getSortedRowModel(),
-    getFilteredRowModel:       getFilteredRowModel(),
-    getFacetedRowModel:        getFacetedRowModel(),
-    getFacetedUniqueValues:    getFacetedUniqueValues(),
+    onSortingChange:          setSorting,
+    onColumnFiltersChange:    setColumnFilters,
+    onColumnVisibilityChange: setColumnVisibility,
+    onRowSelectionChange:     setRowSelection,
+    getCoreRowModel:          getCoreRowModel(),
+    getPaginationRowModel:    getPaginationRowModel(),
+    getSortedRowModel:        getSortedRowModel(),
+    getFilteredRowModel:      getFilteredRowModel(),
+    getFacetedRowModel:       getFacetedRowModel(),
+    getFacetedUniqueValues:   getFacetedUniqueValues(),
     state: { sorting, columnFilters, columnVisibility, rowSelection },
   })
 
@@ -285,7 +245,7 @@ export function DocumentosTab({ deal }: Props) {
           value={(table.getColumn("name")?.getFilterValue() as string) ?? ""}
           onChange={(e) => table.getColumn("name")?.setFilterValue(e.target.value)}
         />
-        <DataTableFacetedFilter column={table.getColumn("category")!} title="Categoría" options={CATEGORY_OPTIONS} />
+        <DataTableFacetedFilter column={table.getColumn("origin")!} title="Origen" options={ORIGIN_OPTIONS} />
         {table.getState().columnFilters.length > 0 && (
           <Button variant="ghost" size="sm" className="h-8" onClick={() => table.resetColumnFilters()}>
             Reset <XIcon className="ml-1 size-4" />
@@ -293,7 +253,7 @@ export function DocumentosTab({ deal }: Props) {
         )}
         <div className="ml-auto flex items-center gap-2">
           <span className="text-sm text-muted-foreground">
-            {table.getFilteredRowModel().rows.length} documento(s)
+            {table.getFilteredRowModel().rows.length} contacto(s)
           </span>
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8 text-xs" />}>
@@ -312,7 +272,7 @@ export function DocumentosTab({ deal }: Props) {
             </DropdownMenuContent>
           </DropdownMenu>
           <Button size="sm" className="h-8 gap-1.5 text-xs">
-            <PlusIcon className="size-3.5" /> Documento
+            <PlusIcon className="size-3.5" /> Vincular contacto
           </Button>
         </div>
       </div>
@@ -345,7 +305,7 @@ export function DocumentosTab({ deal }: Props) {
             ) : (
               <TableRow>
                 <TableCell className="h-24 text-center" colSpan={columns.length}>
-                  Sin resultados.
+                  Sin contactos vinculados.
                 </TableCell>
               </TableRow>
             )}
