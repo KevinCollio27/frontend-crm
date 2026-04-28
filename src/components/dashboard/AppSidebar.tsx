@@ -45,10 +45,11 @@ const data = {
       ],
     },
     {
-      title: "Integraciones",
+      title: "Comunicaciones",
       url: "#",
       icon: <Plug />,
       items: [
+        { title: "Mensajeria", url: "/crm/messaging" },
         { title: "Correo", url: "/crm/mail" },
         { title: "Calendario", url: "/crm/calendaries" },
       ],
@@ -60,6 +61,7 @@ const data = {
       items: [
         { title: "Campañas", url: "/marketing/campaigns" },
         { title: "Formularios", url: "/marketing/forms" },
+        { title: "Widgets AI", url: "/marketing/widget-ai" },
         { title: "Blog", url: "/marketing/blogs" },
       ],
     },
