@@ -5,8 +5,10 @@ import { usePathname } from "next/navigation"
 import {
   Building2Icon,
   CreditCardIcon,
+  DatabaseIcon,
   FilterIcon,
   KeyIcon,
+  LineChartIcon,
   PackageIcon,
   PlugIcon,
   ScrollTextIcon,
@@ -56,6 +58,8 @@ const navGroups: NavGroup[] = [
     items: [
       { label: "Integraciones", href: "/settings/integrations", icon: PlugIcon },
       { label: "API", href: "/settings/api", icon: KeyIcon },
+      { label: "Observabilidad", href: "/settings/observability", icon: LineChartIcon },
+      { label: "Datasources", href: "/settings/datasources", icon: DatabaseIcon },
     ],
   },
 ]

@@ -262,36 +262,30 @@ export const columns: ColumnDef<Widget>[] = [
     id: "actions",
     enableHiding: false,
     cell: () => (
-      <div className="flex items-center gap-1">
-        <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
-          <EyeIcon className="size-3.5" />
-          Ver
-        </Button>
-        <DropdownMenu>
-          <DropdownMenuTrigger render={<Button className="h-8 w-8 p-0" variant="ghost" />}>
-            <span className="sr-only">Abrir menú</span>
-            <MoreHorizontal className="size-4" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="min-w-48">
-            <DropdownMenuGroup>
-              <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-              <DropdownMenuItem>
-                <PencilIcon />
-                Editar
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <CopyIcon />
-                Copiar API Key
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive focus:text-destructive">
-              <Trash2Icon />
-              Eliminar
+      <DropdownMenu>
+        <DropdownMenuTrigger render={<Button className="h-8 w-8 p-0" variant="ghost" />}>
+          <span className="sr-only">Abrir menú</span>
+          <MoreHorizontal className="size-4" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="min-w-48">
+          <DropdownMenuGroup>
+            <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+            <DropdownMenuItem>
+              <PencilIcon />
+              Editar
             </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+            <DropdownMenuItem>
+              <CopyIcon />
+              Copiar API Key
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem className="text-destructive focus:text-destructive">
+            <Trash2Icon />
+            Eliminar
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     ),
   },
 ];
