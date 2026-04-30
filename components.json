@@ -22,6 +22,7 @@
     "hooks": "@/hooks"
   },
   "registries": {
-    "@commercn": "https://commercn.com/r/{name}.json"
+    "@commercn": "https://commercn.com/r/{name}.json",
+    "@blocks-so": "https://blocks.so/r/{name}.json"
   }
 }

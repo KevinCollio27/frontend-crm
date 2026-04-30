@@ -78,7 +78,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <SidebarGroup>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton render={<Link href="/home" />} tooltip="Home">
+              <SidebarMenuButton render={<Link href="/chat" />} tooltip="Chat IA">
                 <Sparkle />
                 <span>Chat</span>
               </SidebarMenuButton>

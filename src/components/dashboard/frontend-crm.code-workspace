@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"path": "../../.."
+		},
+		{
+			"path": "../../../../goxt-backend-crm"
+		},
+		{
+			"path": "../../../../goxt-frontend-crm"
+		}
+	]
+}
