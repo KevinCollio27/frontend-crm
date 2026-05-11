@@ -11,6 +11,7 @@ import { DocumentosTab } from "./tabs/DocumentosTab"
 import { FacturasTab } from "./tabs/FacturasTab"
 import { HistorialTab } from "./tabs/HistorialTab"
 import { NotasTab } from "./tabs/NotasTab"
+import { WhatsAppTab } from "./tabs/WhatsAppTab"
 
 const TABS = [
   { value: "historial",    label: "Historial"    },
@@ -20,6 +21,7 @@ const TABS = [
   { value: "cotizaciones", label: "Cotizaciones" },
   { value: "facturas",     label: "Facturas"     },
   { value: "correo",       label: "Correo"       },
+  { value: "whatsapp",     label: "WhatsApp"     },
 ]
 
 interface Props {
@@ -67,6 +69,7 @@ export function Col2Tabs({ deal }: Props) {
           <TabsPrimitive.Panel value="cotizaciones" className="outline-none"><CotizacionesTab deal={deal} /></TabsPrimitive.Panel>
           <TabsPrimitive.Panel value="facturas"     className="outline-none"><FacturasTab     deal={deal} /></TabsPrimitive.Panel>
           <TabsPrimitive.Panel value="correo"       className="outline-none"><CorreoTab       deal={deal} /></TabsPrimitive.Panel>
+          <TabsPrimitive.Panel value="whatsapp"    className="outline-none"><WhatsAppTab    deal={deal} /></TabsPrimitive.Panel>
         </div>
       </TabsPrimitive.Root>
 

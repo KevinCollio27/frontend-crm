@@ -46,6 +46,7 @@ export type HistorialType = "note" | "activity" | "stage_change" | "created" | "
 export type ActivityDetailStatus = "pendiente" | "en_progreso" | "completada" | "cancelada"
 export type QuotationStatus = "borrador" | "enviada" | "aceptada" | "rechazada"
 export type EmailStatus = "enviado" | "recibido"
+export type WspMessageStatus = "enviado" | "recibido" | "plantilla"
 export type InvoiceStatus = "borrador" | "emitida" | "pagada" | "vencida" | "anulada"
 export type InvoiceUnitOfMeasure = "dias" | "semanas" | "meses" | "años"
 
@@ -136,6 +137,16 @@ export interface DealEmail {
   status: EmailStatus
 }
 
+export interface DealWspMessage {
+  id: string
+  subject: string
+  to?: string
+  from?: string
+  preview: string
+  sentAt: string
+  status: WspMessageStatus
+}
+
 export interface DealResponsible {
   name: string
   initials: string
@@ -159,6 +170,7 @@ export interface DealDetail extends Deal {
   quotations: DealQuotation[]
   invoices: DealInvoice[]
   emails: DealEmail[]
+  whatsappMessages: DealWspMessage[]
 }
 
 export const DEAL_DETAILS: Record<string, DealDetail> = {
@@ -254,6 +266,11 @@ export const DEAL_DETAILS: Record<string, DealDetail> = {
     emails: [
       { id: "e1", subject: "Propuesta inicial CamionGO Pro", to: "juan.perez@transportesnorte.cl", from: "kevin.collio@goxt.io",         preview: "Estimado Juan, adjunto encontrará nuestra propuesta detallada para la implementación de CamionGO Pro...", sentAt: "23 abr 2026 · 09:45", status: "enviado"   },
       { id: "e2", subject: "Re: Seguimiento reunión",        to: "kevin.collio@goxt.io",           from: "juan.perez@transportesnorte.cl", preview: "Kevin, muchas gracias por la información. Estamos revisando la propuesta con nuestro equipo técnico...",    sentAt: "24 abr 2026 · 14:20", status: "recibido"  },
+    ],
+    whatsappMessages: [
+      { id: "w1", subject: "Propuesta CamionGO Pro",  to: "+56 9 1234 5678 (Juan Pérez)",   preview: "Hola Juan, te compartimos el detalle de nuestra propuesta para CamionGO Pro. Puedes...", sentAt: "23 abr 2026 · 09:52", status: "plantilla" },
+      { id: "w2", subject: "Re: Revisión propuesta",  from: "+56 9 1234 5678 (Juan Pérez)", preview: "Kevin, muchas gracias! Lo revisamos con el equipo y te escribimos esta semana con las...",    sentAt: "24 abr 2026 · 15:07", status: "recibido"  },
+      { id: "w3", subject: "Cotización adjunta",      to: "+56 9 1234 5678 (Juan Pérez)",   preview: "📄 Cotizacion_CamionGO_Pro_v2.pdf",                                                           sentAt: "25 abr 2026 · 11:30", status: "enviado"   },
     ],
   },
 }

@@ -8,6 +8,7 @@ import { HistorialTab } from "./tabs/HistorialTab"
 import { InteresesTab } from "./tabs/InteresesTab"
 import { NotasTab } from "./tabs/NotasTab"
 import { OportunidadesTab } from "./tabs/OportunidadesTab"
+import { WhatsAppTab } from "./tabs/WhatsAppTab"
 
 const TABS = [
   { value: "historial",     label: "Historial"     },
@@ -16,6 +17,7 @@ const TABS = [
   { value: "intereses",     label: "Intereses"     },
   { value: "notas",         label: "Notas"         },
   { value: "correo",        label: "Correo"        },
+  { value: "whatsapp",      label: "WhatsApp"      },
 ]
 
 interface Props {
@@ -46,6 +48,7 @@ export function Col2Tabs({ contact }: Props) {
           <TabsPrimitive.Panel value="intereses"     className="outline-none"><InteresesTab     contact={contact} /></TabsPrimitive.Panel>
           <TabsPrimitive.Panel value="notas"         className="outline-none"><NotasTab         contact={contact} /></TabsPrimitive.Panel>
           <TabsPrimitive.Panel value="correo"        className="outline-none"><CorreoTab        contact={contact} /></TabsPrimitive.Panel>
+          <TabsPrimitive.Panel value="whatsapp"      className="outline-none"><WhatsAppTab      contact={contact} /></TabsPrimitive.Panel>
         </div>
       </TabsPrimitive.Root>
 

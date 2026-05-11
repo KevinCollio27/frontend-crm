@@ -76,6 +76,7 @@ export interface ContactInterest {
 // ─── Correo ───────────────────────────────────────────────────────────────────
 
 export type ContactEmailStatus = "enviado" | "recibido"
+export type ContactWspMessageStatus = "enviado" | "recibido" | "plantilla"
 
 export interface ContactEmail {
   id: string
@@ -85,6 +86,16 @@ export interface ContactEmail {
   preview: string
   sentAt: string
   status: ContactEmailStatus
+}
+
+export interface ContactWspMessage {
+  id: string
+  subject: string
+  to?: string
+  from?: string
+  preview: string
+  sentAt: string
+  status: ContactWspMessageStatus
 }
 
 // ─── Detail ───────────────────────────────────────────────────────────────────
@@ -120,6 +131,7 @@ export interface ContactDetail {
   activities: ContactActivity[]
   interests: ContactInterest[]
   emails: ContactEmail[]
+  whatsappMessages: ContactWspMessage[]
 }
 
 // ─── Static data ──────────────────────────────────────────────────────────────
@@ -185,6 +197,11 @@ export const CONTACT_DETAILS: Record<string, ContactDetail> = {
     emails: [
       { id: "ce1", subject: "Propuesta inicial CamionGO Pro", to: "juan.perez@transportesnorte.cl", from: "kevin.collio@goxt.io",         preview: "Estimado Juan, adjunto encontrará nuestra propuesta detallada para la implementación de CamionGO Pro...", sentAt: "23 abr 2026 · 09:45", status: "enviado"  },
       { id: "ce2", subject: "Re: Seguimiento reunión",        to: "kevin.collio@goxt.io",           from: "juan.perez@transportesnorte.cl", preview: "Kevin, muchas gracias por la información. Estamos revisando la propuesta con nuestro equipo técnico...",    sentAt: "24 abr 2026 · 14:20", status: "recibido" },
+    ],
+    whatsappMessages: [
+      { id: "cw1", subject: "Propuesta CamionGO Pro",  to: "+56 9 8765 4321 (Juan Pérez)",   preview: "Hola Juan, te compartimos el detalle de nuestra propuesta para CamionGO Pro. Puedes...", sentAt: "23 abr 2026 · 09:52", status: "plantilla" },
+      { id: "cw2", subject: "Re: Revisión propuesta",  from: "+56 9 8765 4321 (Juan Pérez)", preview: "Kevin, muchas gracias! Lo revisamos con el equipo y te escribimos esta semana con las...",    sentAt: "24 abr 2026 · 15:07", status: "recibido"  },
+      { id: "cw3", subject: "Cotización adjunta",      to: "+56 9 8765 4321 (Juan Pérez)",   preview: "📄 Cotizacion_CamionGO_Pro_v2.pdf",                                                           sentAt: "25 abr 2026 · 11:30", status: "enviado"   },
     ],
   },
 }
