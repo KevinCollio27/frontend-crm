@@ -14,17 +14,17 @@ const Login = () => (
         <h1 className="mt-3 text-center font-medium text-2xl">
           ¡Bienvenido de nuevo!
         </h1>
-        <p className="text-center text-muted-foreground">
+        <p className="mt-1 text-center text-sm text-muted-foreground">
           Gestiona tu pipeline de ventas en un solo lugar.
         </p>
 
-        <div className="mt-10">
+        <div className="mt-2">
           <Button className="w-full" size="lg" type="button">
             <GoogleLogo className="mr-2 size-4" />
             Continuar con Google
           </Button>
 
-          <div className="my-6 flex items-center justify-center gap-2 overflow-hidden">
+          <div className="my-4 flex items-center justify-center gap-2 overflow-hidden">
             <Separator />
             <span className="text-muted-foreground text-sm">O</span>
             <Separator />

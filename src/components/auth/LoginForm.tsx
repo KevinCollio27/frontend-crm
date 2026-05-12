@@ -41,7 +41,7 @@ export const LoginForm = () => {
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
       <div className="space-y-1.5">
         <Label htmlFor="email" className={errors.email ? "text-destructive" : ""}>Email</Label>
         <div className="relative">

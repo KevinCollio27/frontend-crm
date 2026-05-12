@@ -15,7 +15,7 @@ const RecoveryPassword = () => (
           Te enviaremos un enlace seguro a tu correo.
         </p>
 
-        <div className="mt-10">
+        <div className="mt-2">
           <RecoveryPasswordForm />
         </div>
 

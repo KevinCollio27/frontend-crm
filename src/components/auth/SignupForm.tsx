@@ -3,8 +3,10 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowRight, Eye, EyeOff, Lock, Mail, User } from "lucide-react";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
+import { isValidPhoneNumber } from "react-phone-number-input";
 import { z } from "zod";
+import { PhoneInput } from "@/components/phone-input";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,6 +14,10 @@ import { Label } from "@/components/ui/label";
 const formSchema = z.object({
   name: z.string().min(2, { message: "Mínimo 2 caracteres" }),
   email: z.string().email({ message: "Email inválido" }),
+  phone: z
+    .string()
+    .min(1, { message: "El teléfono es requerido" })
+    .refine(isValidPhoneNumber, { message: "Número de teléfono inválido" }),
   password: z.string().min(8, { message: "Mínimo 8 caracteres" }),
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
@@ -29,7 +35,7 @@ export const SignUpForm = ({ onSuccess }: SignUpFormProps) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
-  const { register, handleSubmit, formState: { errors } } = useForm<FormValues>({
+  const { register, handleSubmit, control, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
   });
 
@@ -39,7 +45,7 @@ export const SignUpForm = ({ onSuccess }: SignUpFormProps) => {
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
       <div className="space-y-1.5">
         <Label htmlFor="name" className={errors.name ? "text-destructive" : ""}>Nombre</Label>
         <div className="relative">
@@ -68,6 +74,25 @@ export const SignUpForm = ({ onSuccess }: SignUpFormProps) => {
           />
         </div>
         {errors.email && <p className="text-[0.8rem] text-destructive">{errors.email.message}</p>}
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="phone" className={errors.phone ? "text-destructive" : ""}>Teléfono</Label>
+        <Controller
+          name="phone"
+          control={control}
+          render={({ field }) => (
+            <PhoneInput
+              id="phone"
+              defaultCountry="CL"
+              international
+              withCountryCallingCode
+              value={field.value}
+              onChange={field.onChange}
+            />
+          )}
+        />
+        {errors.phone && <p className="text-[0.8rem] text-destructive">{errors.phone.message}</p>}
       </div>
 
       <div className="space-y-1.5">

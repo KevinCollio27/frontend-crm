@@ -43,12 +43,12 @@ const SignUp = () => {
               <p className="text-center text-muted-foreground text-sm mt-1">
                 Impulsa tus ventas con la plataforma
               </p>
-              <div className="mt-10">
+              <div className="mt-2">
                 <Button className="w-full" size="lg" type="button">
                   <GoogleLogo className="mr-2 size-4" />
                   Continuar con Google
                 </Button>
-                <div className="my-6 flex items-center justify-center gap-2 overflow-hidden">
+                <div className="my-4 flex items-center justify-center gap-2 overflow-hidden">
                   <Separator />
                   <span className="text-muted-foreground text-sm">O</span>
                   <Separator />
