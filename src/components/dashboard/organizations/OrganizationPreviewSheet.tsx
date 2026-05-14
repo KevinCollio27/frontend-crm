@@ -4,6 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetFooter } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
+import { getFlag } from "@/lib/table-utils"
 import {
   BriefcaseIcon,
   ChevronsUpIcon,
@@ -16,11 +17,6 @@ import {
   UserPlusIcon,
 } from "lucide-react"
 import type { Organization } from "./OrganizationsTable"
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-const getFlag = (code: string) =>
-  code.toUpperCase().split("").map((c) => String.fromCodePoint(c.charCodeAt(0) + 127397)).join("")
 
 const countryNames: Record<string, string> = {
   CL: "Chile",
@@ -129,15 +125,15 @@ export function OrganizationPreviewSheet({ organization, open, onOpenChange }: P
           {/* Información */}
           <SectionHeader icon={InfoIcon} label="Información General" />
           <div className="flex flex-col gap-1.5 px-4 py-3">
-            {organization.website && (
+            {organization.webPage && (
               <InfoRow label="Sitio web">
                 <a
-                  href={organization.website}
+                  href={organization.webPage}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-blue-600 hover:underline"
                 >
-                  {organization.website.replace(/^https?:\/\//, "")}
+                  {organization.webPage.replace(/^https?:\/\//, "")}
                 </a>
               </InfoRow>
             )}

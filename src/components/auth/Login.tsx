@@ -1,8 +1,7 @@
 import { Aperture, KeySquare } from "lucide-react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { GoogleLogo } from "@/components/auth/Icons";
+import { GoogleButton } from "@/components/auth/GoogleButton";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { Testimonials } from "./Testimonials";
 
@@ -19,10 +18,7 @@ const Login = () => (
         </p>
 
         <div className="mt-2">
-          <Button className="w-full" size="lg" type="button">
-            <GoogleLogo className="mr-2 size-4" />
-            Continuar con Google
-          </Button>
+          <GoogleButton />
 
           <div className="my-4 flex items-center justify-center gap-2 overflow-hidden">
             <Separator />

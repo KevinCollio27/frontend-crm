@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { authService } from "@/services/auth.service";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -22,21 +23,27 @@ type FormValues = z.infer<typeof formSchema>;
 export const LoginForm = () => {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
 
   const { register, handleSubmit, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
   });
 
-  function onSubmit(values: FormValues) {
-    if (values.email === "error@test.com") {
-      toast.error("Credenciales incorrectas", {
-        description: "Verificá tu email y contraseña.",
-      });
-    } else {
-      toast.success("Sesión iniciada", {
-        description: `Bienvenido, ${values.email}`,
-      });
-      router.replace("/home");
+  async function onSubmit(values: FormValues) {
+    setIsLoading(true);
+    try {
+      const data = await authService.login(values.email, values.password, rememberMe);
+      const firstName = data.user?.name?.split(" ")[0] ?? "";
+      toast.success(`¡Bienvenido, ${firstName}!`, { description: "Comienza a gestionar tus ventas." });
+      const hasWorkspace = !!data.user?.user_workspace?.[0]?.workspace_id;
+      router.replace(hasWorkspace ? "/chat" : "/create-workspace");
+    } catch (err: unknown) {
+      const e = err as { extraMessage?: string; message?: string };
+      const msg = e.extraMessage || e.message || "Verifica tu email y contraseña.";
+      toast.error("Credenciales incorrectas", { description: msg });
+    } finally {
+      setIsLoading(false);
     }
   }
 
@@ -80,13 +87,17 @@ export const LoginForm = () => {
       </div>
 
       <div className="flex items-center gap-2">
-        <Checkbox id="remember" />
+        <Checkbox
+          id="remember"
+          checked={rememberMe}
+          onCheckedChange={(v) => setRememberMe(!!v)}
+        />
         <Label htmlFor="remember" className="text-sm font-normal cursor-pointer">Recuérdame</Label>
       </div>
 
-      <Button className="mt-2 w-full" size="lg" type="submit">
+      <Button className="mt-2 w-full" size="lg" type="submit" disabled={isLoading}>
         <ArrowRight />
-        Continuar con Email
+        {isLoading ? "Iniciando sesión..." : "Continuar con Email"}
       </Button>
     </form>
   );

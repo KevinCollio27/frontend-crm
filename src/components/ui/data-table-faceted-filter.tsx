@@ -24,15 +24,17 @@ interface DataTableFacetedFilterProps<TData, TValue> {
   column: Column<TData, TValue>
   title: string
   options: Option[]
+  counts?: Map<string, number>
 }
 
 export function DataTableFacetedFilter<TData, TValue>({
   column,
   title,
   options,
+  counts,
 }: DataTableFacetedFilterProps<TData, TValue>) {
   const selectedValues = new Set((column.getFilterValue() as string[]) ?? [])
-  const facetedValues = column.getFacetedUniqueValues?.()
+  const facetedValues = counts ?? column.getFacetedUniqueValues?.()
   const selectedArray = Array.from(selectedValues)
 
   const toggle = (value: string) => {

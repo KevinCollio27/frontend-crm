@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ArrowRight, Link } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   InputOTP,
@@ -11,11 +11,25 @@ import {
 
 interface VerifyOTPProps {
   email: string;
+  title?: string;
+  description?: string;
   onVerify: (code: string) => void;
   onResend: () => void;
+  onBack?: () => void;
+  isLoading?: boolean;
+  error?: string;
 }
 
-export const VerifyOTP = ({ email, onVerify, onResend }: VerifyOTPProps) => {
+export const VerifyOTP = ({
+  email,
+  title = "Verifica tu correo",
+  description,
+  onVerify,
+  onResend,
+  onBack,
+  isLoading = false,
+  error,
+}: VerifyOTPProps) => {
   const [code, setCode] = useState("");
   const [countdown, setCountdown] = useState(60);
   const [canResend, setCanResend] = useState(false);
@@ -26,6 +40,10 @@ export const VerifyOTP = ({ email, onVerify, onResend }: VerifyOTPProps) => {
     return () => clearTimeout(timer);
   }, [countdown]);
 
+  useEffect(() => {
+    if (error) setCode("");
+  }, [error]);
+
   const handleResend = () => {
     onResend();
     setCountdown(60);
@@ -35,10 +53,14 @@ export const VerifyOTP = ({ email, onVerify, onResend }: VerifyOTPProps) => {
 
   return (
     <div className="flex flex-col items-center text-center">
-      <h1 className="font-medium text-2xl">Verifica tu correo</h1>
+      <h1 className="font-medium text-2xl">{title}</h1>
       <p className="mt-1 text-sm text-muted-foreground">
-        Enviamos un código de 6 dígitos a{" "}
-        <span className="font-medium text-foreground">{email}</span>
+        {description ?? (
+          <>
+            Enviamos un código de 6 dígitos a{" "}
+            <span className="font-medium text-foreground">{email}</span>
+          </>
+        )}
       </p>
 
       <InputOTP
@@ -67,17 +89,21 @@ export const VerifyOTP = ({ email, onVerify, onResend }: VerifyOTPProps) => {
         </InputOTPGroup>
       </InputOTP>
 
+      {error && (
+        <p className="mt-3 text-sm text-destructive">{error}</p>
+      )}
+
       <Button
-        className="mt-10 w-full"
+        className="mt-6 w-full"
         size="lg"
-        disabled={code.length < 6}
+        disabled={code.length < 6 || isLoading}
         onClick={() => onVerify(code)}
       >
         <ArrowRight />
         Verificar
       </Button>
 
-      <p className="mt-6 text-sm text-muted-foreground">
+      <p className="mt-4 text-sm text-muted-foreground">
         ¿No recibiste el código?{" "}
         {canResend ? (
           <button
@@ -90,6 +116,16 @@ export const VerifyOTP = ({ email, onVerify, onResend }: VerifyOTPProps) => {
           <span>Reenviar en {countdown}s</span>
         )}
       </p>
+
+      {onBack && (
+        <button
+          onClick={onBack}
+          className="mt-4 flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ArrowLeft className="size-3.5" />
+          Cambiar correo
+        </button>
+      )}
     </div>
   );
 };

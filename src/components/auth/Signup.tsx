@@ -2,33 +2,51 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
-import { GoogleLogo } from "@/components/auth/Icons";
+import { GoogleButton } from "@/components/auth/GoogleButton";
 import { SignUpForm } from "@/components/auth/SignupForm";
 import { VerifyOTP } from "@/components/auth/VerifyOTP";
 import { Testimonials } from "@/components/auth/Testimonials";
-import { useRouter } from "next/navigation";
-
-
+import { authService } from "@/services/auth.service";
 
 const SignUp = () => {
   const [step, setStep] = useState(1);
   const [email, setEmail] = useState("");
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verifyError, setVerifyError] = useState("");
   const router = useRouter();
 
   const handleRegistered = (userEmail: string) => {
     setEmail(userEmail);
+    setVerifyError("");
     setStep(2);
   };
 
-  const handleVerified = (code: string) => {
-    console.log("Código verificado:", code);
-    router.push("/create-workspace");
+  const handleVerified = async (code: string) => {
+    setIsVerifying(true);
+    setVerifyError("");
+    try {
+      await authService.verifyEmail(email, code);
+      router.push("/create-workspace");
+    } catch (err: unknown) {
+      const e = err as { extraMessage?: string; message?: string };
+      const msg = e.extraMessage || e.message || "Código inválido";
+      setVerifyError(msg);
+    } finally {
+      setIsVerifying(false);
+    }
   };
 
-  const handleResend = () => {
-    console.log("Reenviar OTP a:", email);
+  const handleResend = async () => {
+    try {
+      await authService.resendVerificationEmail(email);
+      toast.success("Código reenviado", { description: `Revisa tu correo ${email}` });
+    } catch (err: unknown) {
+      const msg = (err as { message?: string }).message ?? "Error inesperado";
+      toast.error(msg);
+    }
   };
 
   return (
@@ -44,10 +62,7 @@ const SignUp = () => {
                 Impulsa tus ventas con la plataforma
               </p>
               <div className="mt-2">
-                <Button className="w-full" size="lg" type="button">
-                  <GoogleLogo className="mr-2 size-4" />
-                  Continuar con Google
-                </Button>
+                <GoogleButton />
                 <div className="my-4 flex items-center justify-center gap-2 overflow-hidden">
                   <Separator />
                   <span className="text-muted-foreground text-sm">O</span>
@@ -70,10 +85,12 @@ const SignUp = () => {
                 email={email}
                 onVerify={handleVerified}
                 onResend={handleResend}
+                onBack={() => setStep(1)}
+                isLoading={isVerifying}
+                error={verifyError}
               />
             </div>
           )}
-
         </div>
       </div>
 

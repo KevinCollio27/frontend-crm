@@ -2,9 +2,12 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowRight, Eye, EyeOff, Lock } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { authService } from "@/services/auth.service";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,20 +22,36 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-export const ResetPasswordForm = () => {
+interface ResetPasswordFormProps {
+  token: string;
+}
+
+export const ResetPasswordForm = ({ token }: ResetPasswordFormProps) => {
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const { register, handleSubmit, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
   });
 
-  function onSubmit(values: FormValues) {
-    console.log(values);
+  async function onSubmit(values: FormValues) {
+    setIsLoading(true);
+    try {
+      await authService.resetPassword(token, values.password, values.confirmPassword);
+      toast.success("Contraseña actualizada", { description: "Ya puedes iniciar sesión" });
+      router.replace("/login");
+    } catch (err: unknown) {
+      const msg = (err as { message?: string }).message ?? "Error inesperado";
+      toast.error("Error al restablecer", { description: msg });
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
       <div className="space-y-1.5">
         <Label htmlFor="password" className={errors.password ? "text-destructive" : ""}>Nueva contraseña</Label>
         <div className="relative">
@@ -77,9 +96,9 @@ export const ResetPasswordForm = () => {
         {errors.confirmPassword && <p className="text-[0.8rem] text-destructive">{errors.confirmPassword.message}</p>}
       </div>
 
-      <Button className="mt-2 w-full" size="lg" type="submit">
+      <Button className="mt-2 w-full" size="lg" type="submit" disabled={isLoading}>
         <ArrowRight />
-        Restablecer contraseña
+        {isLoading ? "Guardando..." : "Restablecer contraseña"}
       </Button>
     </form>
   );

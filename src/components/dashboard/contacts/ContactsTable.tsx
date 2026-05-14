@@ -1,26 +1,37 @@
-"use client";
+"use client"
 
 import {
   type ColumnDef,
   type ColumnFiltersState,
   flexRender,
   getCoreRowModel,
-  getFacetedRowModel,
-  getFacetedUniqueValues,
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
   type SortingState,
   useReactTable,
   type VisibilityState,
-} from "@tanstack/react-table";
-import { ArrowDownIcon, ArrowUpDown, ArrowUpIcon, ChevronDown, MailIcon, MoreHorizontal, PencilIcon, PhoneIcon, PlusIcon, Trash2Icon, UserIcon, XIcon, ExternalLinkIcon} from "lucide-react";
-import * as React from "react";
-import { useRouter } from "next/navigation";
+  type PaginationState,
+} from "@tanstack/react-table"
+import {
+  ChevronDown,
+  ExternalLinkIcon,
+  MailIcon,
+  MoreHorizontal,
+  PencilIcon,
+  PhoneIcon,
+  PlusCircleIcon,
+  PlusIcon,
+  Trash2Icon,
+  UserIcon,
+  XIcon,
+} from "lucide-react"
+import * as React from "react"
+import { useRouter } from "next/navigation"
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -30,11 +41,12 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { ContactPreviewSheet } from "./ContactPreviewSheet";
-import { DataTableFacetedFilter } from "@/components/ui/data-table-faceted-filter";
-import { DataTablePagination } from "@/components/ui/data-table-pagination";
-import { Input } from "@/components/ui/input";
+} from "@/components/ui/dropdown-menu"
+import { DataTableFacetedFilter } from "@/components/ui/data-table-faceted-filter"
+import { DataTablePagination } from "@/components/ui/data-table-pagination"
+import { Input } from "@/components/ui/input"
+import { Separator } from "@/components/ui/separator"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   Table,
   TableBody,
@@ -42,130 +54,57 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@/components/ui/table"
+import { ContactPreviewSheet } from "./ContactPreviewSheet"
+import { contactService, type CountryCount } from "@/services/contact.service"
+import { organizationService, type OrganizationOption } from "@/services/organization.service"
+import type { Person } from "@/types/contact"
+import { getFlag, getSortIcon, getInitials } from "@/lib/table-utils"
 
 export interface Contact {
-  id: number;
-  name: string;
-  org: string;
-  email: string;
-  phone: string;
-  country: string;
-  source: string;
-  createdAt: string;
+  id: number
+  name: string
+  org: string
+  orgId: number | null
+  email: string
+  phone: string
+  country: string
+  source: string
+  createdAt: string
+  internalPosition: string
 }
 
-const data: Contact[] = [
-  {
-    id: 1,
-    name: "Kevin Collio",
-    org: "GOXT",
-    email: "kevin@goxt.io",
-    phone: "+56 9 1234 5678",
-    country: "CL",
-    source: "CRM",
-    createdAt: "2025-12-18",
-  },
-  {
-    id: 2,
-    name: "María González",
-    org: "CamionGO",
-    email: "maria@camionGO.io",
-    phone: "+56 9 8765 4321",
-    country: "CL",
-    source: "Web",
-    createdAt: "2026-01-05",
-  },
-  {
-    id: 3,
-    name: "Carlos Pérez",
-    org: "No Aplica",
-    email: "carlos@gmail.com",
-    phone: "+54 9 1234 5678",
-    country: "AR",
-    source: "CRM",
-    createdAt: "2026-02-20",
-  },
-  {
-    id: 4,
-    name: "Ana Martínez",
-    org: "CamionGO",
-    email: "ana@camionGO.io",
-    phone: "+56 9 1111 2222",
-    country: "CL",
-    source: "CRM",
-    createdAt: "2026-02-20",
-  },
-  {
-    id: 5,
-    name: "Angel Silva",
-    org: "No Aplica",
-    email: "angel@gmail.com",
-    phone: "+54 9 1234 5678",
-    country: "CO",
-    source: "CRM",
-    createdAt: "2026-02-20",
-  },
-  {
-    id: 6,
-    name: "Sofia López",
-    org: "GOXT",
-    email: "sofia@goxt.io",
-    phone: "+56 9 1234 8878",
-    country: "CL",
-    source: "CRM",
-    createdAt: "2025-12-18",
-  },
-  {
-    id: 7,
-    name: "Yael Succo",
-    org: "CamionGO",
-    email: "yael@camionGO.io",
-    phone: "+56 9 2233 4321",
-    country: "CL",
-    source: "Web",
-    createdAt: "2026-01-05",
-  },
-  {
-    id: 8,
-    name: "Javiera Torres",
-    org: "No Aplica",
-    email: "javiera@gmail.com",
-    phone: "+54 9 1234 5678",
-    country: "AR",
-    source: "CRM",
-    createdAt: "2026-02-20",
-  },
-  {
-    id: 9,
-    name: "Claudia Rojas",
-    org: "CamionGO",
-    email: "claudia@camionGO.io",
-    phone: "+56 9 1111 2222",
-    country: "CL",
-    source: "CRM",
-    createdAt: "2026-02-20",
-  },
-  {
-    id: 10,
-    name: "Tomas Fernández",
-    org: "No Aplica",
-    email: "tomas@gmail.com",
-    phone: "+54 9 1234 5678",
-    country: "CO",
-    source: "CRM",
-    createdAt: "2026-02-20",
-  },
-];
+function mapPerson(p: Person): Contact {
+  const email = p.person_detail?.find((d) => d.label?.key === "email")?.value ?? ""
+  const phone =
+    p.person_detail?.find((d) => d.label?.key === "phone" || d.label?.key === "telefono")?.value ?? ""
+  return {
+    id: p.id,
+    name: p.name,
+    org: p.organization?.name ?? "Sin organización",
+    orgId: p.organization_id ?? null,
+    email,
+    phone,
+    country: p.pais_origen ?? "CL",
+    source: p.contact_source ?? p.origin ?? "CRM",
+    createdAt: (p.created_at ?? "").slice(0, 10),
+    internalPosition: p.internal_position ?? "",
+  }
+}
 
-const getFlag = (code: string) =>
-  code.toUpperCase().split("").map((c) => String.fromCodePoint(c.charCodeAt(0) + 127397)).join("");
-
-const getSortIcon = (sorted: false | "asc" | "desc") => {
-  if (sorted === "asc") return <ArrowUpIcon className="ml-2 size-3.5" />;
-  if (sorted === "desc") return <ArrowDownIcon className="ml-2 size-3.5" />;
-  return <ArrowUpDown className="ml-2 size-3.5" />;
-};
+const COUNTRY_LABELS: Record<string, string> = {
+  CL: "Chile",
+  AR: "Argentina",
+  CO: "Colombia",
+  MX: "México",
+  PE: "Perú",
+  BR: "Brasil",
+  UY: "Uruguay",
+  EC: "Ecuador",
+  VE: "Venezuela",
+  BO: "Bolivia",
+  PY: "Paraguay",
+}
 
 const columnLabels: Record<string, string> = {
   id: "ID",
@@ -175,9 +114,19 @@ const columnLabels: Record<string, string> = {
   country: "País",
   source: "Fuente",
   createdAt: "Creado",
-};
+  internalPosition: "Cargo",
+}
 
-function getColumns(onPreview: (contact: Contact) => void, onDetail: (contact: Contact) => void): ColumnDef<Contact>[] {
+const DEFAULT_COLUMN_VISIBILITY: VisibilityState = {
+  source: false,
+  createdAt: false,
+  internalPosition: false,
+}
+
+function getColumns(
+  onPreview: (contact: Contact) => void,
+  onDetail: (contact: Contact) => void
+): ColumnDef<Contact>[] {
   return [
     {
       id: "select",
@@ -185,7 +134,9 @@ function getColumns(onPreview: (contact: Contact) => void, onDetail: (contact: C
         <Checkbox
           aria-label="Select all"
           checked={table.getIsAllPageRowsSelected()}
-          indeterminate={table.getIsSomePageRowsSelected() && !table.getIsAllPageRowsSelected()}
+          indeterminate={
+            table.getIsSomePageRowsSelected() && !table.getIsAllPageRowsSelected()
+          }
           onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
         />
       ),
@@ -218,20 +169,22 @@ function getColumns(onPreview: (contact: Contact) => void, onDetail: (contact: C
         </Button>
       ),
       cell: ({ row }) => {
-        const name: string = row.getValue("name");
-        const email: string = row.original.email;
+        const name: string = row.getValue("name")
+        const email: string = row.original.email
         return (
           <div className="flex items-center gap-2.5">
             <Avatar size="default">
-              <AvatarImage src="/images/avatar-contact.svg" alt={name} />
-              <AvatarFallback>{name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)}</AvatarFallback>
+              <AvatarImage src="https://github.com/shadcn.png" alt={name} />
+              <AvatarFallback className="text-base">
+                {getInitials(name)}
+              </AvatarFallback>
             </Avatar>
             <div className="leading-tight">
               <div className="text-sm font-medium">{name}</div>
-              <div className="text-xs text-muted-foreground">{email}</div>
+              <div className="text-xs text-muted-foreground">{email || "—"}</div>
             </div>
           </div>
-        );
+        )
       },
     },
     {
@@ -242,7 +195,19 @@ function getColumns(onPreview: (contact: Contact) => void, onDetail: (contact: C
         </Button>
       ),
       cell: ({ row }) => <div className="text-sm">{row.getValue("org")}</div>,
-      filterFn: (row, id, value: string[]) => value.includes(row.getValue(id)),
+    },
+    {
+      accessorKey: "internalPosition",
+      header: ({ column }) => (
+        <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
+          Cargo {getSortIcon(column.getIsSorted())}
+        </Button>
+      ),
+      cell: ({ row }) => (
+        <div className="text-sm text-muted-foreground">
+          {(row.getValue("internalPosition") as string) || "—"}
+        </div>
+      ),
     },
     {
       accessorKey: "phone",
@@ -252,7 +217,9 @@ function getColumns(onPreview: (contact: Contact) => void, onDetail: (contact: C
         </Button>
       ),
       cell: ({ row }) => (
-        <div className="text-sm text-muted-foreground">{row.getValue("phone")}</div>
+        <div className="text-sm text-muted-foreground">
+          {(row.getValue("phone") as string) || "—"}
+        </div>
       ),
     },
     {
@@ -263,15 +230,14 @@ function getColumns(onPreview: (contact: Contact) => void, onDetail: (contact: C
         </Button>
       ),
       cell: ({ row }) => {
-        const code: string = row.getValue("country");
+        const code: string = row.getValue("country")
         return (
           <div className="flex items-center gap-1.5 text-sm">
             <span>{getFlag(code)}</span>
             <span>{code}</span>
           </div>
-        );
+        )
       },
-      filterFn: (row, id, value: string[]) => value.includes(row.getValue(id)),
     },
     {
       accessorKey: "source",
@@ -299,7 +265,7 @@ function getColumns(onPreview: (contact: Contact) => void, onDetail: (contact: C
       id: "actions",
       enableHiding: false,
       cell: ({ row }) => {
-        const contact = row.original;
+        const contact = row.original
         return (
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button className="h-8 w-8 p-0" variant="ghost" />}>
@@ -325,11 +291,15 @@ function getColumns(onPreview: (contact: Contact) => void, onDetail: (contact: C
               <DropdownMenuSeparator />
               <DropdownMenuGroup>
                 <DropdownMenuLabel>Acceso rápido</DropdownMenuLabel>
-                <DropdownMenuItem onClick={() => navigator.clipboard.writeText(contact.email)}>
+                <DropdownMenuItem
+                  onClick={() => navigator.clipboard.writeText(contact.email)}
+                >
                   <MailIcon />
                   Copiar email
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigator.clipboard.writeText(contact.phone)}>
+                <DropdownMenuItem
+                  onClick={() => navigator.clipboard.writeText(contact.phone)}
+                >
                   <PhoneIcon />
                   Copiar teléfono
                 </DropdownMenuItem>
@@ -341,32 +311,208 @@ function getColumns(onPreview: (contact: Contact) => void, onDetail: (contact: C
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-        );
+        )
       },
     },
-  ];
+  ]
+}
+
+function OrgFilter({
+  orgs,
+  selected,
+  onChange,
+}: {
+  orgs: OrganizationOption[]
+  selected: number | null
+  onChange: (id: number | null) => void
+}) {
+  const selectedOrg = orgs.find((o) => o.id === selected)
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={<Button variant="outline" size="sm" className="h-8 border-dashed" />}
+      >
+        <PlusCircleIcon className="size-4" />
+        Organización
+        {selected !== null && (
+          <>
+            <Separator
+              orientation="vertical"
+              className="mx-1 data-vertical:h-4 data-vertical:self-auto"
+            />
+            <span className="inline-block max-w-35 truncate align-middle rounded bg-muted px-1.5 py-0.5 text-xs font-medium">
+              {selectedOrg?.name ?? "…"}
+            </span>
+          </>
+        )}
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="max-h-60 min-w-44 overflow-y-auto">
+        {orgs.map((org) => (
+          <DropdownMenuCheckboxItem
+            key={org.id}
+            checked={selected === org.id}
+            onCheckedChange={() => onChange(selected === org.id ? null : org.id)}
+          >
+            {org.name}
+          </DropdownMenuCheckboxItem>
+        ))}
+        {selected !== null && (
+          <>
+            <DropdownMenuSeparator />
+            <button
+              className="w-full px-2 py-1.5 text-center text-xs text-muted-foreground transition-colors hover:text-foreground"
+              onClick={() => onChange(null)}
+            >
+              Limpiar filtro
+            </button>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+interface QueryState {
+  page: number
+  pageSize: number
+  search: string
+  orgId: number | null
+  countries: string[]
 }
 
 export function ContactsTable() {
-  const router = useRouter();
-  const [sorting, setSorting] = React.useState<SortingState>([]);
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
-  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
-  const [rowSelection, setRowSelection] = React.useState({});
-  const [selectedContact, setSelectedContact] = React.useState<Contact | null>(null);
-  const [sheetOpen, setSheetOpen] = React.useState(false);
+  const router = useRouter()
+  const [contacts, setContacts] = React.useState<Contact[]>([])
+  const [total, setTotal] = React.useState(0)
+  const [loading, setLoading] = React.useState(true)
+  const [orgs, setOrgs] = React.useState<OrganizationOption[]>([])
+  const [searchInput, setSearchInput] = React.useState("")
+  const [query, setQuery] = React.useState<QueryState>({
+    page: 1,
+    pageSize: 10,
+    search: "",
+    orgId: null,
+    countries: [],
+  })
+  const [sorting, setSorting] = React.useState<SortingState>([])
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
+  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>(DEFAULT_COLUMN_VISIBILITY)
+  const [rowSelection, setRowSelection] = React.useState({})
+  const [selectedContact, setSelectedContact] = React.useState<Contact | null>(null)
+  const [sheetOpen, setSheetOpen] = React.useState(false)
+  const [countryCounts, setCountryCounts] = React.useState<CountryCount[]>([])
+
+  React.useEffect(() => {
+    const t = setTimeout(
+      () => setQuery((q) => ({ ...q, page: 1, search: searchInput })),
+      400
+    )
+    return () => clearTimeout(t)
+  }, [searchInput])
+
+  React.useEffect(() => {
+    const selected = (columnFilters.find((f) => f.id === "country")?.value as string[]) ?? []
+    setQuery((q) => {
+      if (JSON.stringify(q.countries) === JSON.stringify(selected)) return q
+      return { ...q, page: 1, countries: selected }
+    })
+  }, [columnFilters])
+
+  React.useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    contactService
+      .list({
+        page: query.page,
+        take: query.pageSize,
+        filter: query.search || undefined,
+        organization_id: query.orgId ?? undefined,
+        country: query.countries.length > 0 ? query.countries : undefined,
+      })
+      .then((res) => {
+        if (cancelled) return
+        setContacts(res.data.map(mapPerson))
+        setTotal(res.total)
+        setLoading(false)
+      })
+      .catch(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [query])
+
+  React.useEffect(() => {
+    organizationService.allNoPaginate().then(setOrgs).catch(() => {})
+  }, [])
+
+  React.useEffect(() => {
+    contactService.countryCounts().then(setCountryCounts).catch(() => {})
+  }, [])
+
+  const countryOptions = React.useMemo(
+    () =>
+      countryCounts.map((c) => ({
+        label: COUNTRY_LABELS[c.code] ?? c.code,
+        value: c.code,
+        icon: (
+          <img
+            src={`https://flagcdn.com/w40/${c.code.toLowerCase()}.png`}
+            alt={c.code}
+            width={20}
+            height={15}
+          />
+        ),
+      })),
+    [countryCounts]
+  )
+
+  const countryCountsMap = React.useMemo(
+    () => new Map(countryCounts.map((c) => [c.code, c.count])),
+    [countryCounts]
+  )
+
+  const pagination: PaginationState = { pageIndex: query.page - 1, pageSize: query.pageSize }
+
+  const handlePagination = (
+    updater: PaginationState | ((prev: PaginationState) => PaginationState)
+  ) => {
+    const next = typeof updater === "function" ? updater(pagination) : updater
+    setQuery((q) => ({ ...q, page: next.pageIndex + 1, pageSize: next.pageSize }))
+  }
+
+  const handleOrgFilter = (id: number | null) => {
+    setQuery((q) => ({ ...q, page: 1, orgId: id }))
+  }
+
+  const hasActiveFilters = searchInput || query.orgId !== null || columnFilters.length > 0
+
+  const resetFilters = () => {
+    setSearchInput("")
+    setQuery((q) => ({ ...q, page: 1, search: "", orgId: null }))
+    setColumnFilters([])
+  }
 
   const columns = React.useMemo(
-    () => getColumns(
-      (contact) => { setSelectedContact(contact); setSheetOpen(true); },
-      (contact) => router.push(`/crm/contacts/${contact.id}`)
-    ),
+    () =>
+      getColumns(
+        (contact) => {
+          setSelectedContact(contact)
+          setSheetOpen(true)
+        },
+        (contact) => router.push(`/crm/contacts/${contact.id}`)
+      ),
     [router]
-  );
+  )
 
   const table = useReactTable({
-    data,
+    data: contacts,
     columns,
+    manualPagination: true,
+    rowCount: total,
+    onPaginationChange: handlePagination,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     getCoreRowModel: getCoreRowModel(),
@@ -375,10 +521,8 @@ export function ContactsTable() {
     getFilteredRowModel: getFilteredRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
-    state: { sorting, columnFilters, columnVisibility, rowSelection },
-    getFacetedRowModel: getFacetedRowModel(),
-    getFacetedUniqueValues: getFacetedUniqueValues(),
-  });
+    state: { sorting, columnFilters, columnVisibility, rowSelection, pagination },
+  })
 
   return (
     <div className="w-full">
@@ -386,37 +530,24 @@ export function ContactsTable() {
         <Input
           className="max-w-sm"
           placeholder="Buscar contacto..."
-          value={(table.getColumn("name")?.getFilterValue() as string) ?? ""}
-          onChange={(e) => table.getColumn("name")?.setFilterValue(e.target.value)}
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
         />
-        <DataTableFacetedFilter
-          column={table.getColumn("org")!}
-          title="Organización"
-          options={[
-            { label: "GOXT", value: "GOXT" },
-            { label: "CamionGO", value: "CamionGO" },
-            { label: "No Aplica", value: "No Aplica" },
-          ]}
-        />
+        <OrgFilter orgs={orgs} selected={query.orgId} onChange={handleOrgFilter} />
         <DataTableFacetedFilter
           column={table.getColumn("country")!}
           title="País"
-          options={[
-            { label: "Chile", value: "CL", icon: <img src="https://flagcdn.com/w40/cl.png" alt="CL" width={20} height={15} /> },
-            { label: "Argentina", value: "AR", icon: <img src="https://flagcdn.com/w40/ar.png" alt="AR" width={20} height={15} /> },
-            { label: "Colombia", value: "CO", icon: <img src="https://flagcdn.com/w40/co.png" alt="CO" width={20} height={15} /> },
-          ]}
+          options={countryOptions}
+          counts={countryCountsMap}
         />
-        {table.getState().columnFilters.length > 0 && (
-          <Button variant="ghost" size="sm" className="h-8" onClick={() => table.resetColumnFilters()}>
+        {hasActiveFilters && (
+          <Button variant="ghost" size="sm" className="h-8" onClick={resetFilters}>
             Reset
             <XIcon className="ml-1 size-4" />
           </Button>
         )}
         <div className="ml-auto flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">
-            {table.getFilteredRowModel().rows.length} contactos
-          </span>
+          <span className="text-sm text-muted-foreground">{total} contactos</span>
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button variant="outline" />}>
               Columnas <ChevronDown className="ml-2 size-4" />
@@ -460,7 +591,17 @@ export function ContactsTable() {
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows?.length ? (
+            {loading ? (
+              Array.from({ length: query.pageSize }).map((_, i) => (
+                <TableRow key={i}>
+                  {columns.map((_, j) => (
+                    <TableCell key={j}>
+                      <Skeleton className="h-4 w-full" />
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : table.getRowModel().rows.length ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
                   {row.getVisibleCells().map((cell) => (
@@ -491,5 +632,5 @@ export function ContactsTable() {
         onOpenChange={setSheetOpen}
       />
     </div>
-  );
+  )
 }

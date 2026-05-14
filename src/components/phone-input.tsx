@@ -194,8 +194,8 @@ const CountrySelectOption = ({
   );
 };
 
-const FlagComponent = ({ country, countryName }: RPNInput.FlagProps) => {
-  if (!country) return null;
+const FlagComponent = ({ country, countryName }: RPNInput.FlagProps): React.ReactElement => {
+  if (!country) return <span className="inline-block size-5" />;
   return (
     <img
       src={`https://flagcdn.com/w40/${country.toLowerCase()}.png`}

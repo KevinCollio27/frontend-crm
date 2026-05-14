@@ -1,15 +1,15 @@
 "use client"
 
-import * as React from "react"
-
+import { useRouter } from "next/navigation"
+import { ChevronsUpDownIcon } from "lucide-react"
+import { useSessionStore } from "@/store/session.store"
+import { saveLastWorkspace } from "@/lib/workspace-pref"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
@@ -18,22 +18,50 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { ChevronsUpDownIcon, PlusIcon } from "lucide-react"
+import type { UserWorkspace } from "@/types/auth"
 
-export function TeamSwitcher({
-  teams,
-}: {
-  teams: {
-    name: string
-    logo: React.ReactNode
-    plan: string
-  }[]
-}) {
-  const { isMobile } = useSidebar()
-  const [activeTeam, setActiveTeam] = React.useState(teams[0])
-  if (!activeTeam) {
-    return null
+function WorkspaceLogo({ name, logo, size = "md" }: { name: string; logo?: string | null; size?: "sm" | "md" }) {
+  const sizeClass = size === "md" ? "size-8" : "size-6"
+  const textClass = size === "md" ? "text-sm" : "text-xs"
+  if (logo) {
+    return (
+      <div className={`${sizeClass} shrink-0 flex items-center justify-center rounded-lg bg-white`}>
+        <img src={logo} alt={name} className="size-full object-contain" />
+      </div>
+    )
   }
+  return (
+    <div className={`${sizeClass} flex shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground font-semibold ${textClass}`}>
+      {name.charAt(0).toUpperCase()}
+    </div>
+  )
+}
+
+export function TeamSwitcher() {
+  const { isMobile } = useSidebar()
+  const router = useRouter()
+  const user = useSessionStore((s) => s.user)
+  const workspaceId = useSessionStore((s) => s.workspaceId)
+
+  const workspaces: UserWorkspace[] = user?.user_workspace ?? []
+  const active = workspaces.find((w) => w.workspace_id === workspaceId) ?? workspaces[0]
+
+  if (!active) return null
+
+  const handleSwitch = async (ws: UserWorkspace) => {
+    if (ws.workspace_id === workspaceId) return
+    await fetch("/api/auth/session", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ workspaceId: ws.workspace_id }),
+    })
+    if (user) saveLastWorkspace(user.id, ws.workspace_id)
+    useSessionStore.getState().setSession(user!, ws.workspace_id)
+    router.refresh()
+  }
+
+  const activeName = active.workspace?.name ?? "Workspace"
+
   return (
     <SidebarMenu>
       <SidebarMenuItem>
@@ -46,15 +74,14 @@ export function TeamSwitcher({
               />
             }
           >
-            <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-              {activeTeam.logo}
-            </div>
+            <WorkspaceLogo name={activeName} logo={active.workspace?.logo} />
             <div className="grid flex-1 text-left text-sm leading-tight">
-              <span className="truncate font-medium">{activeTeam.name}</span>
-              <span className="truncate text-xs">{activeTeam.plan}</span>
+              <span className="truncate font-medium">{activeName}</span>
+              <span className="truncate text-xs text-muted-foreground">Workspace</span>
             </div>
             <ChevronsUpDownIcon className="ml-auto" />
           </DropdownMenuTrigger>
+
           <DropdownMenuContent
             className="min-w-56 rounded-lg"
             align="start"
@@ -63,32 +90,25 @@ export function TeamSwitcher({
           >
             <DropdownMenuGroup>
               <DropdownMenuLabel className="text-xs text-muted-foreground">
-                Teams
+                Espacios de Trabajo
               </DropdownMenuLabel>
-              {teams.map((team, index) => (
-                <DropdownMenuItem
-                  key={team.name}
-                  onClick={() => setActiveTeam(team)}
-                  className="gap-2 p-2"
-                >
-                  <div className="flex size-6 items-center justify-center rounded-md border">
-                    {team.logo}
-                  </div>
-                  {team.name}
-                  <DropdownMenuShortcut>⌘{index + 1}</DropdownMenuShortcut>
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuItem className="gap-2 p-2">
-                <div className="flex size-6 items-center justify-center rounded-md border bg-transparent">
-                  <PlusIcon className="size-4" />
-                </div>
-                <div className="font-medium text-muted-foreground">
-                  Add team
-                </div>
-              </DropdownMenuItem>
+              {workspaces.map((ws) => {
+                const wsName = ws.workspace?.name ?? `Workspace ${ws.workspace_id}`
+                const isActive = ws.workspace_id === workspaceId
+                return (
+                  <DropdownMenuItem
+                    key={ws.workspace_id}
+                    onClick={() => handleSwitch(ws)}
+                    className="gap-2 p-2"
+                  >
+                    <WorkspaceLogo name={wsName} logo={ws.workspace?.logo} size="sm" />
+                    <span className={isActive ? "font-medium" : ""}>{wsName}</span>
+                    {isActive && (
+                      <span className="ml-auto size-1.5 rounded-full bg-foreground" />
+                    )}
+                  </DropdownMenuItem>
+                )
+              })}
             </DropdownMenuGroup>
           </DropdownMenuContent>
         </DropdownMenu>

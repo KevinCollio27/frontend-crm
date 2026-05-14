@@ -2,10 +2,12 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowRight, Eye, EyeOff, Lock, Mail, User } from "lucide-react";
+import { toast } from "sonner";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { isValidPhoneNumber } from "react-phone-number-input";
 import { z } from "zod";
+import { authService } from "@/services/auth.service";
 import { PhoneInput } from "@/components/phone-input";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,14 +36,24 @@ interface SignUpFormProps {
 export const SignUpForm = ({ onSuccess }: SignUpFormProps) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const { register, handleSubmit, control, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
   });
 
-  function onSubmit(values: FormValues) {
-    console.log(values);
-    onSuccess(values.email);
+  async function onSubmit(values: FormValues) {
+    setIsLoading(true);
+    try {
+      await authService.register(values.name, values.email, values.password, values.phone);
+      toast.success("Cuenta creada", { description: `Revisa tu correo ${values.email}` });
+      onSuccess(values.email);
+    } catch (err: unknown) {
+      const msg = (err as { message?: string }).message ?? "Error inesperado";
+      toast.error("Error al crear cuenta", { description: msg });
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
@@ -82,11 +94,12 @@ export const SignUpForm = ({ onSuccess }: SignUpFormProps) => {
           name="phone"
           control={control}
           render={({ field }) => (
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             <PhoneInput
               id="phone"
               defaultCountry="CL"
               international
-              withCountryCallingCode
+              {...({ withCountryCallingCode: true } as any)}
               value={field.value}
               onChange={field.onChange}
             />
@@ -139,9 +152,9 @@ export const SignUpForm = ({ onSuccess }: SignUpFormProps) => {
         {errors.confirmPassword && <p className="text-[0.8rem] text-destructive">{errors.confirmPassword.message}</p>}
       </div>
 
-      <Button className="mt-2 w-full" size="lg" type="submit">
+      <Button className="mt-2 w-full" size="lg" type="submit" disabled={isLoading}>
         <ArrowRight />
-        Crear cuenta
+        {isLoading ? "Creando cuenta..." : "Crear cuenta"}
       </Button>
     </form>
   );

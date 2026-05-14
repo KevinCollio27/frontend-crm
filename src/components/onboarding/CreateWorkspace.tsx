@@ -17,7 +17,7 @@ const CreateWorkspace = () => {
   const router = useRouter();
 
   const handleWorkspaceSuccess = () => setStep(2);
-  const handleTeamDone = () => router.push("/dashboard");
+  const handleTeamDone = () => router.push("/chat");
 
   return (
     <div className="grid h-screen overflow-hidden lg:grid-cols-[2fr_3fr]">

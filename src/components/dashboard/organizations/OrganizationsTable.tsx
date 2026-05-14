@@ -1,27 +1,35 @@
-"use client";
+"use client"
 
 import {
   type ColumnDef,
-  type ColumnFiltersState,
   flexRender,
   getCoreRowModel,
-  getFacetedRowModel,
-  getFacetedUniqueValues,
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
   type SortingState,
   useReactTable,
   type VisibilityState,
-} from "@tanstack/react-table";
-import { ArrowDownIcon, ArrowUpDown, ArrowUpIcon, ChevronDown, ExternalLinkIcon, MoreHorizontal, PencilIcon, PlusIcon, Trash2Icon, UserIcon, XIcon } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { OrganizationPreviewSheet } from "./OrganizationPreviewSheet";
-import * as React from "react";
+  type PaginationState,
+} from "@tanstack/react-table"
+import {
+  CheckIcon,
+  ChevronDown,
+  ExternalLinkIcon,
+  MoreHorizontal,
+  PencilIcon,
+  PlusIcon,
+  Trash2Icon,
+  UserIcon,
+  UsersIcon,
+  XIcon,
+} from "lucide-react"
+import * as React from "react"
+import { useRouter } from "next/navigation"
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Avatar, AvatarBadge, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -31,10 +39,10 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { DataTableFacetedFilter } from "@/components/ui/data-table-faceted-filter";
-import { DataTablePagination } from "@/components/ui/data-table-pagination";
-import { Input } from "@/components/ui/input";
+} from "@/components/ui/dropdown-menu"
+import { DataTablePagination } from "@/components/ui/data-table-pagination"
+import { Input } from "@/components/ui/input"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   Table,
   TableBody,
@@ -42,373 +50,344 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@/components/ui/table"
+import { OrganizationPreviewSheet } from "./OrganizationPreviewSheet"
+import { organizationService } from "@/services/organization.service"
+import type { OrganizationRaw } from "@/types/organization"
+import { getFlag, getSortIcon, getInitials } from "@/lib/table-utils"
 
 export interface Organization {
-  id: number;
-  name: string;
-  taxId: string;
-  country: string;
-  industry: string;
-  website?: string;
-  source: string;
-  createdAt: string;
+  id: number
+  name: string
+  taxId: string
+  industry: string
+  webPage: string
+  country: string
+  source: string
+  createdAt: string
+  contactCount: number
 }
 
-const data: Organization[] = [
-  {
-    id: 1,
-    name: "GOXT SpA",
-    taxId: "20.454.519-7",
-    country: "CL",
-    industry: "Tecnología e Informatica",
-    website: "https://goxt.io",
-    source: "CRM",
-    createdAt: "2025-12-18",
-  },
-  {
-    id: 2,
-    name: "CamionGO SpA",
-    taxId: "77.389.123-4",
-    country: "CL",
-    industry: "Servicios de Transporte de Carga",
-    website: "https://camionGO.io",
-    source: "Web",
-    createdAt: "2026-01-05",
-},
-  {
-    id: 3,
-    name: "Fluxie S.A.",
-    taxId: "78.987.654-3",
-    country: "AR",
-    industry: "Servicios Comunicacionales",
-    website: "https://fluxie.xyz",
-    source: "CRM",
-    createdAt: "2026-02-20",
-  },
-  {
-    id: 4,
-    name: "Southway Ltda.",
-    taxId: "11.111.111-1",
-    country: "CL",
-    industry: "Servicios de Carga Maritima",
-    website: "https://southconnect.cl",
-    source: "CRM",
-    createdAt: "2026-02-20",
-  },
-  {
-    id: 5,
-    name: "Telecomunicaciones S.A.",
-    taxId: "22.222.222-2",
-    country: "CO",
-    industry: "Servicios",
-    website: "https://telco.co",
-    source: "CRM",
-    createdAt: "2026-02-20",
-  },
-  {
-    id: 6,
-    name: "Transportes del Sur S.A.",
-    taxId: "33.333.333-3",
-    country: "CL",
-    industry: "Tecnología e Informatica",
-    website: "https://transportes-del-sur.com",
-    source: "CRM",
-    createdAt: "2025-12-18",
-  },
-  {
-    id: 7,
-    name: "Merpez S.A.",
-    taxId: "44.444.444-4",
-    country: "CL",
-    industry: "Servicios",
-    website: "https://merpes.com",
-    source: "Web",
-    createdAt: "2026-01-05",
-  },
-  {
-    id: 8,
-    name: "Latam Airlines S.A.",
-    taxId: "55.555.555-5",
-    country: "AR",
-    industry: "Servicios",
-    website: "https://latam.com",
-    source: "CRM",
-    createdAt: "2026-02-20",
-  },
-  {
-    id: 9,
-    name: "Pronto S.A.",
-    taxId: "66.666.666-6",
-    country: "CL",
-    industry: "Servicios",
-    website: "https://pronto.cl",
-    source: "CRM",
-    createdAt: "2026-02-20",
-  },
-  {
-    id: 10,
-    name: "Tottus S.A.",
-    taxId: "77.777.777-7",
-    country: "CO",
-    industry: "Servicios",
-    website: "https://totus.com",
-    source: "CRM",
-    createdAt: "2026-02-20",
-  },
-];
-
-
-const getFlag = (code: string) =>
-  code.toUpperCase().split("").map((c) => String.fromCodePoint(c.charCodeAt(0) + 127397)).join("");
-
-const getSortIcon = (sorted: false | "asc" | "desc") => {
-  if (sorted === "asc") return <ArrowUpIcon className="ml-2 size-3.5" />;
-  if (sorted === "desc") return <ArrowDownIcon className="ml-2 size-3.5" />;
-  return <ArrowUpDown className="ml-2 size-3.5" />;
-};
+function mapOrganization(o: OrganizationRaw): Organization {
+  return {
+    id: o.id,
+    name: o.name,
+    taxId: o.document_number ?? "",
+    industry: o.industry ?? "",
+    webPage: o.web_page ?? "",
+    country: o.pais_origen ?? "CL",
+    source: o.contact_source ?? o.origin ?? "CRM",
+    createdAt: (o.created_at ?? "").slice(0, 10),
+    contactCount: o.person?.length ?? 0,
+  }
+}
 
 const columnLabels: Record<string, string> = {
   id: "ID",
   name: "Nombre",
-  country: "País",
   industry: "Industria",
+  country: "País",
+  contactCount: "Contactos",
   source: "Fuente",
   createdAt: "Creado",
-};
+}
 
-function getColumns(onPreview: (org: Organization) => void, onDetail: (org: Organization) => void): ColumnDef<Organization>[] {
+const DEFAULT_COLUMN_VISIBILITY: VisibilityState = {
+  source: false,
+  createdAt: false,
+}
+
+function getColumns(
+  onPreview: (org: Organization) => void,
+  onDetail: (org: Organization) => void
+): ColumnDef<Organization>[] {
   return [
-  {
-    id: "select",
-    header: ({ table }) => (
-      <Checkbox
-        aria-label="Select all"
-        checked={table.getIsAllPageRowsSelected()}
-        indeterminate={table.getIsSomePageRowsSelected() && !table.getIsAllPageRowsSelected()}
-        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-      />
-    ),
-    cell: ({ row }) => (
-      <Checkbox
-        aria-label="Select row"
-        checked={row.getIsSelected()}
-        onCheckedChange={(value) => row.toggleSelected(!!value)}
-      />
-    ),
-    enableSorting: false,
-    enableHiding: false,
-  },
-  {
-    accessorKey: "id",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        className="-ml-3"
-        onClick={() => column.toggleSorting()}
-      >
-        ID
-        {getSortIcon(column.getIsSorted())}
-      </Button>
-    ),
-    cell: ({ row }) => (
-      <div className="text-muted-foreground text-xs">#{row.getValue("id")}</div>
-    ),
-  },
-  {
-    accessorKey: "name",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        className="-ml-3"
-        onClick={() => column.toggleSorting()}
-      >
-        Nombre
-        {getSortIcon(column.getIsSorted())}
-      </Button>
-    ),
-    cell: ({ row }) => {
-      const name: string = row.getValue("name");
-      const taxId: string = row.original.taxId;
-      return (
-        <div className="flex items-center gap-2.5">
-          <Avatar size="default">
-            <AvatarImage src="/images/avatar-org.svg" alt={name} />
-            <AvatarFallback>{name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)}</AvatarFallback>
-          </Avatar>
-          <div className="leading-tight">
-            <div className="text-sm font-medium">{name}</div>
-            <div className="text-xs text-muted-foreground">{taxId}</div>
+    {
+      id: "select",
+      header: ({ table }) => (
+        <Checkbox
+          aria-label="Select all"
+          checked={table.getIsAllPageRowsSelected()}
+          indeterminate={
+            table.getIsSomePageRowsSelected() && !table.getIsAllPageRowsSelected()
+          }
+          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+        />
+      ),
+      cell: ({ row }) => (
+        <Checkbox
+          aria-label="Select row"
+          checked={row.getIsSelected()}
+          onCheckedChange={(value) => row.toggleSelected(!!value)}
+        />
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
+    {
+      accessorKey: "id",
+      header: ({ column }) => (
+        <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
+          ID {getSortIcon(column.getIsSorted())}
+        </Button>
+      ),
+      cell: ({ row }) => (
+        <div className="text-muted-foreground text-xs">#{row.getValue("id")}</div>
+      ),
+    },
+    {
+      accessorKey: "name",
+      header: ({ column }) => (
+        <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
+          Nombre {getSortIcon(column.getIsSorted())}
+        </Button>
+      ),
+      cell: ({ row }) => {
+        const name: string = row.getValue("name")
+        const taxId: string = row.original.taxId
+        return (
+          <div className="flex items-center gap-2.5">
+            <Avatar size="default">
+              <AvatarImage src="https://github.com/shadcn.png" alt={name} />
+              <AvatarFallback className="text-xs bg-muted">
+                {getInitials(name)}
+              </AvatarFallback>
+              <AvatarBadge className="bg-blue-500 text-white">
+                <CheckIcon />
+              </AvatarBadge>
+            </Avatar>
+            <div className="leading-tight">
+              <div className="text-sm font-medium">{name}</div>
+              <div className="text-xs text-muted-foreground">{taxId || "—"}</div>
+            </div>
           </div>
-        </div>
-      );
+        )
+      },
     },
-  },
-  {
-    accessorKey: "industry",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        className="-ml-3"
-        onClick={() => column.toggleSorting()}
-      >
-        Industria
-        {getSortIcon(column.getIsSorted())}
-      </Button>
-    ),
-    cell: ({ row }) => {
-      const industry: string = row.getValue("industry");
-      const website = row.original.website;
-      return (
-        <div className="leading-tight">
-          <div className="text-sm font-medium">{industry}</div>
-          {website ? (
-            <a
-              href={website}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-blue-600 hover:text-blue-700 hover:underline"
-            >
-              {website}
-            </a>
-          ) : (
-            <div className="text-xs">No Aplica</div>
-          )}
-        </div>
-      );
+    {
+      accessorKey: "industry",
+      header: ({ column }) => (
+        <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
+          Industria {getSortIcon(column.getIsSorted())}
+        </Button>
+      ),
+      cell: ({ row }) => {
+        const industry: string = row.getValue("industry")
+        const webPage: string = row.original.webPage
+        return (
+          <div className="leading-tight">
+            <div className="text-sm">{industry || "N/A"}</div>
+            {webPage ? (
+              <a
+                href={webPage.startsWith("http") ? webPage : `https://${webPage}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-blue-600 hover:underline"
+              >
+                {webPage}
+              </a>
+            ) : (
+              <div className="text-xs text-muted-foreground">—</div>
+            )}
+          </div>
+        )
+      },
     },
-    filterFn: (row, id, value: string[]) => value.includes(row.getValue(id)),
-  },
-  {
-    accessorKey: "country",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        className="-ml-3"
-        onClick={() => column.toggleSorting()}
-      >
-        País
-        {getSortIcon(column.getIsSorted())}
-      </Button>
-    ),
-    cell: ({ row }) => {
-      const code: string = row.getValue("country");
-      return (
-        <div className="flex items-center gap-1.5 text-sm">
-          <span>{getFlag(code)}</span>
-          <span>{code}</span>
-        </div>
-      );
+    {
+      accessorKey: "country",
+      header: ({ column }) => (
+        <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
+          País {getSortIcon(column.getIsSorted())}
+        </Button>
+      ),
+      cell: ({ row }) => {
+        const code: string = row.getValue("country")
+        return (
+          <div className="flex items-center gap-1.5 text-sm">
+            <span>{getFlag(code)}</span>
+            <span>{code}</span>
+          </div>
+        )
+      },
     },
-    filterFn: (row, id, value: string[]) => value.includes(row.getValue(id)),
-  },
-  {
-    accessorKey: "source",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        className="-ml-3"
-        onClick={() => column.toggleSorting()}
-      >
-        Fuente
-        {getSortIcon(column.getIsSorted())}
-      </Button>
-    ),
-    cell: ({ row }) => (
-      <div className="capitalize text-sm">{row.getValue("source")}</div>
-    ),
-  },
-  {
-    accessorKey: "createdAt",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        className="-ml-3"
-        onClick={() => column.toggleSorting()}
-      >
-        Creado
-        {getSortIcon(column.getIsSorted())}
-      </Button>
-    ),
-    cell: ({ row }) => (
-      <div className="text-sm text-muted-foreground">{row.getValue("createdAt")}</div>
-    ),
-  },
-  {
-    id: "actions",
-    enableHiding: false,
-    cell: ({ row }) => {
-      const org = row.original;
-      return (
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={<Button className="h-8 w-8 p-0" variant="ghost" />}
-          >
-            <span className="sr-only">Abrir menú</span>
-            <MoreHorizontal className="size-4" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="min-w-48">
-            <DropdownMenuGroup>
-              <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => onDetail(org)}>
-                <ExternalLinkIcon />
-                Ver Detalles
+    {
+      accessorKey: "contactCount",
+      header: ({ column }) => (
+        <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
+          Contactos {getSortIcon(column.getIsSorted())}
+        </Button>
+      ),
+      cell: ({ row }) => {
+        const count: number = row.getValue("contactCount")
+        return (
+          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+            <UsersIcon className="size-3.5" />
+            {count}
+          </div>
+        )
+      },
+    },
+    {
+      accessorKey: "source",
+      header: ({ column }) => (
+        <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
+          Fuente {getSortIcon(column.getIsSorted())}
+        </Button>
+      ),
+      cell: ({ row }) => (
+        <div className="capitalize text-sm">{row.getValue("source")}</div>
+      ),
+    },
+    {
+      accessorKey: "createdAt",
+      header: ({ column }) => (
+        <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
+          Creado {getSortIcon(column.getIsSorted())}
+        </Button>
+      ),
+      cell: ({ row }) => (
+        <div className="text-sm text-muted-foreground">{row.getValue("createdAt")}</div>
+      ),
+    },
+    {
+      id: "actions",
+      enableHiding: false,
+      cell: ({ row }) => {
+        const org = row.original
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button className="h-8 w-8 p-0" variant="ghost" />}>
+              <span className="sr-only">Abrir menú</span>
+              <MoreHorizontal className="size-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-48">
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                <DropdownMenuItem onClick={() => onDetail(org)}>
+                  <ExternalLinkIcon />
+                  Ver Detalles
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onPreview(org)}>
+                  <UserIcon />
+                  Vista Previa
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <PencilIcon />
+                  Editar
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="text-destructive focus:text-destructive">
+                <Trash2Icon />
+                Eliminar
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onPreview(org)}>
-                <UserIcon />
-                Vista Previa
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <PencilIcon />
-                Editar
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive focus:text-destructive">
-              <Trash2Icon />
-              Eliminar
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      );
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )
+      },
     },
-  },
-  ];
+  ]
+}
+
+interface QueryState {
+  page: number
+  pageSize: number
+  search: string
 }
 
 export function OrganizationsTable() {
-  const router = useRouter();
-  const [sorting, setSorting] = React.useState<SortingState>([]);
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
-  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
-  const [rowSelection, setRowSelection] = React.useState({});
-  const [selectedOrg, setSelectedOrg] = React.useState<Organization | null>(null);
-  const [sheetOpen, setSheetOpen] = React.useState(false);
+  const router = useRouter()
+  const [organizations, setOrganizations] = React.useState<Organization[]>([])
+  const [total, setTotal] = React.useState(0)
+  const [loading, setLoading] = React.useState(true)
+  const [searchInput, setSearchInput] = React.useState("")
+  const [query, setQuery] = React.useState<QueryState>({
+    page: 1,
+    pageSize: 10,
+    search: "",
+  })
+  const [sorting, setSorting] = React.useState<SortingState>([])
+  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>(
+    DEFAULT_COLUMN_VISIBILITY
+  )
+  const [rowSelection, setRowSelection] = React.useState({})
+  const [selectedOrg, setSelectedOrg] = React.useState<Organization | null>(null)
+  const [sheetOpen, setSheetOpen] = React.useState(false)
+
+  React.useEffect(() => {
+    const t = setTimeout(
+      () => setQuery((q) => ({ ...q, page: 1, search: searchInput })),
+      400
+    )
+    return () => clearTimeout(t)
+  }, [searchInput])
+
+  React.useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    organizationService
+      .list({
+        page: query.page,
+        take: query.pageSize,
+        filter: query.search || undefined,
+      })
+      .then((res) => {
+        if (cancelled) return
+        setOrganizations(res.data.map(mapOrganization))
+        setTotal(res.total)
+        setLoading(false)
+      })
+      .catch(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [query])
+
+  const pagination: PaginationState = { pageIndex: query.page - 1, pageSize: query.pageSize }
+
+  const handlePagination = (
+    updater: PaginationState | ((prev: PaginationState) => PaginationState)
+  ) => {
+    const next = typeof updater === "function" ? updater(pagination) : updater
+    setQuery((q) => ({ ...q, page: next.pageIndex + 1, pageSize: next.pageSize }))
+  }
+
+  const hasActiveFilters = !!searchInput
+
+  const resetFilters = () => {
+    setSearchInput("")
+    setQuery((q) => ({ ...q, page: 1, search: "" }))
+  }
 
   const columns = React.useMemo(
-    () => getColumns(
-      (org) => { setSelectedOrg(org); setSheetOpen(true); },
-      (org) => router.push(`/crm/organizations/${org.id}`),
-    ),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
-  );
+    () =>
+      getColumns(
+        (org) => {
+          setSelectedOrg(org)
+          setSheetOpen(true)
+        },
+        (org) => router.push(`/crm/organizations/${org.id}`)
+      ),
+    [router]
+  )
 
   const table = useReactTable({
-    data,
+    data: organizations,
     columns,
+    manualPagination: true,
+    rowCount: total,
+    onPaginationChange: handlePagination,
     onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
-    state: { sorting, columnFilters, columnVisibility, rowSelection },
-    getFacetedRowModel: getFacetedRowModel(),
-    getFacetedUniqueValues: getFacetedUniqueValues(),
-  });
+    state: { sorting, columnVisibility, rowSelection, pagination },
+  })
 
   return (
     <div className="w-full">
@@ -416,33 +395,17 @@ export function OrganizationsTable() {
         <Input
           className="max-w-sm"
           placeholder="Buscar organización..."
-          value={(table.getColumn("name")?.getFilterValue() as string) ?? ""}
-          onChange={(e) => table.getColumn("name")?.setFilterValue(e.target.value)}
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
         />
-        <DataTableFacetedFilter
-          column={table.getColumn("country")!}
-          title="País"
-          options={[
-            { label: "Chile", value: "CL", icon: <img src="https://flagcdn.com/w40/cl.png" alt="CL" width={20} height={15} /> },
-            { label: "Argentina", value: "AR", icon: <img src="https://flagcdn.com/w40/ar.png" alt="AR" width={20} height={15} /> },
-            { label: "Colombia", value: "CO", icon: <img src="https://flagcdn.com/w40/co.png" alt="CO" width={20} height={15} /> },
-          ]}
-        />
-        {table.getState().columnFilters.length > 0 && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8"
-            onClick={() => table.resetColumnFilters()}
-          >
+        {hasActiveFilters && (
+          <Button variant="ghost" size="sm" className="h-8" onClick={resetFilters}>
             Reset
             <XIcon className="ml-1 size-4" />
           </Button>
         )}
         <div className="ml-auto flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">
-            {table.getFilteredRowModel().rows.length} organizaciones
-          </span>
+          <span className="text-sm text-muted-foreground">{total} organizaciones</span>
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button variant="outline" />}>
               Columnas <ChevronDown className="ml-2 size-4" />
@@ -486,7 +449,17 @@ export function OrganizationsTable() {
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows?.length ? (
+            {loading ? (
+              Array.from({ length: query.pageSize }).map((_, i) => (
+                <TableRow key={i}>
+                  {columns.map((_, j) => (
+                    <TableCell key={j}>
+                      <Skeleton className="h-4 w-full" />
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : table.getRowModel().rows.length ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
                   {row.getVisibleCells().map((cell) => (
@@ -517,5 +490,5 @@ export function OrganizationsTable() {
         onOpenChange={setSheetOpen}
       />
     </div>
-  );
+  )
 }

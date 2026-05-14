@@ -6,21 +6,49 @@ import { z } from "zod";
 import { useState, useEffect, useRef } from "react";
 import { getCountry, getAllCountries } from "countries-and-timezones";
 import { Building2, Camera } from "lucide-react";
+import { toast } from "sonner";
+import { authService } from "@/services/auth.service";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 
 const CURRENCIES = [
-  { value: "USD", label: "USD — Dólar estadounidense", flag: "us" },
-  { value: "EUR", label: "EUR — Euro", flag: "eu" },
-  { value: "CLP", label: "CLP — Peso chileno", flag: "cl" },
-  { value: "ARS", label: "ARS — Peso argentino", flag: "ar" },
-  { value: "COP", label: "COP — Peso colombiano", flag: "co" },
-  { value: "MXN", label: "MXN — Peso mexicano", flag: "mx" },
-  { value: "PEN", label: "PEN — Sol peruano", flag: "pe" },
-  { value: "BRL", label: "BRL — Real brasileño", flag: "br" },
+  { value: "USD", label: "USD — Dólar estadounidense", flag: "us", id: 10, name: "United States Dollar" },
+  { value: "EUR", label: "EUR — Euro",                  flag: "eu", id: 13, name: "Euro" },
+  { value: "CLP", label: "CLP — Peso chileno",          flag: "cl", id: 3,  name: "Chilean Peso" },
+  { value: "ARS", label: "ARS — Peso argentino",        flag: "ar", id: 1,  name: "Argentine Peso" },
+  { value: "COP", label: "COP — Peso colombiano",       flag: "co", id: 4,  name: "Colombian Peso" },
+  { value: "MXN", label: "MXN — Peso mexicano",         flag: "mx", id: 12, name: "Mexican Peso" },
+  { value: "PEN", label: "PEN — Sol peruano",           flag: "pe", id: 5,  name: "Peruvian Sol" },
+  { value: "BRL", label: "BRL — Real brasileño",        flag: "br", id: 2,  name: "Brazilian Real" },
 ];
+
+// ISO country code → currency code (cubre Latam + principales)
+const COUNTRY_CURRENCY: Record<string, string> = {
+  CL: "CLP", AR: "ARS", CO: "COP", MX: "MXN", PE: "PEN", BR: "BRL",
+  US: "USD", CA: "USD",
+  DE: "EUR", FR: "EUR", ES: "EUR", IT: "EUR", PT: "EUR", NL: "EUR",
+  BE: "EUR", AT: "EUR", FI: "EUR", IE: "EUR", GR: "EUR",
+};
+
+// Timezone por defecto para países con múltiples zonas
+const COUNTRY_DEFAULT_TZ: Record<string, string> = {
+  CL: "America/Santiago",
+  AR: "America/Argentina/Buenos_Aires",
+  CO: "America/Bogota",
+  MX: "America/Mexico_City",
+  PE: "America/Lima",
+  BR: "America/Sao_Paulo",
+  US: "America/New_York",
+  CA: "America/Toronto",
+  ES: "Europe/Madrid",
+  FR: "Europe/Paris",
+  DE: "Europe/Berlin",
+  PT: "Europe/Lisbon",
+  GB: "Europe/London",
+  AU: "Australia/Sydney",
+};
 
 const formSchema = z.object({
   name:     z.string().min(2, { message: "Mínimo 2 caracteres" }),
@@ -32,7 +60,7 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 
 interface Props {
-  onSuccess: (data: FormValues & { logo?: File }) => void;
+  onSuccess: () => void;
 }
 
 export const CreateWorkspaceForm = ({ onSuccess }: Props) => {
@@ -42,7 +70,7 @@ export const CreateWorkspaceForm = ({ onSuccess }: Props) => {
 
   const [timezones, setTimezones] = useState<{ value: string; label: string }[]>([]);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
-  const [logoFile, setLogoFile] = useState<File | undefined>(undefined);
+  const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<FormValues>({
@@ -59,18 +87,45 @@ export const CreateWorkspaceForm = ({ onSuccess }: Props) => {
     const country = getCountry(selectedCountry);
     const tzList  = (country?.timezones ?? []).map((tz) => ({ value: tz, label: tz }));
     setTimezones(tzList);
-    setValue("timezone", tzList.length === 1 ? tzList[0].value : "", { shouldValidate: false });
+
+    // Auto-seleccionar timezone
+    const defaultTz = COUNTRY_DEFAULT_TZ[selectedCountry];
+    const tz = (defaultTz && tzList.find(t => t.value === defaultTz))
+      ? defaultTz
+      : tzList.length === 1 ? tzList[0].value : "";
+    setValue("timezone", tz, { shouldValidate: false });
+
+    // Auto-seleccionar moneda
+    const currencyCode = COUNTRY_CURRENCY[selectedCountry];
+    if (currencyCode) setValue("currency", currencyCode, { shouldValidate: false });
   }, [selectedCountry, setValue]);
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setLogoFile(file);
     setLogoPreview(URL.createObjectURL(file));
   };
 
-  function onSubmit(values: FormValues) {
-    onSuccess({ ...values, logo: logoFile });
+  async function onSubmit(values: FormValues) {
+    const countryData = allCountries.find(c => c.value === values.country);
+    const currencyData = CURRENCIES.find(c => c.value === values.currency);
+    if (!countryData || !currencyData) return;
+
+    setIsLoading(true);
+    try {
+      await authService.createWorkspace({
+        name:     values.name,
+        country:  { id: values.country,  name: countryData.label },
+        timezone: { id: values.timezone, name: values.timezone },
+        currency: { id: currencyData.id, name: currencyData.name },
+      });
+      onSuccess();
+    } catch (err: unknown) {
+      const msg = (err as { message?: string }).message ?? "Error inesperado";
+      toast.error("Error al crear workspace", { description: msg });
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
@@ -105,7 +160,7 @@ export const CreateWorkspaceForm = ({ onSuccess }: Props) => {
         <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleLogoChange} />
       </div>
 
-      {/* Fila 2: Nombre + País */}
+      {/* Nombre + País */}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1.5">
           <Label htmlFor="name" className={errors.name ? "text-destructive" : ""}>Nombre</Label>
@@ -135,7 +190,7 @@ export const CreateWorkspaceForm = ({ onSuccess }: Props) => {
         </div>
       </div>
 
-      {/* Fila 3: Zona horaria + Moneda */}
+      {/* Zona horaria + Moneda */}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1.5">
           <Label className={errors.timezone ? "text-destructive" : ""}>Zona horaria</Label>
@@ -165,8 +220,8 @@ export const CreateWorkspaceForm = ({ onSuccess }: Props) => {
         </div>
       </div>
 
-      <Button type="submit" className="w-full" size="lg">
-        Continuar
+      <Button type="submit" className="w-full" size="lg" disabled={isLoading}>
+        {isLoading ? "Creando..." : "Continuar"}
       </Button>
     </form>
   );

@@ -2,8 +2,11 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowRight, Mail } from "lucide-react";
+import { toast } from "sonner";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { authService } from "@/services/auth.service";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,13 +17,29 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-export const RecoveryPasswordForm = () => {
+interface RecoveryPasswordFormProps {
+  onSuccess: (email: string) => void;
+}
+
+export const RecoveryPasswordForm = ({ onSuccess }: RecoveryPasswordFormProps) => {
+  const [isLoading, setIsLoading] = useState(false);
+
   const { register, handleSubmit, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
   });
 
-  function onSubmit(values: FormValues) {
-    console.log(values);
+  async function onSubmit(values: FormValues) {
+    setIsLoading(true);
+    try {
+      await authService.recoveryPassword(values.email);
+      toast.success("Código enviado", { description: `Revisa tu correo ${values.email}` });
+      onSuccess(values.email);
+    } catch (err: unknown) {
+      const msg = (err as { message?: string }).message ?? "Error inesperado";
+      toast.error(msg);
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
@@ -40,9 +59,9 @@ export const RecoveryPasswordForm = () => {
         {errors.email && <p className="text-[0.8rem] text-destructive">{errors.email.message}</p>}
       </div>
 
-      <Button className="mt-2 w-full" size="lg" type="submit">
+      <Button className="mt-2 w-full" size="lg" type="submit" disabled={isLoading}>
         <ArrowRight />
-        Enviar enlace
+        {isLoading ? "Enviando..." : "Enviar código"}
       </Button>
     </form>
   );

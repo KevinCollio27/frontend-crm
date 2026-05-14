@@ -6,6 +6,7 @@ import { ExternalLinkIcon, HomeIcon, LifeBuoyIcon, MegaphoneIcon, Plug, Settings
 import { NavMain } from "@/components/dashboard/NavMain"
 import { NavUser } from "@/components/dashboard/NavUser"
 import { TeamSwitcher } from "@/components/dashboard/TeamSwitcher"
+import { useSessionStore } from "@/store/session.store"
 import {
   Sidebar,
   SidebarContent,
@@ -18,61 +19,55 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar"
 
-const data = {
-  user: {
-    name: "Kevin Collio",
-    email: "kevincollio27@gmail.com",
-    avatar: "https://github.com/shadcn.png",
+const navMain = [
+  {
+    title: "CRM",
+    url: "#",
+    icon: <UsersIcon />,
+    items: [
+      { title: "Funnels", url: "/crm/funnels" },
+      { title: "Contactos", url: "/crm/contacts" },
+      { title: "Organizaciones", url: "/crm/organizations" },
+      { title: "Actividades", url: "/crm/activities" },
+      { title: "Documentos", url: "/crm/documents" },
+    ],
   },
-  workspace: [
-    {
-      name: "GOXT CRM",
-      logo: <img src="https://github.com/shadcn.png" alt="GOXT" className="size-full rounded-lg object-cover" />,
-      plan: "Workspace",
-    },
-  ],
-  navMain: [
-    {
-      title: "CRM",
-      url: "#",
-      icon: <UsersIcon />,
-      items: [
-        { title: "Funnels", url: "/crm/funnels" },
-        { title: "Contactos", url: "/crm/contacts" },
-        { title: "Organizaciones", url: "/crm/organizations" },
-        { title: "Actividades", url: "/crm/activities" },
-        { title: "Documentos", url: "/crm/documents" },
-      ],
-    },
-    {
-      title: "Comunicaciones",
-      url: "#",
-      icon: <Plug />,
-      items: [
-        { title: "Mensajeria", url: "/crm/messaging" },
-        { title: "Correo", url: "/crm/mail" },
-        { title: "Calendario", url: "/crm/calendaries" },
-      ],
-    },
-    {
-      title: "Marketing",
-      url: "#",
-      icon: <MegaphoneIcon />,
-      items: [
-        { title: "Campañas", url: "/marketing/campaigns" },
-        { title: "Formularios", url: "/marketing/forms" },
-        { title: "Widgets AI", url: "/marketing/widget-ai" },
-        { title: "Blog", url: "/marketing/blogs" },
-      ],
-    },
-  ],
-}
+  {
+    title: "Comunicaciones",
+    url: "#",
+    icon: <Plug />,
+    items: [
+      { title: "Mensajeria", url: "/crm/messaging" },
+      { title: "Correo", url: "/crm/mail" },
+      { title: "Calendario", url: "/crm/calendaries" },
+    ],
+  },
+  {
+    title: "Marketing",
+    url: "#",
+    icon: <MegaphoneIcon />,
+    items: [
+      { title: "Campañas", url: "/marketing/campaigns" },
+      { title: "Formularios", url: "/marketing/forms" },
+      { title: "Widgets AI", url: "/marketing/widget-ai" },
+      { title: "Blog", url: "/marketing/blogs" },
+    ],
+  },
+]
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const user = useSessionStore((s) => s.user)
+
+  const currentUser = {
+    name: user?.name ?? "",
+    email: user?.email ?? "",
+    avatar: "",
+  }
+
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
-        <TeamSwitcher teams={data.workspace} />
+        <TeamSwitcher />
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
@@ -89,7 +84,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroup>
-        <NavMain items={data.navMain} />
+        <NavMain items={navMain} />
         <SidebarGroup className="mt-auto">
           <SidebarMenu>
             <SidebarMenuItem>
@@ -126,10 +121,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroup>
-
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser user={currentUser} />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

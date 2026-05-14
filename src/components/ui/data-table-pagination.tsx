@@ -53,6 +53,7 @@ export function DataTablePagination<TData>({ table }: DataTablePaginationProps<T
             className="hidden size-8 lg:flex"
             onClick={() => table.setPageIndex(0)}
             disabled={!table.getCanPreviousPage()}
+            suppressHydrationWarning
           >
             <span className="sr-only">Primera página</span>
             <ChevronsLeft />
@@ -63,6 +64,7 @@ export function DataTablePagination<TData>({ table }: DataTablePaginationProps<T
             className="size-8"
             onClick={() => table.previousPage()}
             disabled={!table.getCanPreviousPage()}
+            suppressHydrationWarning
           >
             <span className="sr-only">Página anterior</span>
             <ChevronLeft />
@@ -73,6 +75,7 @@ export function DataTablePagination<TData>({ table }: DataTablePaginationProps<T
             className="size-8"
             onClick={() => table.nextPage()}
             disabled={!table.getCanNextPage()}
+            suppressHydrationWarning
           >
             <span className="sr-only">Página siguiente</span>
             <ChevronRight />
@@ -83,6 +86,7 @@ export function DataTablePagination<TData>({ table }: DataTablePaginationProps<T
             className="hidden size-8 lg:flex"
             onClick={() => table.setPageIndex(table.getPageCount() - 1)}
             disabled={!table.getCanNextPage()}
+            suppressHydrationWarning
           >
             <span className="sr-only">Última página</span>
             <ChevronsRight />
