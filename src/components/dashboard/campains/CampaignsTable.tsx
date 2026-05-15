@@ -1,24 +1,28 @@
-"use client";
+"use client"
 
 import {
   type ColumnDef,
-  type ColumnFiltersState,
   flexRender,
   getCoreRowModel,
-  getFacetedRowModel,
-  getFacetedUniqueValues,
-  getFilteredRowModel,
-  getPaginationRowModel,
   getSortedRowModel,
   type SortingState,
   useReactTable,
   type VisibilityState,
-} from "@tanstack/react-table";
-import { ArrowDownIcon, ArrowUpDown, ArrowUpIcon, ChevronDown, CopyIcon, EyeIcon, MailIcon, MoreHorizontal, PlusIcon, Trash2Icon, XIcon } from "lucide-react";
-import * as React from "react";
+} from "@tanstack/react-table"
+import {
+  ChevronDown,
+  CopyIcon,
+  EyeIcon,
+  MailIcon,
+  MoreHorizontal,
+  PlusIcon,
+  Trash2Icon,
+} from "lucide-react"
+import * as React from "react"
 
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
+import { DataTablePagination } from "@/components/ui/data-table-pagination"
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -28,10 +32,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { DataTableFacetedFilter } from "@/components/ui/data-table-faceted-filter";
-import { DataTablePagination } from "@/components/ui/data-table-pagination";
-import { Input } from "@/components/ui/input";
+} from "@/components/ui/dropdown-menu"
 import {
   Table,
   TableBody,
@@ -39,63 +40,123 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@/components/ui/table"
+import { getSortIcon } from "@/lib/table-utils"
+import { cn } from "@/lib/utils"
+import { campaignService } from "@/services/campaign.service"
+import type { CampaignRaw } from "@/types/campaign"
 
-interface Campaign {
-  id: number;
-  name: string;
-  subject: string;
-  type: string;
-  status: string;
-  totalSent: number;
-  totalOpened: number;
-  totalClicked: number;
-  sentAt?: string;
-  createdAt: string;
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export interface Campaign {
+  id: number
+  name: string
+  subject: string
+  audienceFilter: string
+  status: string
+  sentCount: number
+  deliveredCount: number
+  openedCount: number
+  clickedCount: number
+  sentAt: string | null
+  createdAt: string
+  createdBy: string
 }
 
-const data: Campaign[] = [
-  { id: 1,  name: "Boletín GOXT CRM",           subject: "Novedades de febrero",                    type: "specific", status: "sent",      totalSent: 248,  totalOpened: 186, totalClicked: 42,  sentAt: "2026-02-13", createdAt: "2026-02-10" },
-  { id: 2,  name: "Lanzamiento Form Widget",     subject: "Nuevo widget embebible en tu sitio",      type: "all",      status: "sent",      totalSent: 1043, totalOpened: 721, totalClicked: 198, sentAt: "2026-02-20", createdAt: "2026-02-18" },
-  { id: 3,  name: "Actualización de Precios Q1", subject: "Cambios en planes para 2026",             type: "segment",  status: "sent",      totalSent: 85,   totalOpened: 52,  totalClicked: 14,  sentAt: "2026-03-01", createdAt: "2026-02-28" },
-  { id: 4,  name: "Webinar CRM en acción",       subject: "Te invitamos a nuestro webinar",          type: "all",      status: "scheduled", totalSent: 0,    totalOpened: 0,   totalClicked: 0,                         createdAt: "2026-04-10" },
-  { id: 5,  name: "Propuesta Enterprise",        subject: "Solución a medida para tu empresa",       type: "specific", status: "draft",     totalSent: 0,    totalOpened: 0,   totalClicked: 0,                         createdAt: "2026-04-12" },
-  { id: 6,  name: "Reactivación leads fríos",   subject: "¿Sigues interesado en GOXT CRM?",         type: "segment",  status: "sent",      totalSent: 312,  totalOpened: 89,  totalClicked: 22,  sentAt: "2026-03-15", createdAt: "2026-03-14" },
-  { id: 7,  name: "Novedad: Chat con IA",        subject: "Asistente virtual ya disponible",         type: "all",      status: "sent",      totalSent: 1150, totalOpened: 843, totalClicked: 261, sentAt: "2026-03-22", createdAt: "2026-03-20" },
-  { id: 8,  name: "Encuesta de satisfacción",    subject: "Cuéntanos tu experiencia con el CRM",     type: "segment",  status: "draft",     totalSent: 0,    totalOpened: 0,   totalClicked: 0,                         createdAt: "2026-04-15" },
-  { id: 9,  name: "Promoción abril 2026",        subject: "Oferta especial este mes para ti",        type: "all",      status: "scheduled", totalSent: 0,    totalOpened: 0,   totalClicked: 0,                         createdAt: "2026-04-16" },
-  { id: 10, name: "Boletín GOXT CRM – Marzo",   subject: "Novedades de marzo 2026",                 type: "specific", status: "sent",      totalSent: 318,  totalOpened: 204, totalClicked: 67,  sentAt: "2026-04-02", createdAt: "2026-03-30" },
-];
+function mapCampaign(d: CampaignRaw): Campaign {
+  return {
+    id: d.id,
+    name: d.name,
+    subject: d.subject,
+    audienceFilter: d.audience_filter,
+    status: d.status,
+    sentCount: d.sent_count,
+    deliveredCount: d.delivered_count,
+    openedCount: d.opened_count,
+    clickedCount: d.clicked_count,
+    sentAt: d.sent_at,
+    createdAt: d.created_at,
+    createdBy: d.user.name,
+  }
+}
+
+// ─── Config ───────────────────────────────────────────────────────────────────
 
 const statusConfig: Record<string, { dot: string; badge: string; label: string }> = {
-  sent:      { dot: "bg-emerald-500", badge: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",  label: "Enviada"    },
-  draft:     { dot: "bg-zinc-400",    badge: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400", label: "Borrador"   },
-  scheduled: { dot: "bg-blue-500",    badge: "bg-blue-500/10 text-blue-600 dark:text-blue-400",           label: "Programada" },
-  sending:   { dot: "bg-amber-500",   badge: "bg-amber-500/10 text-amber-600 dark:text-amber-400",        label: "Enviando"   },
-};
+  sent:       { dot: "bg-emerald-500", badge: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",      label: "Enviada"    },
+  draft:      { dot: "bg-zinc-400",    badge: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400", label: "Borrador"   },
+  processing: { dot: "bg-amber-500",   badge: "bg-amber-500/10 text-amber-600 dark:text-amber-400",            label: "Procesando" },
+  partial:    { dot: "bg-orange-500",  badge: "bg-orange-500/10 text-orange-600 dark:text-orange-400",         label: "Parcial"    },
+  failed:     { dot: "bg-red-500",     badge: "bg-red-500/10 text-red-600 dark:text-red-400",                  label: "Fallida"    },
+}
 
-const typeConfig: Record<string, { label: string; badge: string }> = {
-  specific: { label: "Específica", badge: "bg-purple-50 text-purple-600 dark:bg-purple-950 dark:text-purple-400" },
-  all:      { label: "General",    badge: "bg-sky-50 text-sky-600 dark:bg-sky-950 dark:text-sky-400"             },
-  segment:  { label: "Segmento",   badge: "bg-orange-50 text-orange-600 dark:bg-orange-950 dark:text-orange-400" },
-};
-
-const getSortIcon = (sorted: false | "asc" | "desc") => {
-  if (sorted === "asc") return <ArrowUpIcon className="ml-2 size-3.5" />;
-  if (sorted === "desc") return <ArrowDownIcon className="ml-2 size-3.5" />;
-  return <ArrowUpDown className="ml-2 size-3.5" />;
-};
+const audienceConfig: Record<string, { label: string; badge: string }> = {
+  all:          { label: "General",      badge: "bg-sky-50 text-sky-600 dark:bg-sky-950 dark:text-sky-400"             },
+  recent:       { label: "Recientes",    badge: "bg-teal-50 text-teal-600 dark:bg-teal-950 dark:text-teal-400"         },
+  specific:     { label: "Específica",   badge: "bg-purple-50 text-purple-600 dark:bg-purple-950 dark:text-purple-400" },
+  organization: { label: "Organización", badge: "bg-orange-50 text-orange-600 dark:bg-orange-950 dark:text-orange-400" },
+  custom_list:  { label: "Lista custom", badge: "bg-pink-50 text-pink-600 dark:bg-pink-950 dark:text-pink-400"         },
+}
 
 const columnLabels: Record<string, string> = {
-  id:        "ID",
-  name:      "Nombre",
-  type:      "Tipo",
-  status:    "Estado",
-  totalSent: "Métricas",
-  createdAt: "Fecha",
-};
+  id:             "ID",
+  name:           "Nombre",
+  audienceFilter: "Audiencia",
+  status:         "Estado",
+  sentCount:      "Métricas",
+  deliveredCount: "Entregados",
+  createdBy:      "Creado por",
+  createdAt:      "Fecha",
+}
 
-export const columns: ColumnDef<Campaign>[] = [
+const DEFAULT_COLUMN_VISIBILITY: VisibilityState = {
+  deliveredCount: false,
+  createdBy: false,
+}
+
+// ─── QueryState ───────────────────────────────────────────────────────────────
+
+type QueryState = {
+  page: number
+  pageSize: number
+}
+
+// ─── Skeleton ────────────────────────────────────────────────────────────────
+
+const skeletonCell: Record<string, React.ReactNode> = {
+  select:        <div className="size-4 animate-pulse rounded bg-muted" />,
+  id:            <div className="h-3 w-8 animate-pulse rounded bg-muted" />,
+  name: (
+    <div className="flex items-center gap-2.5">
+      <div className="size-7 shrink-0 animate-pulse rounded-md bg-muted" />
+      <div className="space-y-1.5">
+        <div className="h-4 w-36 animate-pulse rounded bg-muted" />
+        <div className="h-3 w-24 animate-pulse rounded bg-muted" />
+      </div>
+    </div>
+  ),
+  audienceFilter: <div className="h-5 w-20 animate-pulse rounded bg-muted" />,
+  status:         <div className="h-5 w-24 animate-pulse rounded-full bg-muted" />,
+  sentCount: (
+    <div className="space-y-1.5">
+      <div className="h-4 w-28 animate-pulse rounded bg-muted" />
+      <div className="h-3 w-36 animate-pulse rounded bg-muted" />
+    </div>
+  ),
+  deliveredCount: <div className="h-4 w-16 animate-pulse rounded bg-muted" />,
+  createdAt: (
+    <div className="space-y-1.5">
+      <div className="h-4 w-20 animate-pulse rounded bg-muted" />
+      <div className="h-3 w-14 animate-pulse rounded bg-muted" />
+    </div>
+  ),
+  createdBy:     <div className="h-4 w-24 animate-pulse rounded bg-muted" />,
+  actions:       <div className="size-8 animate-pulse rounded bg-muted" />,
+}
+
+// ─── Columns ─────────────────────────────────────────────────────────────────
+
+const columns: ColumnDef<Campaign>[] = [
   {
     id: "select",
     header: ({ table }) => (
@@ -103,14 +164,14 @@ export const columns: ColumnDef<Campaign>[] = [
         aria-label="Select all"
         checked={table.getIsAllPageRowsSelected()}
         indeterminate={table.getIsSomePageRowsSelected() && !table.getIsAllPageRowsSelected()}
-        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+        onCheckedChange={(v) => table.toggleAllPageRowsSelected(!!v)}
       />
     ),
     cell: ({ row }) => (
       <Checkbox
         aria-label="Select row"
         checked={row.getIsSelected()}
-        onCheckedChange={(value) => row.toggleSelected(!!value)}
+        onCheckedChange={(v) => row.toggleSelected(!!v)}
       />
     ),
     enableSorting: false,
@@ -120,8 +181,7 @@ export const columns: ColumnDef<Campaign>[] = [
     accessorKey: "id",
     header: ({ column }) => (
       <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
-        ID
-        {getSortIcon(column.getIsSorted())}
+        ID {getSortIcon(column.getIsSorted())}
       </Button>
     ),
     cell: ({ row }) => (
@@ -132,13 +192,12 @@ export const columns: ColumnDef<Campaign>[] = [
     accessorKey: "name",
     header: ({ column }) => (
       <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
-        Nombre
-        {getSortIcon(column.getIsSorted())}
+        Nombre {getSortIcon(column.getIsSorted())}
       </Button>
     ),
     cell: ({ row }) => {
-      const name: string = row.getValue("name");
-      const subject = row.original.subject;
+      const name: string = row.getValue("name")
+      const subject = row.original.subject
       return (
         <div className="flex items-center gap-2.5">
           <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/10">
@@ -149,89 +208,104 @@ export const columns: ColumnDef<Campaign>[] = [
             <div className="text-xs text-muted-foreground">{subject}</div>
           </div>
         </div>
-      );
+      )
     },
   },
   {
-    accessorKey: "type",
+    accessorKey: "audienceFilter",
     header: ({ column }) => (
       <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
-        Tipo
-        {getSortIcon(column.getIsSorted())}
+        Audiencia {getSortIcon(column.getIsSorted())}
       </Button>
     ),
     cell: ({ row }) => {
-      const type: string = row.getValue("type");
-      const config = typeConfig[type];
+      const v: string = row.getValue("audienceFilter")
+      const cfg = audienceConfig[v]
       return (
-        <span className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${config?.badge ?? "bg-muted text-muted-foreground"}`}>
-          {config?.label ?? type}
+        <span className={cn("inline-flex rounded px-2 py-0.5 text-xs font-medium", cfg?.badge ?? "bg-muted text-muted-foreground")}>
+          {cfg?.label ?? v}
         </span>
-      );
+      )
     },
-    filterFn: (row, id, value: string[]) => value.includes(row.getValue(id)),
   },
   {
     accessorKey: "status",
     header: ({ column }) => (
       <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
-        Estado
-        {getSortIcon(column.getIsSorted())}
+        Estado {getSortIcon(column.getIsSorted())}
       </Button>
     ),
     cell: ({ row }) => {
-      const status: string = row.getValue("status");
-      const config = statusConfig[status];
+      const s: string = row.getValue("status")
+      const cfg = statusConfig[s]
       return (
-        <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ${config?.badge ?? "bg-muted text-muted-foreground"}`}>
-          <span className={`size-1.5 rounded-full ${config?.dot ?? "bg-muted-foreground"}`} />
-          {config?.label ?? status}
+        <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium", cfg?.badge ?? "bg-muted text-muted-foreground")}>
+          <span className={cn("size-1.5 rounded-full", cfg?.dot ?? "bg-muted-foreground")} />
+          {cfg?.label ?? s}
         </span>
-      );
+      )
     },
-    filterFn: (row, id, value: string[]) => value.includes(row.getValue(id)),
   },
   {
-    accessorKey: "totalSent",
+    accessorKey: "sentCount",
     header: ({ column }) => (
       <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
-        Métricas
-        {getSortIcon(column.getIsSorted())}
+        Métricas {getSortIcon(column.getIsSorted())}
       </Button>
     ),
     cell: ({ row }) => {
-      const totalSent: number = row.getValue("totalSent");
-      const { totalOpened, totalClicked, status } = row.original;
-      if (status === "draft" || status === "scheduled") {
-        return <div className="text-xs text-muted-foreground">—</div>;
+      const { status, sentCount, openedCount, clickedCount } = row.original
+      if (status === "draft" || status === "failed") {
+        return <div className="text-xs text-muted-foreground">—</div>
       }
       return (
         <div className="leading-tight">
-          <div className="text-sm font-medium">{totalSent.toLocaleString()} enviados</div>
+          <div className="text-sm font-medium">{sentCount.toLocaleString()} enviados</div>
           <div className="text-xs text-muted-foreground">
-            {totalOpened.toLocaleString()} abiertos · {totalClicked.toLocaleString()} clics
+            {openedCount.toLocaleString()} abiertos · {clickedCount.toLocaleString()} clics
           </div>
         </div>
-      );
+      )
+    },
+  },
+  {
+    accessorKey: "deliveredCount",
+    header: ({ column }) => (
+      <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
+        Entregados {getSortIcon(column.getIsSorted())}
+      </Button>
+    ),
+    cell: ({ row }) => {
+      const v: number = row.getValue("deliveredCount")
+      return <div className="text-sm">{v > 0 ? v.toLocaleString() : "—"}</div>
     },
   },
   {
     accessorKey: "createdAt",
     header: ({ column }) => (
       <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
-        Fecha
-        {getSortIcon(column.getIsSorted())}
+        Fecha {getSortIcon(column.getIsSorted())}
       </Button>
     ),
     cell: ({ row }) => {
-      const { sentAt, createdAt } = row.original;
+      const { sentAt, createdAt } = row.original
+      const date = sentAt ?? createdAt
       return (
         <div className="leading-tight">
-          <div className="text-sm text-muted-foreground">{sentAt ?? createdAt}</div>
+          <div className="text-sm text-muted-foreground">
+            {new Date(date).toLocaleDateString("es-CL", { day: "numeric", month: "short", year: "numeric" })}
+          </div>
           <div className="text-xs text-muted-foreground/60">{sentAt ? "Enviada" : "Creada"}</div>
         </div>
-      );
+      )
     },
+  },
+  {
+    accessorKey: "createdBy",
+    header: "Creado por",
+    cell: ({ row }) => (
+      <div className="text-sm text-muted-foreground">{row.getValue("createdBy")}</div>
+    ),
   },
   {
     id: "actions",
@@ -246,84 +320,84 @@ export const columns: ColumnDef<Campaign>[] = [
           <DropdownMenuGroup>
             <DropdownMenuLabel>Acciones</DropdownMenuLabel>
             <DropdownMenuItem>
-              <EyeIcon />
-              Ver campaña
+              <EyeIcon /> Ver campaña
             </DropdownMenuItem>
             <DropdownMenuItem>
-              <CopyIcon />
-              Duplicar
+              <CopyIcon /> Duplicar
             </DropdownMenuItem>
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
           <DropdownMenuItem className="text-destructive focus:text-destructive">
-            <Trash2Icon />
-            Eliminar
+            <Trash2Icon /> Eliminar
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     ),
   },
-];
+]
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export function CampaignsTable() {
-  const [sorting, setSorting] = React.useState<SortingState>([]);
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
-  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
-  const [rowSelection, setRowSelection] = React.useState({});
+  const [data, setData] = React.useState<Campaign[]>([])
+  const [total, setTotal] = React.useState(0)
+  const [loading, setLoading] = React.useState(true)
+  const [query, setQuery] = React.useState<QueryState>({ page: 1, pageSize: 10 })
+  const [sorting, setSorting] = React.useState<SortingState>([])
+  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>(DEFAULT_COLUMN_VISIBILITY)
+  const [rowSelection, setRowSelection] = React.useState({})
+
+  React.useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    campaignService
+      .list({ page: query.page, limit: query.pageSize })
+      .then((res) => {
+        if (cancelled) return
+        setData(res.data.map(mapCampaign))
+        setTotal(res.total)
+        setLoading(false)
+      })
+      .catch(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [query])
 
   const table = useReactTable({
     data,
     columns,
+    rowCount: total,
+    manualPagination: true,
     onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
     getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
-    state: { sorting, columnFilters, columnVisibility, rowSelection },
-    getFacetedRowModel: getFacetedRowModel(),
-    getFacetedUniqueValues: getFacetedUniqueValues(),
-  });
+    state: {
+      sorting,
+      columnVisibility,
+      rowSelection,
+      pagination: { pageIndex: query.page - 1, pageSize: query.pageSize },
+    },
+    onPaginationChange: (updater) => {
+      const next =
+        typeof updater === "function"
+          ? updater({ pageIndex: query.page - 1, pageSize: query.pageSize })
+          : updater
+      setQuery((q) => ({ ...q, page: next.pageIndex + 1, pageSize: next.pageSize }))
+    },
+  })
+
+  const skeletonRows = Array.from({ length: query.pageSize })
 
   return (
     <div className="w-full">
+      {/* Toolbar */}
       <div className="flex items-center gap-2 py-4">
-        <Input
-          className="max-w-sm"
-          placeholder="Buscar campañas..."
-          value={(table.getColumn("name")?.getFilterValue() as string) ?? ""}
-          onChange={(e) => table.getColumn("name")?.setFilterValue(e.target.value)}
-        />
-        <DataTableFacetedFilter
-          column={table.getColumn("status")!}
-          title="Estado"
-          options={[
-            { label: "Enviada",    value: "sent"      },
-            { label: "Borrador",   value: "draft"     },
-            { label: "Programada", value: "scheduled" },
-            { label: "Enviando",   value: "sending"   },
-          ]}
-        />
-        <DataTableFacetedFilter
-          column={table.getColumn("type")!}
-          title="Tipo"
-          options={[
-            { label: "Específica", value: "specific" },
-            { label: "Segmento",   value: "segment"  },
-            { label: "General",    value: "all"      },
-          ]}
-        />
-        {table.getState().columnFilters.length > 0 && (
-          <Button variant="ghost" size="sm" className="h-8" onClick={() => table.resetColumnFilters()}>
-            Reset
-            <XIcon className="ml-1 size-4" />
-          </Button>
-        )}
         <div className="ml-auto flex items-center gap-2">
           <span className="text-sm text-muted-foreground">
-            {table.getFilteredRowModel().rows.length} campañas
+            {loading ? "…" : `${total} campañas`}
           </span>
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button variant="outline" />}>
@@ -338,7 +412,7 @@ export function CampaignsTable() {
                     key={col.id}
                     className="capitalize"
                     checked={col.getIsVisible()}
-                    onCheckedChange={(value) => col.toggleVisibility(!!value)}
+                    onCheckedChange={(v) => col.toggleVisibility(!!v)}
                   >
                     {columnLabels[col.id] ?? col.id}
                   </DropdownMenuCheckboxItem>
@@ -346,29 +420,37 @@ export function CampaignsTable() {
             </DropdownMenuContent>
           </DropdownMenu>
           <Button>
-            <PlusIcon className="size-4" />
-            Crear Campaña
+            <PlusIcon className="size-4" /> Crear Campaña
           </Button>
         </div>
       </div>
 
+      {/* Table */}
       <div className="rounded-md border">
         <Table>
           <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id}>
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(header.column.columnDef.header, header.getContext())}
+            {table.getHeaderGroups().map((hg) => (
+              <TableRow key={hg.id}>
+                {hg.headers.map((h) => (
+                  <TableHead key={h.id}>
+                    {h.isPlaceholder ? null : flexRender(h.column.columnDef.header, h.getContext())}
                   </TableHead>
                 ))}
               </TableRow>
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows?.length ? (
+            {loading ? (
+              skeletonRows.map((_, i) => (
+                <TableRow key={i}>
+                  {table.getVisibleLeafColumns().map((col) => (
+                    <TableCell key={col.id}>
+                      {skeletonCell[col.id] ?? <div className="h-4 w-3/4 animate-pulse rounded bg-muted" />}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : table.getRowModel().rows.length ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
                   {row.getVisibleCells().map((cell) => (
@@ -393,5 +475,5 @@ export function CampaignsTable() {
         <DataTablePagination table={table} />
       </div>
     </div>
-  );
+  )
 }

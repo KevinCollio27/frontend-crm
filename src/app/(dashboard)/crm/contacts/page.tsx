@@ -6,7 +6,7 @@ export default function ContactsPage() {
   return (
     <>
       <PageHeader icon={UsersIcon} title="Contactos" description="Gestiona tus contactos" />
-      <main className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
+      <main className="flex flex-1 flex-col gap-4 overflow-y-auto px-4">
         <ContactsTable />
       </main>
     </>

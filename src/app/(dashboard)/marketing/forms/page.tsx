@@ -6,7 +6,7 @@ export default function FormsPage() {
   return (
     <>
       <PageHeader icon={ClipboardListIcon} title="Formularios" description="Gestiona tus formularios embebidos" />
-      <main className="flex flex-1 flex-col gap-4 overflow-y-auto p-6">
+      <main className="flex flex-1 flex-col gap-4 overflow-y-auto px-4">
         <FormsTable />
       </main>
     </>

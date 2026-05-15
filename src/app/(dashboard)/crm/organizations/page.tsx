@@ -6,7 +6,7 @@ export default function OrganizationPage() {
   return (
     <>
       <PageHeader icon={BuildingIcon} title="Organización" description="Gestiona tu organización" />
-      <main className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
+      <main className="flex flex-1 flex-col gap-4 overflow-y-auto px-4">
         <OrganizationsTable />
       </main>
     </>

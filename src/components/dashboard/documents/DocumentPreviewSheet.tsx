@@ -13,38 +13,56 @@ import {
   FileTextIcon,
   ImageIcon,
   InfoIcon,
+  Link2,
   TargetIcon,
   Trash2,
+  UserIcon,
 } from "lucide-react"
+import * as React from "react"
 import type { Document } from "./DocumentsTable"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const formatSize = (bytes: number) => {
+const formatSize = (bytes: number | null) => {
+  if (!bytes) return "—"
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 const fileConfig: Record<string, { icon: React.ElementType; iconClass: string; bgClass: string }> = {
-  pdf:  { icon: FileTextIcon, iconClass: "text-red-600",   bgClass: "bg-red-50"   },
-  png:  { icon: ImageIcon,    iconClass: "text-blue-600",  bgClass: "bg-blue-50"  },
-  jpg:  { icon: ImageIcon,    iconClass: "text-blue-600",  bgClass: "bg-blue-50"  },
-  docx: { icon: FileIcon,     iconClass: "text-sky-600",   bgClass: "bg-sky-50"   },
-  xlsx: { icon: FileIcon,     iconClass: "text-green-600", bgClass: "bg-green-50" },
+  pdf:  { icon: FileTextIcon, iconClass: "text-red-600",    bgClass: "bg-red-50"    },
+  png:  { icon: ImageIcon,    iconClass: "text-blue-600",   bgClass: "bg-blue-50"   },
+  jpg:  { icon: ImageIcon,    iconClass: "text-blue-600",   bgClass: "bg-blue-50"   },
+  jpeg: { icon: ImageIcon,    iconClass: "text-blue-600",   bgClass: "bg-blue-50"   },
+  docx: { icon: FileIcon,     iconClass: "text-sky-600",    bgClass: "bg-sky-50"    },
+  doc:  { icon: FileIcon,     iconClass: "text-sky-600",    bgClass: "bg-sky-50"    },
+  xlsx: { icon: FileIcon,     iconClass: "text-green-600",  bgClass: "bg-green-50"  },
+  xls:  { icon: FileIcon,     iconClass: "text-green-600",  bgClass: "bg-green-50"  },
+  pptx: { icon: FileIcon,     iconClass: "text-orange-600", bgClass: "bg-orange-50" },
+  link: { icon: Link2,        iconClass: "text-violet-600", bgClass: "bg-violet-50" },
 }
 
-const extensionBadge: Record<string, string> = {
-  pdf:  "bg-red-50 text-red-600",
-  png:  "bg-blue-50 text-blue-600",
-  jpg:  "bg-blue-50 text-blue-600",
-  docx: "bg-sky-50 text-sky-600",
-  xlsx: "bg-green-50 text-green-600",
+const fileTypeBadge: Record<string, string> = {
+  pdf:  "bg-red-50 text-red-600 dark:bg-red-950 dark:text-red-400",
+  png:  "bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400",
+  jpg:  "bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400",
+  jpeg: "bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400",
+  docx: "bg-sky-50 text-sky-600 dark:bg-sky-950 dark:text-sky-400",
+  doc:  "bg-sky-50 text-sky-600 dark:bg-sky-950 dark:text-sky-400",
+  xlsx: "bg-green-50 text-green-600 dark:bg-green-950 dark:text-green-400",
+  xls:  "bg-green-50 text-green-600 dark:bg-green-950 dark:text-green-400",
+  pptx: "bg-orange-50 text-orange-600 dark:bg-orange-950 dark:text-orange-400",
+  ppt:  "bg-orange-50 text-orange-600 dark:bg-orange-950 dark:text-orange-400",
+  zip:  "bg-yellow-50 text-yellow-600 dark:bg-yellow-950 dark:text-yellow-400",
+  rar:  "bg-yellow-50 text-yellow-600 dark:bg-yellow-950 dark:text-yellow-400",
+  link: "bg-violet-50 text-violet-600 dark:bg-violet-950 dark:text-violet-400",
 }
 
-const categoryLabel: Record<string, string> = {
-  presentacion: "Presentación",
+const categoryLabels: Record<string, string> = {
   contrato:     "Contrato",
-  informe:      "Informe",
+  factura:      "Factura",
+  presentacion: "Presentación",
+  manual:       "Manual",
   otro:         "Otro",
 }
 
@@ -71,10 +89,10 @@ function InfoRow({ label, children }: { label: string; children: React.ReactNode
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
 const quickActions = [
-  { icon: FileTextIcon,  label: "Nota",        color: "text-blue-500"    },
-  { icon: TargetIcon,    label: "Desafío",      color: "text-amber-500"   },
-  { icon: BriefcaseIcon, label: "Oportunidad",  color: "text-emerald-500" },
-  { icon: CalendarIcon,  label: "Tarea",        color: "text-violet-500"  },
+  { icon: FileTextIcon,  label: "Nota",       color: "text-blue-500"    },
+  { icon: TargetIcon,    label: "Desafío",     color: "text-amber-500"   },
+  { icon: BriefcaseIcon, label: "Oportunidad", color: "text-emerald-500" },
+  { icon: CalendarIcon,  label: "Tarea",       color: "text-violet-500"  },
 ]
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -90,8 +108,8 @@ interface Props {
 export function DocumentPreviewSheet({ document: doc, open, onOpenChange }: Props) {
   if (!doc) return null
 
-  const config = fileConfig[doc.extension] ?? { icon: FileIcon, iconClass: "text-muted-foreground", bgClass: "bg-muted" }
-  const FileIcon_ = config.icon
+  const config = fileConfig[doc.fileType] ?? { icon: FileIcon, iconClass: "text-muted-foreground", bgClass: "bg-muted" }
+  const FileTypeIcon = config.icon
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -100,7 +118,7 @@ export function DocumentPreviewSheet({ document: doc, open, onOpenChange }: Prop
         {/* Identity */}
         <div className="flex shrink-0 items-center gap-4 border-b px-5 py-4">
           <div className={cn("size-14 shrink-0 rounded-xl flex items-center justify-center", config.bgClass)}>
-            <FileIcon_ className={cn("size-7", config.iconClass)} />
+            <FileTypeIcon className={cn("size-7", config.iconClass)} />
           </div>
           <div className="flex min-w-0 flex-col gap-1">
             <span className="truncate text-sm font-medium leading-snug">{doc.name}</span>
@@ -108,11 +126,24 @@ export function DocumentPreviewSheet({ document: doc, open, onOpenChange }: Prop
               <span className="truncate text-xs text-muted-foreground">{doc.description}</span>
             )}
             <div className="flex gap-1.5 flex-wrap mt-0.5">
-              <span className={cn("w-fit rounded px-2 py-0.5 text-xs font-medium uppercase", extensionBadge[doc.extension] ?? "bg-muted text-muted-foreground")}>
-                {doc.extension}
+              <span className={cn(
+                "w-fit rounded px-2 py-0.5 text-xs font-medium uppercase",
+                fileTypeBadge[doc.fileType] ?? "bg-muted text-muted-foreground"
+              )}>
+                {doc.fileType}
               </span>
-              <span className="w-fit rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                {categoryLabel[doc.category] ?? doc.category}
+              {doc.category && (
+                <span className="w-fit rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                  {categoryLabels[doc.category] ?? doc.category}
+                </span>
+              )}
+              <span className={cn(
+                "w-fit rounded-full px-2 py-0.5 text-xs font-medium",
+                doc.visibility === "public"
+                  ? "bg-emerald-50 text-emerald-600"
+                  : "bg-muted text-muted-foreground"
+              )}>
+                {doc.visibility === "public" ? "Público" : "Privado"}
               </span>
             </div>
           </div>
@@ -140,12 +171,37 @@ export function DocumentPreviewSheet({ document: doc, open, onOpenChange }: Prop
           <SectionHeader icon={InfoIcon} label="Información General" />
           <div className="flex flex-col gap-1.5 px-4 py-3">
             <InfoRow label="Tipo">
-              <span className={cn("rounded px-2 py-0.5 text-xs font-medium uppercase", extensionBadge[doc.extension] ?? "bg-muted text-muted-foreground")}>
-                {doc.extension}
+              <span className={cn(
+                "rounded px-2 py-0.5 text-xs font-medium uppercase",
+                fileTypeBadge[doc.fileType] ?? "bg-muted text-muted-foreground"
+              )}>
+                {doc.fileType}
               </span>
             </InfoRow>
-            <InfoRow label="Tamaño">{formatSize(doc.size)}</InfoRow>
-            <InfoRow label="Categoría">{categoryLabel[doc.category] ?? doc.category}</InfoRow>
+            {doc.fileSize && (
+              <InfoRow label="Tamaño">{formatSize(doc.fileSize)}</InfoRow>
+            )}
+            {doc.category && (
+              <InfoRow label="Categoría">{categoryLabels[doc.category] ?? doc.category}</InfoRow>
+            )}
+            <InfoRow label="Visibilidad">
+              <span className={cn(
+                "rounded-full px-2 py-0.5 text-xs font-medium",
+                doc.visibility === "public"
+                  ? "bg-emerald-50 text-emerald-600"
+                  : "bg-muted text-muted-foreground"
+              )}>
+                {doc.visibility === "public" ? "Público" : "Privado"}
+              </span>
+            </InfoRow>
+            {doc.uploadedBy && (
+              <InfoRow label="Subido por">
+                <span className="flex items-center gap-1">
+                  <UserIcon className="size-3 text-muted-foreground" />
+                  {doc.uploadedBy}
+                </span>
+              </InfoRow>
+            )}
             <InfoRow label="Subido el">
               {new Date(doc.createdAt).toLocaleDateString("es-CL", {
                 day: "numeric",

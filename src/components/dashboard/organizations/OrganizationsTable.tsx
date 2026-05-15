@@ -42,7 +42,6 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { DataTablePagination } from "@/components/ui/data-table-pagination"
 import { Input } from "@/components/ui/input"
-import { Skeleton } from "@/components/ui/skeleton"
 import {
   Table,
   TableBody,
@@ -289,6 +288,43 @@ function getColumns(
   ]
 }
 
+// ─── Skeleton ────────────────────────────────────────────────────────────────
+
+const skeletonCell: Record<string, React.ReactNode> = {
+  select: <div className="size-4 animate-pulse rounded bg-muted" />,
+  id:     <div className="h-3 w-8 animate-pulse rounded bg-muted" />,
+  name: (
+    <div className="flex items-center gap-2.5">
+      <div className="size-8 shrink-0 animate-pulse rounded-full bg-muted" />
+      <div className="space-y-1.5">
+        <div className="h-4 w-32 animate-pulse rounded bg-muted" />
+        <div className="h-3 w-20 animate-pulse rounded bg-muted" />
+      </div>
+    </div>
+  ),
+  industry: (
+    <div className="space-y-1.5">
+      <div className="h-4 w-24 animate-pulse rounded bg-muted" />
+      <div className="h-3 w-32 animate-pulse rounded bg-muted" />
+    </div>
+  ),
+  country: (
+    <div className="flex items-center gap-1.5">
+      <div className="size-4 animate-pulse rounded bg-muted" />
+      <div className="h-4 w-6 animate-pulse rounded bg-muted" />
+    </div>
+  ),
+  contactCount: (
+    <div className="flex items-center gap-1.5">
+      <div className="size-3.5 animate-pulse rounded bg-muted" />
+      <div className="h-4 w-6 animate-pulse rounded bg-muted" />
+    </div>
+  ),
+  source:    <div className="h-4 w-20 animate-pulse rounded bg-muted" />,
+  createdAt: <div className="h-4 w-20 animate-pulse rounded bg-muted" />,
+  actions:   <div className="size-8 animate-pulse rounded bg-muted" />,
+}
+
 interface QueryState {
   page: number
   pageSize: number
@@ -452,9 +488,9 @@ export function OrganizationsTable() {
             {loading ? (
               Array.from({ length: query.pageSize }).map((_, i) => (
                 <TableRow key={i}>
-                  {columns.map((_, j) => (
-                    <TableCell key={j}>
-                      <Skeleton className="h-4 w-full" />
+                  {table.getVisibleLeafColumns().map((col) => (
+                    <TableCell key={col.id}>
+                      {skeletonCell[col.id] ?? <div className="h-4 w-3/4 animate-pulse rounded bg-muted" />}
                     </TableCell>
                   ))}
                 </TableRow>

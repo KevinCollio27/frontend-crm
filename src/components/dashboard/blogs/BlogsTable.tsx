@@ -1,24 +1,29 @@
-"use client";
+"use client"
 
 import {
   type ColumnDef,
-  type ColumnFiltersState,
   flexRender,
   getCoreRowModel,
-  getFacetedRowModel,
-  getFacetedUniqueValues,
-  getFilteredRowModel,
-  getPaginationRowModel,
   getSortedRowModel,
   type SortingState,
   useReactTable,
   type VisibilityState,
-} from "@tanstack/react-table";
-import { ArrowDownIcon, ArrowUpDown, ArrowUpIcon, BookOpenIcon, ChevronDown, EyeIcon, Link2Icon, MoreHorizontal, PencilIcon, PlusIcon, Trash2Icon, XIcon } from "lucide-react";
-import * as React from "react";
+} from "@tanstack/react-table"
+import {
+  BookOpenIcon,
+  ChevronDown,
+  FileTextIcon,
+  MoreHorizontal,
+  PencilIcon,
+  PlusIcon,
+  Trash2Icon,
+  XIcon,
+} from "lucide-react"
+import * as React from "react"
 
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
+import { DataTablePagination } from "@/components/ui/data-table-pagination"
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -28,10 +33,8 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { DataTableFacetedFilter } from "@/components/ui/data-table-faceted-filter";
-import { DataTablePagination } from "@/components/ui/data-table-pagination";
-import { Input } from "@/components/ui/input";
+} from "@/components/ui/dropdown-menu"
+import { Input } from "@/components/ui/input"
 import {
   Table,
   TableBody,
@@ -39,46 +42,141 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@/components/ui/table"
+import { getSortIcon } from "@/lib/table-utils"
+import { cn } from "@/lib/utils"
+import { blogService, type BlogListParams } from "@/services/blog.service"
+import type { BlogRaw } from "@/types/blog"
 
-interface BlogPost {
-  id: number;
-  title: string;
-  slug: string;
-  tags: string;
-  views: number;
-  isPublished: boolean;
-  publishedAt?: string;
-  createdAt: string;
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export interface Blog {
+  id: number
+  name: string
+  postCount: number
+  isActive: boolean
+  brandColor: string | null
+  logoUrl: string | null
+  allowedDomains: string | null
+  createdAt: string
 }
 
-const data: BlogPost[] = [
-  { id: 1, title: "Suministro en festivales gastronómicos",               slug: "suministro-en-festivales-gastronomicos",           tags: "economía circular, suministros, cadena de suministro, NODO, Sostenibilidad",            views: 32,  isPublished: true,  publishedAt: "2026-03-25", createdAt: "2026-03-25" },
-  { id: 2, title: "Encrucijada Geopolítica: Un Efecto Dominó",            slug: "encrucijada-geopolitica-un-efecto-domino",         tags: "economía circular, suministros, cadena de suministro, NODO, Sostenibilidad, Geopolítica", views: 0,   isPublished: true,  publishedAt: "2026-03-27", createdAt: "2026-03-27" },
-  { id: 3, title: "El futuro del transporte de carga en Latinoamérica",   slug: "futuro-transporte-carga-latinoamerica",            tags: "logística, transporte, carga, Latinoamérica",                                           views: 148, isPublished: true,  publishedAt: "2026-02-10", createdAt: "2026-02-08" },
-  { id: 4, title: "Cómo optimizar tu cadena de suministro",               slug: "optimizar-cadena-suministro-tecnologia",           tags: "cadena de suministro, tecnología, TMS",                                                 views: 214, isPublished: true,  publishedAt: "2026-02-20", createdAt: "2026-02-18" },
-  { id: 5, title: "Tendencias logísticas 2026",                           slug: "tendencias-logisticas-2026",                       tags: "logística, tendencias, 2026",                                                           views: 89,  isPublished: true,  publishedAt: "2026-01-15", createdAt: "2026-01-12" },
-  { id: 6, title: "Gestión de flotas inteligente con GOXT",               slug: "gestion-flotas-inteligente-goxt",                  tags: "flotas, gestión, TMS, GOXT",                                                            views: 67,  isPublished: true,  publishedAt: "2026-01-28", createdAt: "2026-01-25" },
-  { id: 7, title: "Impacto del cambio climático en rutas de distribución", slug: "impacto-cambio-climatico-rutas-distribucion",     tags: "sostenibilidad, cambio climático, distribución",                                        views: 0,   isPublished: false,                            createdAt: "2026-04-10" },
-  { id: 8, title: "Integración de IA en la logística moderna",            slug: "integracion-ia-logistica-moderna",                 tags: "inteligencia artificial, logística, automatización",                                     views: 0,   isPublished: false,                            createdAt: "2026-04-14" },
-];
+function mapBlog(d: BlogRaw): Blog {
+  return {
+    id: d.id,
+    name: d.name,
+    postCount: d._count.blog_post,
+    isActive: d.is_active,
+    brandColor: d.brand_color,
+    logoUrl: d.logo_url,
+    allowedDomains: d.allowed_domains,
+    createdAt: d.created_at,
+  }
+}
 
-const getSortIcon = (sorted: false | "asc" | "desc") => {
-  if (sorted === "asc") return <ArrowUpIcon className="ml-2 size-3.5" />;
-  if (sorted === "desc") return <ArrowDownIcon className="ml-2 size-3.5" />;
-  return <ArrowUpDown className="ml-2 size-3.5" />;
-};
+// ─── Config ───────────────────────────────────────────────────────────────────
 
 const columnLabels: Record<string, string> = {
-  id:          "ID",
-  title:       "Título",
-  tags:        "Etiquetas",
-  views:       "Vistas",
-  isPublished: "Estado",
-  createdAt:   "Fecha",
-};
+  id:             "ID",
+  name:           "Nombre",
+  postCount:      "Artículos",
+  isActive:       "Estado",
+  createdAt:      "Fecha",
+  brandColor:     "Color",
+  logoUrl:        "Logo",
+  allowedDomains: "Dominios",
+}
 
-export const columns: ColumnDef<BlogPost>[] = [
+const DEFAULT_COLUMN_VISIBILITY: VisibilityState = {
+  brandColor:     false,
+  logoUrl:        false,
+  allowedDomains: false,
+}
+
+// ─── QueryState ───────────────────────────────────────────────────────────────
+
+type QueryState = {
+  page: number
+  pageSize: number
+  search: string
+  isActive: boolean | null
+}
+
+// ─── SimpleFilter ─────────────────────────────────────────────────────────────
+
+function SimpleFilter({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string
+  value: string | null
+  options: { label: string; value: string }[]
+  onChange: (v: string | null) => void
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger render={
+        <Button variant="outline" size="sm" className={cn("h-8 gap-1", value && "border-primary/50 bg-primary/5")} />
+      }>
+        {label}
+        {value && <span className="ml-1 text-primary">·</span>}
+        <ChevronDown className="size-3.5" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="min-w-32">
+        {value && (
+          <DropdownMenuItem onClick={() => onChange(null)}>
+            <XIcon className="size-3.5" /> Todos
+          </DropdownMenuItem>
+        )}
+        {options.map((opt) => (
+          <DropdownMenuItem
+            key={opt.value}
+            onClick={() => onChange(opt.value === value ? null : opt.value)}
+            className={opt.value === value ? "font-medium" : ""}
+          >
+            {opt.label}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+// ─── Skeleton ────────────────────────────────────────────────────────────────
+
+const skeletonCell: Record<string, React.ReactNode> = {
+  select: <div className="size-4 animate-pulse rounded bg-muted" />,
+  id:     <div className="h-3 w-8 animate-pulse rounded bg-muted" />,
+  name: (
+    <div className="flex items-center gap-2.5">
+      <div className="size-7 shrink-0 animate-pulse rounded-md bg-muted" />
+      <div className="h-4 w-32 animate-pulse rounded bg-muted" />
+    </div>
+  ),
+  postCount: (
+    <div className="flex items-center gap-1.5">
+      <div className="size-3.5 animate-pulse rounded bg-muted" />
+      <div className="h-4 w-8 animate-pulse rounded bg-muted" />
+    </div>
+  ),
+  isActive:       <div className="h-5 w-20 animate-pulse rounded-full bg-muted" />,
+  createdAt:      <div className="h-4 w-20 animate-pulse rounded bg-muted" />,
+  brandColor: (
+    <div className="flex items-center gap-2">
+      <div className="size-4 animate-pulse rounded bg-muted" />
+      <div className="h-3 w-16 animate-pulse rounded bg-muted" />
+    </div>
+  ),
+  logoUrl:        <div className="h-4 w-8 animate-pulse rounded bg-muted" />,
+  allowedDomains: <div className="h-4 w-16 animate-pulse rounded bg-muted" />,
+  actions:        <div className="size-8 animate-pulse rounded bg-muted" />,
+}
+
+// ─── Columns ─────────────────────────────────────────────────────────────────
+
+const columns: ColumnDef<Blog>[] = [
   {
     id: "select",
     header: ({ table }) => (
@@ -86,14 +184,14 @@ export const columns: ColumnDef<BlogPost>[] = [
         aria-label="Select all"
         checked={table.getIsAllPageRowsSelected()}
         indeterminate={table.getIsSomePageRowsSelected() && !table.getIsAllPageRowsSelected()}
-        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+        onCheckedChange={(v) => table.toggleAllPageRowsSelected(!!v)}
       />
     ),
     cell: ({ row }) => (
       <Checkbox
         aria-label="Select row"
         checked={row.getIsSelected()}
-        onCheckedChange={(value) => row.toggleSelected(!!value)}
+        onCheckedChange={(v) => row.toggleSelected(!!v)}
       />
     ),
     enableSorting: false,
@@ -103,8 +201,7 @@ export const columns: ColumnDef<BlogPost>[] = [
     accessorKey: "id",
     header: ({ column }) => (
       <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
-        ID
-        {getSortIcon(column.getIsSorted())}
+        ID {getSortIcon(column.getIsSorted())}
       </Button>
     ),
     cell: ({ row }) => (
@@ -112,107 +209,104 @@ export const columns: ColumnDef<BlogPost>[] = [
     ),
   },
   {
-    accessorKey: "title",
+    accessorKey: "name",
     header: ({ column }) => (
       <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
-        Título
-        {getSortIcon(column.getIsSorted())}
+        Nombre {getSortIcon(column.getIsSorted())}
       </Button>
     ),
     cell: ({ row }) => {
-      const title: string = row.getValue("title");
-      const slug = row.original.slug;
+      const name: string = row.getValue("name")
       return (
         <div className="flex items-center gap-2.5">
           <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-orange-500/10">
             <BookOpenIcon className="size-3.5 text-orange-600 dark:text-orange-400" />
           </div>
-          <div className="leading-tight">
-            <div className="text-sm font-medium">{title}</div>
-            <div className="text-xs text-muted-foreground">{slug}</div>
-          </div>
+          <div className="text-sm font-medium">{name}</div>
         </div>
-      );
+      )
     },
   },
   {
-    accessorKey: "tags",
-    header: ({ column }) => (
-      <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
-        Etiquetas
-        {getSortIcon(column.getIsSorted())}
-      </Button>
-    ),
+    accessorKey: "postCount",
+    header: "Artículos",
     cell: ({ row }) => {
-      const tags: string = row.getValue("tags");
-      const tagList = tags.split(",").map((t) => t.trim());
-      const visible = tagList.slice(0, 2);
-      const extra = tagList.length - 2;
+      const count: number = row.getValue("postCount")
       return (
-        <div className="flex flex-wrap items-center gap-1">
-          {visible.map((tag, i) => (
-            <span key={i} className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-              {tag}
-            </span>
-          ))}
-          {extra > 0 && (
-            <span className="text-xs text-muted-foreground">+{extra}</span>
-          )}
+        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+          <FileTextIcon className="size-3.5" />
+          {count}
         </div>
-      );
+      )
     },
   },
   {
-    accessorKey: "views",
+    accessorKey: "isActive",
     header: ({ column }) => (
       <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
-        Vistas
-        {getSortIcon(column.getIsSorted())}
-      </Button>
-    ),
-    cell: ({ row }) => (
-      <div className="text-sm text-muted-foreground">{row.getValue<number>("views").toLocaleString()} vistas</div>
-    ),
-  },
-  {
-    accessorKey: "isPublished",
-    header: ({ column }) => (
-      <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
-        Estado
-        {getSortIcon(column.getIsSorted())}
+        Estado {getSortIcon(column.getIsSorted())}
       </Button>
     ),
     cell: ({ row }) => {
-      const isPublished: boolean = row.getValue("isPublished");
+      const isActive: boolean = row.getValue("isActive")
       return (
-        <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ${
-          isPublished
+        <span className={cn(
+          "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium",
+          isActive
             ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
             : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
-        }`}>
-          <span className={`size-1.5 rounded-full ${isPublished ? "bg-emerald-500" : "bg-zinc-400"}`} />
-          {isPublished ? "Publicado" : "Borrador"}
+        )}>
+          <span className={cn("size-1.5 rounded-full", isActive ? "bg-emerald-500" : "bg-zinc-400")} />
+          {isActive ? "Activo" : "Inactivo"}
         </span>
-      );
+      )
     },
-    filterFn: (row, id, value: string[]) => value.includes(String(row.getValue(id))),
   },
   {
     accessorKey: "createdAt",
     header: ({ column }) => (
       <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
-        Fecha
-        {getSortIcon(column.getIsSorted())}
+        Fecha {getSortIcon(column.getIsSorted())}
       </Button>
     ),
+    cell: ({ row }) => (
+      <div className="text-sm text-muted-foreground">
+        {new Date(row.getValue("createdAt")).toLocaleDateString("es-CL", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        })}
+      </div>
+    ),
+  },
+  {
+    accessorKey: "brandColor",
+    header: "Color",
     cell: ({ row }) => {
-      const { publishedAt, createdAt } = row.original;
+      const color: string | null = row.getValue("brandColor")
+      if (!color) return <span className="text-xs text-muted-foreground">—</span>
       return (
-        <div className="leading-tight">
-          <div className="text-sm text-muted-foreground">{publishedAt ?? createdAt}</div>
-          <div className="text-xs text-muted-foreground/60">{publishedAt ? "Publicado" : "Borrador"}</div>
+        <div className="flex items-center gap-2">
+          <div className="size-4 rounded" style={{ backgroundColor: color }} />
+          <span className="text-xs text-muted-foreground">{color}</span>
         </div>
-      );
+      )
+    },
+  },
+  {
+    accessorKey: "logoUrl",
+    header: "Logo",
+    cell: ({ row }) => {
+      const url: string | null = row.getValue("logoUrl")
+      return <span className="text-xs text-muted-foreground">{url ? "Sí" : "—"}</span>
+    },
+  },
+  {
+    accessorKey: "allowedDomains",
+    header: "Dominios",
+    cell: ({ row }) => {
+      const domains: string | null = row.getValue("allowedDomains")
+      return <span className="text-xs text-muted-foreground">{domains ?? "—"}</span>
     },
   },
   {
@@ -228,77 +322,138 @@ export const columns: ColumnDef<BlogPost>[] = [
           <DropdownMenuGroup>
             <DropdownMenuLabel>Acciones</DropdownMenuLabel>
             <DropdownMenuItem>
-              <EyeIcon />
-              Ver post
+              <BookOpenIcon />
+              Ver posts
             </DropdownMenuItem>
             <DropdownMenuItem>
               <PencilIcon />
-              Editar
-            </DropdownMenuItem>
-            <DropdownMenuItem>
-              <Link2Icon />
-              Copiar enlace
+              Editar blog
             </DropdownMenuItem>
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
           <DropdownMenuItem className="text-destructive focus:text-destructive">
             <Trash2Icon />
-            Eliminar
+            Desactivar
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     ),
   },
-];
+]
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export function BlogsTable() {
-  const [sorting, setSorting] = React.useState<SortingState>([]);
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
-  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
-  const [rowSelection, setRowSelection] = React.useState({});
+  const [data, setData] = React.useState<Blog[]>([])
+  const [total, setTotal] = React.useState(0)
+  const [loading, setLoading] = React.useState(true)
+  const [query, setQuery] = React.useState<QueryState>({
+    page: 1,
+    pageSize: 10,
+    search: "",
+    isActive: null,
+  })
+  const [sorting, setSorting] = React.useState<SortingState>([])
+  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>(DEFAULT_COLUMN_VISIBILITY)
+  const [rowSelection, setRowSelection] = React.useState({})
+
+  React.useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    const timer = setTimeout(() => {
+      const params: BlogListParams = {
+        page: query.page,
+        take: query.pageSize,
+        filter: query.search || undefined,
+        is_active: query.isActive !== null ? query.isActive : undefined,
+      }
+      blogService
+        .list(params)
+        .then((res) => {
+          if (cancelled) return
+          setData(res.data.map(mapBlog))
+          setTotal(res.total)
+          setLoading(false)
+        })
+        .catch(() => {
+          if (!cancelled) setLoading(false)
+        })
+    }, query.search ? 400 : 0)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [query])
 
   const table = useReactTable({
     data,
     columns,
+    rowCount: total,
+    manualPagination: true,
     onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
     getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
-    state: { sorting, columnFilters, columnVisibility, rowSelection },
-    getFacetedRowModel: getFacetedRowModel(),
-    getFacetedUniqueValues: getFacetedUniqueValues(),
-  });
+    state: {
+      sorting,
+      columnVisibility,
+      rowSelection,
+      pagination: { pageIndex: query.page - 1, pageSize: query.pageSize },
+    },
+    onPaginationChange: (updater) => {
+      const next =
+        typeof updater === "function"
+          ? updater({ pageIndex: query.page - 1, pageSize: query.pageSize })
+          : updater
+      setQuery((q) => ({ ...q, page: next.pageIndex + 1, pageSize: next.pageSize }))
+    },
+  })
+
+  const skeletonRows = Array.from({ length: query.pageSize })
+  const hasFilters = !!query.search || query.isActive !== null
+
+  const activeFilterValue =
+    query.isActive === true ? "true" : query.isActive === false ? "false" : null
 
   return (
     <div className="w-full">
+      {/* Toolbar */}
       <div className="flex items-center gap-2 py-4">
         <Input
-          className="max-w-sm"
-          placeholder="Buscar posts..."
-          value={(table.getColumn("title")?.getFilterValue() as string) ?? ""}
-          onChange={(e) => table.getColumn("title")?.setFilterValue(e.target.value)}
+          className="max-w-sm h-8"
+          placeholder="Buscar blogs..."
+          value={query.search}
+          onChange={(e) => setQuery((q) => ({ ...q, search: e.target.value, page: 1 }))}
         />
-        <DataTableFacetedFilter
-          column={table.getColumn("isPublished")!}
-          title="Estado"
+        <SimpleFilter
+          label="Estado"
+          value={activeFilterValue}
           options={[
-            { label: "Publicado", value: "true"  },
-            { label: "Borrador",  value: "false" },
+            { label: "Activo",   value: "true"  },
+            { label: "Inactivo", value: "false" },
           ]}
+          onChange={(v) =>
+            setQuery((q) => ({
+              ...q,
+              page: 1,
+              isActive: v === "true" ? true : v === "false" ? false : null,
+            }))
+          }
         />
-        {table.getState().columnFilters.length > 0 && (
-          <Button variant="ghost" size="sm" className="h-8" onClick={() => table.resetColumnFilters()}>
-            Reset
-            <XIcon className="ml-1 size-4" />
+        {hasFilters && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8"
+            onClick={() => setQuery((q) => ({ ...q, search: "", isActive: null, page: 1 }))}
+          >
+            Reset <XIcon className="ml-1 size-4" />
           </Button>
         )}
         <div className="ml-auto flex items-center gap-2">
           <span className="text-sm text-muted-foreground">
-            {table.getFilteredRowModel().rows.length} posts
+            {loading ? "…" : `${total} blogs`}
           </span>
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button variant="outline" />}>
@@ -313,7 +468,7 @@ export function BlogsTable() {
                     key={col.id}
                     className="capitalize"
                     checked={col.getIsVisible()}
-                    onCheckedChange={(value) => col.toggleVisibility(!!value)}
+                    onCheckedChange={(v) => col.toggleVisibility(!!v)}
                   >
                     {columnLabels[col.id] ?? col.id}
                   </DropdownMenuCheckboxItem>
@@ -321,29 +476,37 @@ export function BlogsTable() {
             </DropdownMenuContent>
           </DropdownMenu>
           <Button>
-            <PlusIcon className="size-4" />
-            Nuevo Post
+            <PlusIcon className="size-4" /> Nuevo Blog
           </Button>
         </div>
       </div>
 
+      {/* Table */}
       <div className="rounded-md border">
         <Table>
           <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id}>
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(header.column.columnDef.header, header.getContext())}
+            {table.getHeaderGroups().map((hg) => (
+              <TableRow key={hg.id}>
+                {hg.headers.map((h) => (
+                  <TableHead key={h.id}>
+                    {h.isPlaceholder ? null : flexRender(h.column.columnDef.header, h.getContext())}
                   </TableHead>
                 ))}
               </TableRow>
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows?.length ? (
+            {loading ? (
+              skeletonRows.map((_, i) => (
+                <TableRow key={i}>
+                  {table.getVisibleLeafColumns().map((col) => (
+                    <TableCell key={col.id}>
+                      {skeletonCell[col.id] ?? <div className="h-4 w-3/4 animate-pulse rounded bg-muted" />}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : table.getRowModel().rows.length ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
                   {row.getVisibleCells().map((cell) => (
@@ -368,5 +531,5 @@ export function BlogsTable() {
         <DataTablePagination table={table} />
       </div>
     </div>
-  );
+  )
 }

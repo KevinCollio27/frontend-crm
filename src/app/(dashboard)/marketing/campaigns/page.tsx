@@ -6,7 +6,7 @@ export default function CampaignsPage() {
   return (
     <>
       <PageHeader icon={SendIcon} title="Campañas" description="Gestiona tus campañas de email" />
-      <main className="flex flex-1 flex-col gap-4 overflow-y-auto p-6">
+      <main className="flex flex-1 flex-col gap-4 overflow-y-auto px-4">
         <CampaignsTable />
       </main>
     </>
