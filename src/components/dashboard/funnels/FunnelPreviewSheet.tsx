@@ -20,27 +20,49 @@ import {
   UsersIcon,
   ZapIcon,
 } from "lucide-react"
-import { STAGES, type Deal, type DealStatus, type Priority } from "./data"
+import { STAGES } from "./data"
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface DealLike {
+  name: string
+  status: string
+  stageName?: string
+  stageId?: string
+  company: string
+  contact: string
+  value: number
+  currency?: string
+  closeDate: string | null
+  responsible: { name: string; initials: string; avatar?: string }
+  priority?: string
+  quotationCount?: number
+  activityCount?: number
+}
 
 // ─── Configs ──────────────────────────────────────────────────────────────────
 
-const PRIORITY_CONFIG: Record<Priority, { icon: React.ElementType; label: string; color: string }> = {
+const PRIORITY_CONFIG: Record<string, { icon: React.ElementType; label: string; color: string }> = {
   alta:  { icon: ArrowUpIcon,   label: "Alta",  color: "text-red-600"          },
   media: { icon: MinusIcon,     label: "Media", color: "text-yellow-600"        },
   baja:  { icon: ArrowDownIcon, label: "Baja",  color: "text-muted-foreground" },
 }
 
-const STATUS_CONFIG: Record<DealStatus, { label: string; badge: string; dot: string }> = {
-  open: { label: "Abierta", badge: "bg-blue-500/10 text-blue-600",       dot: "bg-blue-500"     },
-  won:  { label: "Ganada",  badge: "bg-emerald-500/10 text-emerald-600", dot: "bg-emerald-500"  },
-  lost: { label: "Perdida", badge: "bg-red-500/10 text-red-600",         dot: "bg-red-500"      },
+const STATUS_CONFIG: Record<string, { label: string; badge: string; dot: string }> = {
+  open:        { label: "Abierta",     badge: "bg-blue-500/10 text-blue-600",       dot: "bg-blue-500"     },
+  won:         { label: "Ganada",      badge: "bg-emerald-500/10 text-emerald-600", dot: "bg-emerald-500"  },
+  lost:        { label: "Perdida",     badge: "bg-red-500/10 text-red-600",         dot: "bg-red-500"      },
+  en_progreso: { label: "En Progreso", badge: "bg-blue-500/10 text-blue-600",       dot: "bg-blue-500"     },
+  ganada:      { label: "Ganada",      badge: "bg-emerald-500/10 text-emerald-600", dot: "bg-emerald-500"  },
+  perdida:     { label: "Perdida",     badge: "bg-red-500/10 text-red-600",         dot: "bg-red-500"      },
+  reabierta:   { label: "Reabierta",   badge: "bg-amber-500/10 text-amber-600",     dot: "bg-amber-500"    },
 }
 
-function formatValue(value: number) {
-  if (value === 0) return "No aplica"
-  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`
-  if (value >= 1_000)     return `$${(value / 1_000).toFixed(0)}K`
-  return `$${value.toLocaleString("es-CL")}`
+function formatValue(value: number, symbol = "$") {
+  if (value === 0) return "—"
+  if (value >= 1_000_000) return `${symbol}${(value / 1_000_000).toFixed(1)}M`
+  if (value >= 1_000)     return `${symbol}${(value / 1_000).toFixed(0)}K`
+  return `${symbol}${value.toLocaleString("es-CL")}`
 }
 
 // ─── Sub-componentes ──────────────────────────────────────────────────────────
@@ -66,16 +88,16 @@ function InfoRow({ label, children }: { label: string; children: React.ReactNode
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
 const quickActions = [
-  { icon: FileTextIcon, label: "Nota",        color: "text-blue-500"    },
-  { icon: ZapIcon,      label: "Desafío",     color: "text-amber-500"   },
-  { icon: TargetIcon,   label: "Oportunidad", color: "text-violet-500"  },
-  { icon: ClipboardListIcon, label: "Tarea",  color: "text-emerald-500" },
+  { icon: FileTextIcon,    label: "Nota",        color: "text-blue-500"    },
+  { icon: ZapIcon,         label: "Desafío",     color: "text-amber-500"   },
+  { icon: TargetIcon,      label: "Oportunidad", color: "text-violet-500"  },
+  { icon: ClipboardListIcon, label: "Tarea",     color: "text-emerald-500" },
 ]
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface Props {
-  deal: Deal | null
+  deal: DealLike | null
   open: boolean
   onOpenChange: (open: boolean) => void
 }
@@ -85,10 +107,10 @@ interface Props {
 export function FunnelPreviewSheet({ deal, open, onOpenChange }: Props) {
   if (!deal) return null
 
-  const statusConf  = STATUS_CONFIG[deal.status]
-  const priorityConf = PRIORITY_CONFIG[deal.priority]
-  const PriorityIcon = priorityConf.icon
-  const stageName   = STAGES.find((s) => s.id === deal.stageId)?.name ?? deal.stageId
+  const statusConf   = STATUS_CONFIG[deal.status] ?? STATUS_CONFIG.en_progreso
+  const priorityConf = deal.priority ? PRIORITY_CONFIG[deal.priority] : null
+  const PriorityIcon = priorityConf?.icon
+  const stageName    = deal.stageName ?? STAGES.find((s) => s.id === deal.stageId)?.name ?? deal.stageId ?? "—"
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -109,10 +131,12 @@ export function FunnelPreviewSheet({ deal, open, onOpenChange }: Props) {
                 <span className={cn("size-1.5 rounded-full", statusConf.dot)} />
                 {statusConf.label}
               </span>
-              <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium", priorityConf.color, "bg-muted")}>
-                <PriorityIcon className="size-3" />
-                {priorityConf.label}
-              </span>
+              {priorityConf && PriorityIcon && (
+                <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-muted", priorityConf.color)}>
+                  <PriorityIcon className="size-3" />
+                  {priorityConf.label}
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -141,7 +165,7 @@ export function FunnelPreviewSheet({ deal, open, onOpenChange }: Props) {
           <div className="flex flex-col gap-1.5 px-4 py-3">
             <InfoRow label="Valor">
               <span className={cn("font-semibold", deal.value > 0 ? "text-primary" : "text-muted-foreground")}>
-                {formatValue(deal.value)}
+                {formatValue(deal.value, deal.currency)}
               </span>
             </InfoRow>
             <InfoRow label="Etapa">{stageName}</InfoRow>
@@ -151,12 +175,14 @@ export function FunnelPreviewSheet({ deal, open, onOpenChange }: Props) {
                 {statusConf.label}
               </span>
             </InfoRow>
-            <InfoRow label="Prioridad">
-              <span className={cn("inline-flex items-center gap-1 text-xs font-medium", priorityConf.color)}>
-                <PriorityIcon className="size-3" />
-                {priorityConf.label}
-              </span>
-            </InfoRow>
+            {priorityConf && PriorityIcon && (
+              <InfoRow label="Prioridad">
+                <span className={cn("inline-flex items-center gap-1 text-xs font-medium", priorityConf.color)}>
+                  <PriorityIcon className="size-3" />
+                  {priorityConf.label}
+                </span>
+              </InfoRow>
+            )}
             <InfoRow label="Fecha cierre">
               {deal.closeDate ? (
                 <div className="flex items-center gap-1.5">
@@ -176,16 +202,24 @@ export function FunnelPreviewSheet({ deal, open, onOpenChange }: Props) {
             <InfoRow label="Contacto">{deal.contact}</InfoRow>
           </div>
 
-          {/* Métricas */}
-          <SectionHeader icon={ClipboardListIcon} label="Métricas" />
-          <div className="flex flex-col gap-1.5 px-4 py-3">
-            <InfoRow label="Cotizaciones">
-              <span className="font-medium">{deal.quotationCount}</span>
-            </InfoRow>
-            <InfoRow label="Actividades">
-              <span className="font-medium">{deal.activityCount}</span>
-            </InfoRow>
-          </div>
+          {/* Métricas — solo si el dato está disponible */}
+          {(deal.quotationCount != null || deal.activityCount != null) && (
+            <>
+              <SectionHeader icon={ClipboardListIcon} label="Métricas" />
+              <div className="flex flex-col gap-1.5 px-4 py-3">
+                {deal.quotationCount != null && (
+                  <InfoRow label="Cotizaciones">
+                    <span className="font-medium">{deal.quotationCount}</span>
+                  </InfoRow>
+                )}
+                {deal.activityCount != null && (
+                  <InfoRow label="Actividades">
+                    <span className="font-medium">{deal.activityCount}</span>
+                  </InfoRow>
+                )}
+              </div>
+            </>
+          )}
 
           {/* Responsable */}
           <SectionHeader icon={UsersIcon} label="Responsable" />

@@ -25,6 +25,7 @@ import {
   ActivityIcon,
   ArrowUpRightIcon,
   CalendarIcon,
+  ChevronDownIcon,
   EyeIcon,
   FileTextIcon,
   KanbanSquareIcon,
@@ -50,12 +51,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { KanbanBoard, KanbanColumn } from "@/components/ui/kanban"
-import { FunnelTable } from "./FunnelTable"
+import { FunnelTable, COLUMN_LABELS, DEFAULT_COLUMN_VISIBILITY } from "./FunnelTable"
+import type { VisibilityState } from "@tanstack/react-table"
 import { FunnelPreviewSheet } from "./FunnelPreviewSheet"
+import { flowService } from "@/services/flow.service"
+import type { Flow } from "@/types/flow"
 import {
   STAGES,
   DEALS,
-  FUNNELS,
   type Deal,
   type Priority,
   type DealStatus,
@@ -83,6 +86,64 @@ const STATUS_FILTERS: { key: DealStatus | "all"; label: string }[] = [
   { key: "won",  label: "Ganadas"  },
   { key: "lost", label: "Perdidas" },
 ]
+
+// ─── FlowFilter ─────────────────────────────────────────────────────────────
+
+function FlowFilter({
+  flows,
+  selected,
+  onChange,
+}: {
+  flows: Flow[]
+  selected: number | null
+  onChange: (id: number | null) => void
+}) {
+  const selectedFlow = flows.find((f) => f.id === selected)
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={<Button variant="outline" size="sm" className="h-8 border-dashed" />}
+      >
+        <PlusCircleIcon className="size-4" />
+        Pipeline
+        {selected !== null && (
+          <>
+            <Separator orientation="vertical" className="mx-1 data-[orientation=vertical]:h-4 data-[orientation=vertical]:self-auto" />
+            <span className="inline-block max-w-32 truncate align-middle rounded bg-muted px-1.5 py-0.5 text-xs font-medium">
+              {selectedFlow?.name ?? "…"}
+            </span>
+          </>
+        )}
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="max-h-60 min-w-44 overflow-y-auto">
+        {flows.map((flow) => (
+          <DropdownMenuCheckboxItem
+            key={flow.id}
+            checked={selected === flow.id}
+            onCheckedChange={() => onChange(selected === flow.id ? null : flow.id)}
+          >
+            {flow.name}
+            {flow.is_default && (
+              <span className="ml-auto text-[10px] text-muted-foreground">default</span>
+            )}
+          </DropdownMenuCheckboxItem>
+        ))}
+        {selected !== null && (
+          <>
+            <DropdownMenuSeparator />
+            <button
+              className="w-full px-2 py-1.5 text-center text-xs text-muted-foreground transition-colors hover:text-foreground"
+              onClick={() => onChange(null)}
+            >
+              Limpiar filtro
+            </button>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -384,8 +445,19 @@ export function FunnelKanban() {
   }, [router])
 
   const [search, setSearch]                       = React.useState("")
-  const [funnelId, setFunnelId]                   = React.useState("default")
+  const [flowId, setFlowId]                       = React.useState<number | null>(null)
+  const [flows, setFlows]                         = React.useState<Flow[]>([])
   const [statusFilter, setStatusFilter]           = React.useState<DealStatus | "all">("all")
+  const [columnVisibility, setColumnVisibility]   = React.useState<VisibilityState>(DEFAULT_COLUMN_VISIBILITY)
+  const [oppTotal, setOppTotal]                   = React.useState(0)
+
+  React.useEffect(() => {
+    flowService.all().then((list) => {
+      setFlows(list)
+      const def = list.find((f) => f.is_default)
+      if (def) setFlowId(def.id)
+    }).catch(() => {})
+  }, [])
   const [responsibleFilter, setResponsibleFilter] = React.useState<string[]>([])
   const [priorityFilter, setPriorityFilter]       = React.useState<string[]>([])
 
@@ -524,86 +596,102 @@ export function FunnelKanban() {
         <Button size="sm">+ Crear Oportunidad</Button>
       </div>
 
-      {/* Row 2 — filters (board only) */}
-      {view === "board" && (
-        <div className="flex shrink-0 items-center gap-2 border-b px-4 py-2">
-          <div className="relative w-44 shrink-0">
-            <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Buscar oportunidad..."
-              className="h-8 pl-8 text-xs"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-
-          <select
-            value={funnelId}
-            onChange={(e) => setFunnelId(e.target.value)}
-            className="h-8 w-40 shrink-0 rounded-lg border border-input bg-transparent px-2 text-xs text-foreground outline-none"
-          >
-            {FUNNELS.map((f) => (
-              <option key={f.id} value={f.id}>{f.name}</option>
-            ))}
-          </select>
-
-          <Separator orientation="vertical" className="mx-0.5 data-[orientation=vertical]:h-5 data-[orientation=vertical]:self-auto" />
-
-          <div className="flex items-center gap-1 shrink-0">
-            {STATUS_FILTERS.map((f) => (
-              <button
-                key={f.key}
-                type="button"
-                onClick={() => setStatusFilter(f.key)}
-                className={cn(
-                  "rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
-                  statusFilter === f.key
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                )}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
-
-          <Separator orientation="vertical" className="mx-0.5 data-[orientation=vertical]:h-5 data-[orientation=vertical]:self-auto" />
-
-          <KanbanFacetedFilter
-            title="Responsable"
-            options={responsibleOptions}
-            selected={responsibleFilter}
-            onChange={setResponsibleFilter}
+      {/* Row 2 — filters */}
+      <div className="flex shrink-0 items-center gap-2 border-b px-4 py-2">
+        <div className="relative w-44 shrink-0">
+          <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Buscar oportunidad..."
+            className="h-8 pl-8 text-xs"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
           />
-
-          <KanbanFacetedFilter
-            title="Prioridad"
-            options={[
-              { value: "alta",  label: "Alta"  },
-              { value: "media", label: "Media" },
-              { value: "baja",  label: "Baja"  },
-            ]}
-            selected={priorityFilter}
-            onChange={setPriorityFilter}
-          />
-
-          {(responsibleFilter.length > 0 || priorityFilter.length > 0) && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 px-2 text-xs"
-              onClick={() => { setResponsibleFilter([]); setPriorityFilter([]) }}
-            >
-              <XIcon className="size-3.5" />
-              Restablecer
-            </Button>
-          )}
-
-          <span className="ml-auto shrink-0 text-xs text-muted-foreground">
-            {filtered.length} oportunidades · {formatTotal(totalValue)}
-          </span>
         </div>
-      )}
+
+        <FlowFilter flows={flows} selected={flowId} onChange={setFlowId} />
+
+        <Separator orientation="vertical" className="mx-0.5 data-[orientation=vertical]:h-5 data-[orientation=vertical]:self-auto" />
+
+        <div className="flex items-center gap-1 shrink-0">
+          {STATUS_FILTERS.map((f) => (
+            <button
+              key={f.key}
+              type="button"
+              onClick={() => setStatusFilter(f.key)}
+              className={cn(
+                "rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
+                statusFilter === f.key
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
+              )}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        {view === "lista" && (
+          <div className="ml-auto flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">{oppTotal} oportunidades</span>
+            <DropdownMenu>
+              <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8" />}>
+                Columnas <ChevronDownIcon className="ml-1.5 size-3.5" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {Object.entries(COLUMN_LABELS).map(([id, label]) => (
+                  <DropdownMenuCheckboxItem
+                    key={id}
+                    checked={columnVisibility[id] !== false}
+                    onCheckedChange={(v) => setColumnVisibility((prev) => ({ ...prev, [id]: !!v }))}
+                  >
+                    {label}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
+
+        {view === "board" && (
+          <>
+            <Separator orientation="vertical" className="mx-0.5 data-[orientation=vertical]:h-5 data-[orientation=vertical]:self-auto" />
+
+            <KanbanFacetedFilter
+              title="Responsable"
+              options={responsibleOptions}
+              selected={responsibleFilter}
+              onChange={setResponsibleFilter}
+            />
+
+            <KanbanFacetedFilter
+              title="Prioridad"
+              options={[
+                { value: "alta",  label: "Alta"  },
+                { value: "media", label: "Media" },
+                { value: "baja",  label: "Baja"  },
+              ]}
+              selected={priorityFilter}
+              onChange={setPriorityFilter}
+            />
+
+            {(responsibleFilter.length > 0 || priorityFilter.length > 0) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 px-2 text-xs"
+                onClick={() => { setResponsibleFilter([]); setPriorityFilter([]) }}
+              >
+                <XIcon className="size-3.5" />
+                Restablecer
+              </Button>
+            )}
+
+            <span className="ml-auto shrink-0 text-xs text-muted-foreground">
+              {filtered.length} oportunidades · {formatTotal(totalValue)}
+            </span>
+          </>
+        )}
+      </div>
 
       {/* Board */}
       {view === "board" && (
@@ -637,7 +725,16 @@ export function FunnelKanban() {
       )}
 
       {/* List */}
-      {view === "lista" && <FunnelTable deals={deals} />}
+      {view === "lista" && (
+        <FunnelTable
+          search={search}
+          statusFilter={statusFilter}
+          flowId={flowId}
+          columnVisibility={columnVisibility}
+          onColumnVisibilityChange={setColumnVisibility}
+          onTotalChange={setOppTotal}
+        />
+      )}
 
       <FunnelPreviewSheet
         deal={previewDeal}

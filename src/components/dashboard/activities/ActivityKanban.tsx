@@ -367,7 +367,7 @@ function DroppableColumn({ stage, activities, statsActivities, onMove, onPreview
 export function ActivityKanban() {
   const router = useRouter()
 
-  const [view, setView]               = React.useState<"board" | "lista">("board")
+  const [view, setView]               = React.useState<"board" | "lista">("lista")
   const [activities, setActivities]   = React.useState(ACTIVITIES)
   const [activeActivity, setActiveActivity] = React.useState<Activity | null>(null)
   const [previewActivity, setPreviewActivity] = React.useState<Activity | null>(null)
@@ -487,19 +487,6 @@ export function ActivityKanban() {
         <div className="flex items-center gap-0.5 rounded-lg border bg-muted/40 p-0.5">
           <button
             type="button"
-            onClick={() => setView("board")}
-            className={cn(
-              "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
-              view === "board"
-                ? "bg-background shadow-sm"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <KanbanSquareIcon className="size-3.5" />
-            Board
-          </button>
-          <button
-            type="button"
             onClick={() => setView("lista")}
             className={cn(
               "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
@@ -511,11 +498,15 @@ export function ActivityKanban() {
             <ListIcon className="size-3.5" />
             Lista
           </button>
+          <button
+            type="button"
+            disabled
+            className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground/50 cursor-not-allowed"
+          >
+            <KanbanSquareIcon className="size-3.5" />
+            Board
+          </button>
         </div>
-        <Button size="sm">
-          <ActivityIcon className="size-3.5" />
-          Crear Actividad
-        </Button>
       </div>
 
       {/* Row 2 — filters (board only) */}
@@ -623,7 +614,11 @@ export function ActivityKanban() {
       )}
 
       {/* List */}
-      {view === "lista" && <ActivitiesTable activities={activities} />}
+      {view === "lista" && (
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <ActivitiesTable />
+        </div>
+      )}
 
       <ActivityPreviewSheet
         activity={previewActivity}

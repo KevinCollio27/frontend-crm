@@ -22,7 +22,22 @@ import {
   UsersIcon,
   VideoIcon,
 } from "lucide-react"
-import { STAGES, type Activity, type ActivityPriority } from "./data"
+import { STAGES } from "./data"
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface ActivityLike {
+  title: string
+  type: string
+  priority: string
+  startDate: string
+  endDate: string
+  stageId: string
+  createdAt: string
+  responsible: { name: string; initials: string; avatar?: string }
+  opportunityName?: string
+  funnelName?: string
+}
 
 // ─── Configs ──────────────────────────────────────────────────────────────────
 
@@ -44,7 +59,7 @@ const STAGE_CONFIG: Record<string, { dot: string; badge: string; label: string }
   cancelada:   { dot: "bg-muted-foreground",badge: "bg-muted text-muted-foreground",     label: "Cancelada"   },
 }
 
-const PRIORITY_CONFIG: Record<ActivityPriority, { icon: React.ElementType; label: string; color: string }> = {
+const PRIORITY_CONFIG: Record<string, { icon: React.ElementType; label: string; color: string }> = {
   alta:  { icon: ArrowUpIcon,   label: "Alta",  color: "text-red-600"              },
   media: { icon: MinusIcon,     label: "Media", color: "text-yellow-600"           },
   baja:  { icon: ArrowDownIcon, label: "Baja",  color: "text-muted-foreground"     },
@@ -85,7 +100,7 @@ const quickActions = [
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface Props {
-  activity: Activity | null
+  activity: ActivityLike | null
   open: boolean
   onOpenChange: (open: boolean) => void
 }
