@@ -6,7 +6,7 @@ export default function BlogsPage() {
   return (
     <>
       <PageHeader icon={BookOpenIcon} title="Blog" description="Gestiona el contenido de tu blog" />
-      <main className="flex flex-1 flex-col gap-4 overflow-y-auto px-4">
+      <main className="flex flex-1 flex-col overflow-y-auto">
         <BlogsTable />
       </main>
     </>

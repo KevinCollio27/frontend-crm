@@ -9,6 +9,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
 import { cn } from "@/lib/utils"
+import { getInitials } from "@/lib/table-utils"
 import {
   CalendarIcon,
   ChevronDownIcon,
@@ -20,7 +21,7 @@ import {
   UsersIcon,
   VideoIcon,
 } from "lucide-react"
-import type { ActivityDetail } from "../data"
+import type { ActivityRaw } from "@/types/activity"
 
 // ─── Configs ──────────────────────────────────────────────────────────────────
 
@@ -54,9 +55,14 @@ const STAGE_CONFIG: Record<string, { label: string; className: string }> = {
 }
 
 const PRIORITY_CONFIG: Record<string, { label: string; className: string }> = {
-  alta:  { label: "Alta",  className: "bg-red-50 text-red-700"           },
-  media: { label: "Media", className: "bg-amber-50 text-amber-700"       },
-  baja:  { label: "Baja",  className: "bg-emerald-50 text-emerald-700"   },
+  alta:  { label: "Alta",  className: "bg-red-50 text-red-700"         },
+  media: { label: "Media", className: "bg-amber-50 text-amber-700"     },
+  baja:  { label: "Baja",  className: "bg-emerald-50 text-emerald-700" },
+}
+
+function fmtDate(iso: string | null) {
+  if (!iso) return "—"
+  return new Date(iso).toLocaleDateString("es-CL", { day: "numeric", month: "short", year: "numeric" })
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -89,27 +95,35 @@ function PropRow({ label, children }: { label: string; children: React.ReactNode
 // ─── Component ────────────────────────────────────────────────────────────────
 
 interface Props {
-  activity: ActivityDetail
+  activity: ActivityRaw
 }
 
 export function Col1Info({ activity }: Props) {
-  const typeStyle = TYPE_STYLE[activity.type] ?? { bg: "bg-muted", icon: "text-muted-foreground" }
-  const TypeIcon  = TYPE_ICON[activity.type]  ?? CalendarIcon
-  const stageConf    = STAGE_CONFIG[activity.stageId]    ?? STAGE_CONFIG.pendiente
-  const priorityConf = PRIORITY_CONFIG[activity.priority] ?? PRIORITY_CONFIG.media
+  const typeDetail = activity.opportunity_activity_detail.find((d) => d.label?.key === "activity_type")
+  const prioDetail = activity.opportunity_activity_detail.find((d) => d.label?.key === "priority")
+
+  const type      = typeDetail?.value ?? ""
+  const priority  = prioDetail?.value?.toLowerCase() ?? "media"
+  const stageId   = activity.status ?? (activity.is_completed ? "completada" : "pendiente")
+  const responsible = activity.user?.name ?? "—"
+
+  const typeStyle  = TYPE_STYLE[type]  ?? { bg: "bg-muted", icon: "text-muted-foreground" }
+  const TypeIcon   = TYPE_ICON[type]   ?? CalendarIcon
+  const stageConf    = STAGE_CONFIG[stageId]    ?? STAGE_CONFIG.pendiente
+  const priorityConf = PRIORITY_CONFIG[priority] ?? PRIORITY_CONFIG.media
 
   return (
     <div className="flex flex-col gap-4 p-4">
 
-      {/* ── Identidad ────────────────────────────────────────────────────── */}
+      {/* Identidad */}
       <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
         <div className="flex items-center gap-3 p-3.5">
           <div className={cn("flex size-12 shrink-0 items-center justify-center rounded-xl", typeStyle.bg)}>
             <TypeIcon className={cn("size-6", typeStyle.icon)} />
           </div>
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold leading-snug">{activity.title}</p>
-            <p className="mt-0.5 truncate text-xs text-muted-foreground">{activity.type}</p>
+            <p className="truncate text-sm font-semibold leading-snug">{activity.title ?? "Sin título"}</p>
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">{type || "Sin tipo"}</p>
             <div className="mt-1 flex flex-wrap gap-1">
               <Badge className={cn("rounded-full border-0 px-2.5 py-0.5 text-xs", stageConf.className)}>
                 {stageConf.label}
@@ -122,78 +136,49 @@ export function Col1Info({ activity }: Props) {
         </div>
       </div>
 
-      {/* ── Propiedades ───────────────────────────────────────────────────── */}
+      {/* Propiedades */}
       <CollapsibleSection title="Propiedades">
         <div className="divide-y">
-
           <PropRow label="Responsable">
             <Avatar className="size-5 shrink-0">
-              <AvatarImage src={activity.responsible.avatar} alt={activity.responsible.name} />
-              <AvatarFallback className="text-[9px] font-semibold">{activity.responsible.initials}</AvatarFallback>
+              <AvatarImage src="https://github.com/shadcn.png" alt={responsible} />
+              <AvatarFallback className="text-[9px] font-semibold">{getInitials(responsible)}</AvatarFallback>
             </Avatar>
-            <span className="truncate text-sm font-medium">{activity.responsible.name}</span>
+            <span className="truncate text-sm font-medium">{responsible}</span>
           </PropRow>
 
           <PropRow label="Fecha inicio">
-            <span className="text-sm font-medium">{activity.startDate}</span>
+            <span className="text-sm font-medium">{fmtDate(activity.date_from)}</span>
           </PropRow>
 
           <PropRow label="Fecha fin">
-            <span className="text-sm font-medium">{activity.endDate}</span>
+            <span className="text-sm font-medium">{fmtDate(activity.date_to)}</span>
           </PropRow>
 
-          {activity.ubicacion && (
+          {activity.ubication && (
             <PropRow label="Ubicación">
-              <span className="truncate text-sm font-medium">{activity.ubicacion}</span>
+              <span className="truncate text-sm font-medium">{activity.ubication}</span>
             </PropRow>
           )}
 
-          {activity.opportunityName && (
+          {activity.opportunity?.name && (
             <PropRow label="Oportunidad">
-              <span className="truncate text-right text-sm font-medium">{activity.opportunityName}</span>
+              <span className="truncate text-right text-sm font-medium">{activity.opportunity.name}</span>
             </PropRow>
           )}
 
-          {activity.funnelName && (
+          {activity.opportunity?.flow?.name && (
             <PropRow label="Pipeline">
-              <span className="truncate text-sm font-medium">{activity.funnelName}</span>
+              <span className="truncate text-sm font-medium">{activity.opportunity.flow.name}</span>
             </PropRow>
           )}
 
           <PropRow label="Creada">
-            <span className="text-sm font-medium">{activity.createdAt}</span>
+            <span className="text-sm font-medium">{fmtDate(activity.created_at)}</span>
           </PropRow>
-
         </div>
       </CollapsibleSection>
 
-      {/* ── Relacionado con ───────────────────────────────────────────────── */}
-      {(activity.contact || activity.organization) && (
-        <CollapsibleSection title="Relacionado con">
-          <div className="divide-y">
-            {activity.contact && (
-              <PropRow label="Contacto">
-                <div className="flex min-w-0 flex-col items-end">
-                  <span className="truncate text-sm font-medium">{activity.contact.name}</span>
-                  {activity.contact.position && (
-                    <span className="text-xs text-muted-foreground">{activity.contact.position}</span>
-                  )}
-                </div>
-              </PropRow>
-            )}
-            {activity.organization && (
-              <PropRow label="Organización">
-                <div className="flex min-w-0 flex-col items-end">
-                  <span className="truncate text-sm font-medium">{activity.organization.name}</span>
-                  {activity.organization.industry && (
-                    <span className="text-xs text-muted-foreground">{activity.organization.industry}</span>
-                  )}
-                </div>
-              </PropRow>
-            )}
-          </div>
-        </CollapsibleSection>
-      )}
 
     </div>
   )

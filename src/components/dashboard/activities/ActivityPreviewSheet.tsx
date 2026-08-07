@@ -5,23 +5,16 @@ import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetFooter } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
 import {
-  ArrowDownIcon,
-  ArrowUpIcon,
   CalendarIcon,
   ChevronsUpIcon,
   EyeIcon,
   FileTextIcon,
-  MailIcon,
-  MapPinIcon,
-  MinusIcon,
   PencilIcon,
-  PhoneIcon,
-  SearchIcon,
   TargetIcon,
   Trash2,
   UsersIcon,
-  VideoIcon,
 } from "lucide-react"
+import { ACTIVITY_TYPE_CONFIG, DEFAULT_TYPE_CONFIG, PRIORITY_CONFIG } from "@/lib/activity-utils"
 import { STAGES } from "./data"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -41,28 +34,11 @@ interface ActivityLike {
 
 // ─── Configs ──────────────────────────────────────────────────────────────────
 
-const TYPE_CONFIG: Record<string, { icon: React.ElementType; iconClass: string; bgClass: string }> = {
-  "Reunión":       { icon: UsersIcon,    iconClass: "text-violet-600", bgClass: "bg-violet-50"  },
-  "Llamada":       { icon: PhoneIcon,    iconClass: "text-blue-600",   bgClass: "bg-blue-50"    },
-  "Correo":        { icon: MailIcon,     iconClass: "text-amber-600",  bgClass: "bg-amber-50"   },
-  "Seguimiento":   { icon: SearchIcon,   iconClass: "text-cyan-600",   bgClass: "bg-cyan-50"    },
-  "Revisión":      { icon: EyeIcon,      iconClass: "text-orange-600", bgClass: "bg-orange-50"  },
-  "Planificación": { icon: CalendarIcon, iconClass: "text-emerald-600",bgClass: "bg-emerald-50" },
-  "Video Llamada": { icon: VideoIcon,    iconClass: "text-pink-600",   bgClass: "bg-pink-50"    },
-  "Visita":        { icon: MapPinIcon,   iconClass: "text-red-600",    bgClass: "bg-red-50"     },
-}
-
 const STAGE_CONFIG: Record<string, { dot: string; badge: string; label: string }> = {
   pendiente:   { dot: "bg-amber-500",       badge: "bg-amber-500/10 text-amber-600",     label: "Pendiente"   },
   en_progreso: { dot: "bg-blue-500",        badge: "bg-blue-500/10 text-blue-600",       label: "En Progreso" },
   completada:  { dot: "bg-emerald-500",     badge: "bg-emerald-500/10 text-emerald-600", label: "Completada"  },
   cancelada:   { dot: "bg-muted-foreground",badge: "bg-muted text-muted-foreground",     label: "Cancelada"   },
-}
-
-const PRIORITY_CONFIG: Record<string, { icon: React.ElementType; label: string; color: string }> = {
-  alta:  { icon: ArrowUpIcon,   label: "Alta",  color: "text-red-600"              },
-  media: { icon: MinusIcon,     label: "Media", color: "text-yellow-600"           },
-  baja:  { icon: ArrowDownIcon, label: "Baja",  color: "text-muted-foreground"     },
 }
 
 const TODAY = new Date().toISOString().slice(0, 10)
@@ -103,18 +79,20 @@ interface Props {
   activity: ActivityLike | null
   open: boolean
   onOpenChange: (open: boolean) => void
+  onViewDetail?: () => void
+  onEdit?: () => void
+  onDelete?: () => void
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function ActivityPreviewSheet({ activity, open, onOpenChange }: Props) {
+export function ActivityPreviewSheet({ activity, open, onOpenChange, onViewDetail, onEdit, onDelete }: Props) {
   if (!activity) return null
 
-  const typeConfig   = TYPE_CONFIG[activity.type] ?? { icon: CalendarIcon, iconClass: "text-muted-foreground", bgClass: "bg-muted" }
+  const typeConfig   = ACTIVITY_TYPE_CONFIG[activity.type] ?? DEFAULT_TYPE_CONFIG
   const TypeIcon     = typeConfig.icon
   const stageConfig  = STAGE_CONFIG[activity.stageId] ?? STAGE_CONFIG.pendiente
-  const priorityConf = PRIORITY_CONFIG[activity.priority]
-  const PriorityIcon = priorityConf.icon
+  const priorityConf = PRIORITY_CONFIG[activity.priority] ?? null
   const stageName    = STAGES.find((s) => s.id === activity.stageId)?.name ?? activity.stageId
   const overdue      = activity.stageId !== "completada" && activity.stageId !== "cancelada" && activity.endDate < TODAY
 
@@ -175,12 +153,14 @@ export function ActivityPreviewSheet({ activity, open, onOpenChange }: Props) {
                 {stageName}
               </span>
             </InfoRow>
-            <InfoRow label="Prioridad">
-              <span className={cn("inline-flex items-center gap-1 text-xs font-medium", priorityConf.color)}>
-                <PriorityIcon className="size-3" />
-                {priorityConf.label}
-              </span>
-            </InfoRow>
+            {priorityConf && (
+              <InfoRow label="Prioridad">
+                <span className={cn("inline-flex items-center gap-1 text-xs font-medium", priorityConf.color)}>
+                  <priorityConf.icon className="size-3" />
+                  {priorityConf.label}
+                </span>
+              </InfoRow>
+            )}
             <InfoRow label="Fecha inicio">{fmtDate(activity.startDate)}</InfoRow>
             <InfoRow label="Fecha límite">
               <span className={cn(overdue && "text-red-600 font-medium")}>
@@ -224,15 +204,16 @@ export function ActivityPreviewSheet({ activity, open, onOpenChange }: Props) {
 
         {/* Footer */}
         <SheetFooter className="flex-col gap-2 border-t px-4 py-3 shrink-0">
-          <Button variant="outline" className="w-full justify-start text-xs h-8 gap-1.5">
+          <Button variant="outline" className="w-full justify-start text-xs h-8 gap-1.5" onClick={onViewDetail}>
             <EyeIcon className="size-3.5" /> Ver detalle
           </Button>
-          <Button className="w-full justify-start text-xs h-8 gap-1.5 bg-[#534AB7] hover:bg-[#4840A0]">
+          <Button className="w-full justify-start text-xs h-8 gap-1.5 bg-[#534AB7] hover:bg-[#4840A0]" onClick={onEdit}>
             <PencilIcon className="size-3.5" /> Editar actividad
           </Button>
           <Button
             variant="outline"
             className="w-full justify-start text-xs h-8 gap-1.5 border-red-200 text-red-500 hover:bg-red-50 hover:text-red-600"
+            onClick={onDelete}
           >
             <Trash2 className="size-3.5" /> Eliminar
           </Button>

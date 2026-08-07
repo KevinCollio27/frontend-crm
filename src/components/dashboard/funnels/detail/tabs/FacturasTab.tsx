@@ -23,6 +23,7 @@ import {
   PencilIcon,
   PlusIcon,
   ReceiptIcon,
+  RocketIcon,
   Trash2Icon,
   XIcon,
 } from "lucide-react"
@@ -53,7 +54,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { cn } from "@/lib/utils"
-import type { DealDetail, DealInvoice, InvoiceStatus, InvoiceUnitOfMeasure } from "../../data"
+import type { DealInvoice, InvoiceStatus, InvoiceUnitOfMeasure } from "../../data"
 
 // ─── Configs ──────────────────────────────────────────────────────────────────
 
@@ -274,10 +275,10 @@ const UM_OPTIONS = [
 // ─── Component ────────────────────────────────────────────────────────────────
 
 interface Props {
-  deal: DealDetail
+  opportunityId: number
 }
 
-export function FacturasTab({ deal }: Props) {
+export function FacturasTab({ opportunityId: _opportunityId }: Props) {
   const [sorting, setSorting]                  = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters]       = React.useState<ColumnFiltersState>([])
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({
@@ -291,7 +292,7 @@ export function FacturasTab({ deal }: Props) {
   const columns = React.useMemo(() => getColumns(), [])
 
   const table = useReactTable({
-    data: deal.invoices,
+    data: [] as DealInvoice[],
     columns,
     onSortingChange:          setSorting,
     onColumnFiltersChange:    setColumnFilters,
@@ -307,7 +308,18 @@ export function FacturasTab({ deal }: Props) {
   })
 
   return (
-    <div className="p-4">
+    <div className="relative p-4">
+
+      {/* Próximamente overlay */}
+      <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-background/80 backdrop-blur-[2px]">
+        <div className="flex items-center gap-2 rounded-full bg-muted px-4 py-1.5">
+          <RocketIcon className="size-3.5 text-muted-foreground" />
+          <span className="text-sm font-semibold">¡Próximamente!</span>
+        </div>
+        <p className="max-w-xs text-center text-xs text-muted-foreground">
+          Estamos trabajando en esta funcionalidad. ¡Disponible a la brevedad!
+        </p>
+      </div>
 
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2 pb-4">

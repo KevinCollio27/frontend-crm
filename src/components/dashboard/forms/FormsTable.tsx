@@ -11,18 +11,20 @@ import {
 } from "@tanstack/react-table"
 import {
   ChevronDown,
-  ClipboardListIcon,
+  Code2Icon,
+  EditIcon,
   EyeIcon,
   GitBranchIcon,
   Link2Icon,
   MoreHorizontal,
-  PlusIcon,
+  SearchIcon,
   Trash2Icon,
   XIcon,
 } from "lucide-react"
 import * as React from "react"
 
 import { Button } from "@/components/ui/button"
+import { EntityAccentBar } from "@/components/ui/entity-accent-bar"
 import { Checkbox } from "@/components/ui/checkbox"
 import { DataTablePagination } from "@/components/ui/data-table-pagination"
 import {
@@ -36,6 +38,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
+import { SingleSelectFilter, type SingleSelectOption } from "@/components/ui/single-select-filter"
 import {
   Table,
   TableBody,
@@ -44,10 +47,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { confirmDialog } from "@/lib/confirm"
+import { notify } from "@/lib/notify"
 import { getSortIcon } from "@/lib/table-utils"
 import { cn } from "@/lib/utils"
 import { formService } from "@/services/form.service"
+import { flowService } from "@/services/flow.service"
 import type { FormRaw } from "@/types/form"
+import type { Flow } from "@/types/flow"
+import { CreateFormSheet } from "./CreateFormSheet"
+import { FormIntegrateSheet } from "./FormIntegrateSheet"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -59,6 +68,7 @@ export interface Form {
   flowName: string
   isActive: boolean
   createdAt: string
+  raw: FormRaw
 }
 
 function mapForm(d: FormRaw): Form {
@@ -70,6 +80,7 @@ function mapForm(d: FormRaw): Form {
     flowName: d.flow.name,
     isActive: d.is_active,
     createdAt: d.created_at,
+    raw: d,
   }
 }
 
@@ -92,47 +103,13 @@ type QueryState = {
   isActive: boolean | null
 }
 
-// ─── SimpleFilter ─────────────────────────────────────────────────────────────
+// ─── Filtros ──────────────────────────────────────────────────────────────────
 
-function SimpleFilter({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string
-  value: string | null
-  options: { label: string; value: string }[]
-  onChange: (v: string | null) => void
-}) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger render={
-        <Button variant="outline" size="sm" className={cn("h-8 gap-1", value && "border-primary/50 bg-primary/5")} />
-      }>
-        {label}
-        {value && <span className="ml-1 text-primary">·</span>}
-        <ChevronDown className="size-3.5" />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="min-w-32">
-        {value && (
-          <DropdownMenuItem onClick={() => onChange(null)}>
-            <XIcon className="size-3.5" /> Todos
-          </DropdownMenuItem>
-        )}
-        {options.map((opt) => (
-          <DropdownMenuItem
-            key={opt.value}
-            onClick={() => onChange(opt.value === value ? null : opt.value)}
-            className={opt.value === value ? "font-medium" : ""}
-          >
-            {opt.label}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
-}
+const STATUS_OPTIONS: SingleSelectOption[] = [
+  { value: "all",   label: "Todos"    },
+  { value: "true",  label: "Activo"   },
+  { value: "false", label: "Inactivo" },
+]
 
 // ─── Skeleton ────────────────────────────────────────────────────────────────
 
@@ -161,7 +138,12 @@ const skeletonCell: Record<string, React.ReactNode> = {
 
 // ─── Columns ─────────────────────────────────────────────────────────────────
 
-const columns: ColumnDef<Form>[] = [
+function buildColumns(
+  onEdit: (raw: FormRaw) => void,
+  onDelete: (id: number) => void,
+  onIntegrate: (raw: FormRaw) => void
+): ColumnDef<Form>[] {
+  return [
   {
     id: "select",
     header: ({ table }) => (
@@ -201,16 +183,14 @@ const columns: ColumnDef<Form>[] = [
       </Button>
     ),
     cell: ({ row }) => {
+      const form = row.original
       const name: string = row.getValue("name")
-      const slug = row.original.slug
       return (
-        <div className="flex items-center gap-2.5">
-          <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-teal-500/10">
-            <ClipboardListIcon className="size-3.5 text-teal-600 dark:text-teal-400" />
-          </div>
+        <div className="flex items-stretch gap-2.5">
+          <EntityAccentBar seed={form.id} />
           <div className="leading-tight">
             <div className="text-sm font-medium">{name}</div>
-            <div className="text-xs text-muted-foreground font-mono">{slug}</div>
+            <div className="text-xs text-muted-foreground font-mono">{form.slug}</div>
           </div>
         </div>
       )
@@ -276,7 +256,7 @@ const columns: ColumnDef<Form>[] = [
     id: "actions",
     enableHiding: false,
     cell: ({ row }) => {
-      const slug = row.original.slug
+      const form = row.original
       return (
         <DropdownMenu>
           <DropdownMenuTrigger render={<Button className="h-8 w-8 p-0" variant="ghost" />}>
@@ -286,15 +266,24 @@ const columns: ColumnDef<Form>[] = [
           <DropdownMenuContent align="end" className="min-w-48">
             <DropdownMenuGroup>
               <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => window.open(`/widget/form/${form.slug}`, "_blank")}>
                 <EyeIcon /> Ver formulario
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigator.clipboard.writeText(slug)}>
-                <Link2Icon /> Copiar slug
+              <DropdownMenuItem onClick={() => onEdit(form.raw)}>
+                <EditIcon /> Editar
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigator.clipboard.writeText(`${window.location.origin}/widget/form/${form.slug}`)}>
+                <Link2Icon /> Copiar enlace
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onIntegrate(form.raw)}>
+                <Code2Icon /> Integrar formulario
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive focus:text-destructive">
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onClick={() => onDelete(form.id)}
+            >
               <Trash2Icon /> Eliminar
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -303,10 +292,11 @@ const columns: ColumnDef<Form>[] = [
     },
   },
 ]
+}
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function FormsTable() {
+export function FormsTable({ viewToggle }: { viewToggle?: React.ReactNode } = {}) {
   const [data, setData] = React.useState<Form[]>([])
   const [total, setTotal] = React.useState(0)
   const [loading, setLoading] = React.useState(true)
@@ -319,6 +309,46 @@ export function FormsTable() {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
   const [rowSelection, setRowSelection] = React.useState({})
+  const [sheetOpen, setSheetOpen] = React.useState(false)
+  const [editForm, setEditForm] = React.useState<FormRaw | null>(null)
+  const [integrateForm, setIntegrateForm] = React.useState<FormRaw | null>(null)
+  const [flows, setFlows] = React.useState<Flow[]>([])
+  const [flowFilter, setFlowFilter] = React.useState<string>("all")
+
+  React.useEffect(() => {
+    flowService.all().then(setFlows).catch(() => {})
+  }, [])
+
+  const handleEdit = React.useCallback((raw: FormRaw) => {
+    setEditForm(raw)
+    setSheetOpen(true)
+  }, [])
+
+  const handleIntegrate = React.useCallback((raw: FormRaw) => {
+    setIntegrateForm(raw)
+  }, [])
+
+  const handleDelete = React.useCallback(async (id: number) => {
+    const ok = await confirmDialog({
+      title: "¿Eliminar formulario?",
+      description: "El formulario dejará de estar disponible públicamente.",
+      confirmText: "Sí, eliminar",
+      cancelText: "Cancelar",
+      tone: "danger",
+    })
+    if (!ok) return
+    try {
+      setData((prev) => prev.filter((f) => f.id !== id))
+      setTotal((prev) => prev - 1)
+      await formService.delete(id)
+      notify.success({ title: "Formulario eliminado", description: "El formulario ya no está disponible públicamente." })
+    } catch {
+      notify.error({ title: "Error al eliminar", description: "No se pudo eliminar el formulario. Intenta de nuevo." })
+      setQuery((q) => ({ ...q }))
+    }
+  }, [])
+
+  const columns = React.useMemo(() => buildColumns(handleEdit, handleDelete, handleIntegrate), [handleEdit, handleDelete, handleIntegrate])
 
   React.useEffect(() => {
     let cancelled = false
@@ -347,8 +377,15 @@ export function FormsTable() {
     }
   }, [query])
 
+  // Pipeline — client-side sobre la página cargada, el backend no tiene
+  // param de flow_id todavía (igual criterio que Fuente en Organización).
+  const visibleData = React.useMemo(() => {
+    if (flowFilter === "all") return data
+    return data.filter((f) => String(f.flowId) === flowFilter)
+  }, [data, flowFilter])
+
   const table = useReactTable({
-    data,
+    data: visibleData,
     columns,
     rowCount: total,
     manualPagination: true,
@@ -374,30 +411,47 @@ export function FormsTable() {
 
   const skeletonRows = Array.from({ length: query.pageSize })
 
-  const activeFilterValue =
-    query.isActive === true ? "true" : query.isActive === false ? "false" : null
+  const flowOptions: SingleSelectOption[] = [
+    { value: "all", label: "Todos" },
+    ...flows.map((f) => ({ value: String(f.id), label: f.name })),
+  ]
 
-  const hasFilters = !!query.search || query.isActive !== null
+  const activeFilterValue =
+    query.isActive === true ? "true" : query.isActive === false ? "false" : "all"
+
+  const hasFilters = !!query.search || query.isActive !== null || flowFilter !== "all"
+
+  function resetFilters() {
+    setQuery((q) => ({ ...q, search: "", isActive: null, page: 1 }))
+    setFlowFilter("all")
+  }
 
   return (
     <div className="w-full">
-      {/* Toolbar */}
-      <div className="flex items-center gap-2 py-4">
-        <Input
-          className="max-w-sm h-8"
-          placeholder="Buscar formularios..."
-          value={query.search}
-          onChange={(e) =>
-            setQuery((q) => ({ ...q, search: e.target.value, page: 1 }))
-          }
-        />
-        <SimpleFilter
-          label="Estado"
-          value={activeFilterValue}
-          options={[
-            { label: "Activo",   value: "true"  },
-            { label: "Inactivo", value: "false" },
-          ]}
+      {/* Row 1 — view toggle + create */}
+      <div className="flex items-center justify-between border-b px-4 py-2">
+        {viewToggle}
+        <Button size="sm" onClick={() => { setEditForm(null); setSheetOpen(true) }}>+ Crear Formulario</Button>
+      </div>
+
+      {/* Row 2 — filters */}
+      <div className="flex items-center gap-2 border-b px-4 py-2">
+        <div className="relative w-44 shrink-0">
+          <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Buscar formularios..."
+            className="h-8 pl-8 text-xs"
+            value={query.search}
+            onChange={(e) =>
+              setQuery((q) => ({ ...q, search: e.target.value, page: 1 }))
+            }
+          />
+        </div>
+
+        <SingleSelectFilter
+          title="Estado"
+          options={STATUS_OPTIONS}
+          selected={activeFilterValue}
           onChange={(v) =>
             setQuery((q) => ({
               ...q,
@@ -406,23 +460,28 @@ export function FormsTable() {
             }))
           }
         />
+
+        <SingleSelectFilter
+          title="Pipeline"
+          options={flowOptions}
+          selected={flowFilter}
+          onChange={setFlowFilter}
+        />
+
         {hasFilters && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8"
-            onClick={() => setQuery((q) => ({ ...q, search: "", isActive: null, page: 1 }))}
-          >
-            Reset <XIcon className="ml-1 size-4" />
+          <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={resetFilters}>
+            <XIcon className="size-3.5" />
+            Restablecer
           </Button>
         )}
+
         <div className="ml-auto flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">
+          <span className="text-xs text-muted-foreground">
             {loading ? "…" : `${total} formularios`}
           </span>
           <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="outline" />}>
-              Columnas <ChevronDown className="ml-2 size-4" />
+            <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8" />}>
+              Columnas <ChevronDown className="ml-1.5 size-3.5" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               {table
@@ -440,14 +499,24 @@ export function FormsTable() {
                 ))}
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button>
-            <PlusIcon className="size-4" /> Crear Formulario
-          </Button>
         </div>
       </div>
 
+      <CreateFormSheet
+        open={sheetOpen}
+        onOpenChange={(open) => { setSheetOpen(open); if (!open) setEditForm(null) }}
+        editForm={editForm}
+        onSuccess={() => setQuery((q) => ({ ...q }))}
+      />
+
+      <FormIntegrateSheet
+        open={!!integrateForm}
+        onOpenChange={(open) => { if (!open) setIntegrateForm(null) }}
+        form={integrateForm}
+      />
+
       {/* Table */}
-      <div className="rounded-md border">
+      <div className="mx-4 mt-3 rounded-md border">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((hg) => (
@@ -492,7 +561,7 @@ export function FormsTable() {
         </Table>
       </div>
 
-      <div className="py-4">
+      <div className="px-4 py-3">
         <DataTablePagination table={table} />
       </div>
     </div>

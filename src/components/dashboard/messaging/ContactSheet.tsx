@@ -10,12 +10,13 @@ import {
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   Sheet,
   SheetContent,
   SheetTitle,
 } from "@/components/ui/sheet"
-import { type Conversation, AVATAR_COLOR_CLASSES, STATUS_CONFIG } from "./data"
+import { type Conversation, STATUS_CONFIG } from "./data"
 
 interface ContactSheetProps {
   open: boolean
@@ -25,6 +26,9 @@ interface ContactSheetProps {
 
 export function ContactSheet({ open, onOpenChange, conversation }: ContactSheetProps) {
   const isWsp      = conversation.channel === "whatsapp"
+  const isIg       = conversation.channel === "instagram"
+  const isFb       = conversation.channel === "facebook"
+  const channelLabel = isWsp ? "WhatsApp" : isIg ? "Instagram" : isFb ? "Messenger" : conversation.widgetName ?? "Widget web"
   const hasContact = !!conversation.crmContactId
   const displayName = conversation.visitorName ?? "Visitante anónimo"
   const statusCfg  = STATUS_CONFIG[conversation.status]
@@ -35,20 +39,19 @@ export function ContactSheet({ open, onOpenChange, conversation }: ContactSheetP
 
         {/* Avatar + nombre */}
         <div className="flex flex-col items-center gap-3 px-6 pb-6 pt-10">
-          <div className={cn(
-            "flex size-16 items-center justify-center rounded-full text-xl font-semibold",
-            conversation.visitorName
-              ? AVATAR_COLOR_CLASSES[conversation.visitorAvatarColor]
-              : "bg-muted text-muted-foreground"
-          )}>
-            {conversation.visitorInitials}
-          </div>
+          <Avatar className="size-16">
+            <AvatarImage src={conversation.visitorAvatarUrl || "https://github.com/shadcn.png"} alt="" />
+            <AvatarFallback className="text-xl font-semibold">
+              {conversation.visitorInitials}
+            </AvatarFallback>
+          </Avatar>
 
           <div className="text-center">
             <SheetTitle className="text-base font-semibold">{displayName}</SheetTitle>
             <div className="mt-1 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
-              <span className={cn("size-1.5 rounded-full", isWsp ? "bg-[#25D366]" : "bg-violet-600")} />
-              {isWsp ? "WhatsApp" : (conversation.widgetName ?? "Widget web")}
+              <span className={cn("size-1.5 rounded-full", isWsp ? "bg-[#25D366]" : isIg ? "bg-pink-500" : isFb ? "bg-[#1877F2]" : "bg-blue-600")} />
+              {channelLabel}
+              {isIg && conversation.visitorUsername && <span>· @{conversation.visitorUsername}</span>}
             </div>
           </div>
 
@@ -76,6 +79,9 @@ export function ContactSheet({ open, onOpenChange, conversation }: ContactSheetP
           <div className="flex flex-col">
             {conversation.visitorPhone && (
               <InfoRow label="Teléfono" value={conversation.visitorPhone} />
+            )}
+            {conversation.visitorUsername && (
+              <InfoRow label="Instagram" value={`@${conversation.visitorUsername}`} />
             )}
             {conversation.visitorEmail && (
               <InfoRow label="Email" value={conversation.visitorEmail} />

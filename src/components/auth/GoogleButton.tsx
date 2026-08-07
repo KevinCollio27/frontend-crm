@@ -13,7 +13,7 @@ export const GoogleButton = () => {
   };
 
   return (
-    <Button className="w-full" size="lg" type="button" disabled={loading} onClick={handleClick}>
+    <Button className="w-full" variant="outline" size="lg" type="button" disabled={loading} onClick={handleClick}>
       <GoogleLogo className="mr-2 size-4" />
       {loading ? "Conectando con Google..." : "Continuar con Google"}
     </Button>

@@ -1,13 +1,10 @@
 "use client"
 
+import * as React from "react"
 import {
   type ColumnDef,
-  type ColumnFiltersState,
   flexRender,
   getCoreRowModel,
-  getFacetedRowModel,
-  getFacetedUniqueValues,
-  getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
   type SortingState,
@@ -15,25 +12,21 @@ import {
   type VisibilityState,
 } from "@tanstack/react-table"
 import {
-  ArrowDownIcon,
-  ArrowUpDown,
-  ArrowUpIcon,
   ChevronDown,
   DownloadIcon,
   FileTextIcon,
-  MoreHorizontal,
+  Loader2Icon,
+  MoreHorizontalIcon,
   PencilIcon,
   PlusIcon,
   Trash2Icon,
-  XIcon,
 } from "lucide-react"
-import * as React from "react"
-
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
+import { cn } from "@/lib/utils"
+import { getSortIcon } from "@/lib/table-utils"
+import { orgConfirm } from "@/lib/confirm"
+import { notify } from "@/lib/notify"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import { DataTableFacetedFilter } from "@/components/ui/data-table-faceted-filter"
 import { DataTablePagination } from "@/components/ui/data-table-pagination"
 import {
   DropdownMenu,
@@ -54,49 +47,74 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { cn } from "@/lib/utils"
-import type { DealDetail, DealDocument } from "../../data"
+import { fileOpportunityService } from "@/services/file-opportunity.service"
+import { FileOpportunitySheet } from "../sheets/FileOpportunitySheet"
+import { useEntityRealtime } from "@/hooks/useEntityRealtime"
+import type { FileOpportunityRaw } from "@/types/file-opportunity"
 
-// ─── Configs ──────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function formatBytes(bytes: number): string {
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+function getExtension(fileName: string): string {
+  return fileName.split(".").pop()?.toLowerCase() ?? "file"
 }
 
 const FILE_TYPE_STYLE: Record<string, { bg: string; color: string }> = {
-  pdf:  { bg: "bg-red-100",    color: "text-red-600"    },
-  docx: { bg: "bg-blue-100",   color: "text-blue-600"   },
+  pdf:  { bg: "bg-red-100",     color: "text-red-600"     },
+  docx: { bg: "bg-blue-100",    color: "text-blue-600"    },
+  doc:  { bg: "bg-blue-100",    color: "text-blue-600"    },
   xlsx: { bg: "bg-emerald-100", color: "text-emerald-600" },
-  pptx: { bg: "bg-orange-100", color: "text-orange-600" },
+  xls:  { bg: "bg-emerald-100", color: "text-emerald-600" },
+  pptx: { bg: "bg-orange-100",  color: "text-orange-600"  },
+  ppt:  { bg: "bg-orange-100",  color: "text-orange-600"  },
 }
 
-const CATEGORY_CONFIG: Record<string, { label: string; className: string }> = {
-  contrato:     { label: "Contrato",     className: "bg-blue-50 text-blue-700 border-blue-200"           },
-  factura:      { label: "Factura",      className: "bg-amber-50 text-amber-700 border-amber-200"         },
-  presentacion: { label: "Presentación", className: "bg-violet-50 text-violet-700 border-violet-200"      },
-  manual:       { label: "Manual",       className: "bg-emerald-50 text-emerald-700 border-emerald-200"   },
-  otro:         { label: "Otro",         className: "bg-muted text-muted-foreground border-border"        },
+const COLUMN_LABELS: Record<string, string> = {
+  id:         "ID",
+  name:       "Nombre",
+  created_at: "Fecha",
 }
 
-const columnLabels: Record<string, string> = {
-  id:          "ID",
-  name:        "Nombre",
-  category:    "Categoría",
-  file_size:   "Tamaño",
-  uploaded_by: "Subido por",
-  created_at:  "Creado",
+// ─── Skeleton ─────────────────────────────────────────────────────────────────
+
+const skeletonCell: Record<string, React.ReactNode> = {
+  select: <div className="size-4 animate-pulse rounded bg-muted" />,
+  id:     <div className="h-3 w-8 animate-pulse rounded bg-muted" />,
+  name: (
+    <div className="flex items-center gap-2.5">
+      <div className="size-7 shrink-0 animate-pulse rounded-lg bg-muted" />
+      <div className="space-y-1.5">
+        <div className="h-3.5 w-36 animate-pulse rounded bg-muted" />
+        <div className="h-3 w-10 animate-pulse rounded bg-muted" />
+      </div>
+    </div>
+  ),
+  created_at: <div className="h-3.5 w-24 animate-pulse rounded bg-muted" />,
+  actions:    <div className="size-7 animate-pulse rounded bg-muted" />,
 }
 
-const getSortIcon = (sorted: false | "asc" | "desc") => {
-  if (sorted === "asc")  return <ArrowUpIcon   className="ml-2 size-3.5" />
-  if (sorted === "desc") return <ArrowDownIcon  className="ml-2 size-3.5" />
-  return <ArrowUpDown className="ml-2 size-3.5" />
+function TableSkeleton({ visibleIds }: { visibleIds: string[] }) {
+  return (
+    <>
+      {Array.from({ length: 5 }).map((_, i) => (
+        <TableRow key={i}>
+          {visibleIds.map((id) => (
+            <TableCell key={id}>
+              {skeletonCell[id] ?? <div className="h-3.5 w-20 animate-pulse rounded bg-muted" />}
+            </TableCell>
+          ))}
+        </TableRow>
+      ))}
+    </>
+  )
 }
 
 // ─── Columns ──────────────────────────────────────────────────────────────────
 
-function getColumns(): ColumnDef<DealDocument>[] {
+function getColumns(
+  onDownload: (row: FileOpportunityRaw) => void,
+  onEdit:     (row: FileOpportunityRaw) => void,
+  onDelete:   (row: FileOpportunityRaw) => void,
+): ColumnDef<FileOpportunityRaw>[] {
   return [
     {
       id: "select",
@@ -105,14 +123,14 @@ function getColumns(): ColumnDef<DealDocument>[] {
           aria-label="Select all"
           checked={table.getIsAllPageRowsSelected()}
           indeterminate={table.getIsSomePageRowsSelected() && !table.getIsAllPageRowsSelected()}
-          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+          onCheckedChange={(v) => table.toggleAllPageRowsSelected(!!v)}
         />
       ),
       cell: ({ row }) => (
         <Checkbox
           aria-label="Select row"
           checked={row.getIsSelected()}
-          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          onCheckedChange={(v) => row.toggleSelected(!!v)}
         />
       ),
       enableSorting: false,
@@ -133,64 +151,18 @@ function getColumns(): ColumnDef<DealDocument>[] {
         </Button>
       ),
       cell: ({ row }) => {
-        const doc = row.original
-        const style = FILE_TYPE_STYLE[doc.file_type] ?? { bg: "bg-muted", color: "text-muted-foreground" }
+        const doc  = row.original
+        const ext  = getExtension(doc.file_name)
+        const conf = FILE_TYPE_STYLE[ext] ?? { bg: "bg-muted", color: "text-muted-foreground" }
         return (
-          <div className="flex items-center gap-2.5">
-            <div className={cn("flex size-7 shrink-0 items-center justify-center rounded-lg", style.bg)}>
-              <FileTextIcon className={cn("size-3.5", style.color)} />
+          <div className="flex min-w-0 items-center gap-2.5">
+            <div className={cn("flex size-7 shrink-0 items-center justify-center rounded-lg", conf.bg)}>
+              <FileTextIcon className={cn("size-3.5", conf.color)} />
             </div>
-            <div className="leading-tight">
-              <div className="text-sm font-medium">{doc.name}</div>
-              <div className="text-xs text-muted-foreground uppercase">{doc.file_type}</div>
+            <div className="min-w-0 leading-tight">
+              <div className="truncate text-sm font-medium">{doc.name}</div>
+              <div className="text-xs uppercase text-muted-foreground">{ext}</div>
             </div>
-          </div>
-        )
-      },
-    },
-    {
-      accessorKey: "category",
-      header: "Categoría",
-      cell: ({ row }) => {
-        const conf = CATEGORY_CONFIG[row.getValue("category") as string] ?? CATEGORY_CONFIG.otro
-        return (
-          <Badge className={cn("rounded-full border px-2.5 py-0.5 text-xs", conf.className)}>
-            {conf.label}
-          </Badge>
-        )
-      },
-      filterFn: (row, id, value: string[]) => value.includes(row.getValue(id)),
-    },
-    {
-      accessorKey: "file_size",
-      header: ({ column }) => (
-        <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
-          Tamaño {getSortIcon(column.getIsSorted())}
-        </Button>
-      ),
-      cell: ({ row }) => (
-        <div className="text-sm text-muted-foreground tabular-nums">
-          {formatBytes(row.getValue("file_size"))}
-        </div>
-      ),
-    },
-    {
-      id: "uploaded_by",
-      accessorFn: (row) => row.uploaded_by.name,
-      header: ({ column }) => (
-        <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
-          Subido por {getSortIcon(column.getIsSorted())}
-        </Button>
-      ),
-      cell: ({ row }) => {
-        const u = row.original.uploaded_by
-        return (
-          <div className="flex items-center gap-2">
-            <Avatar className="size-6 shrink-0">
-              <AvatarImage src={u.avatar} alt={u.name} />
-              <AvatarFallback className="text-[9px] font-semibold">{u.initials}</AvatarFallback>
-            </Avatar>
-            <span className="text-sm">{u.name}</span>
           </div>
         )
       },
@@ -199,30 +171,42 @@ function getColumns(): ColumnDef<DealDocument>[] {
       accessorKey: "created_at",
       header: ({ column }) => (
         <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
-          Creado {getSortIcon(column.getIsSorted())}
+          Fecha {getSortIcon(column.getIsSorted())}
         </Button>
       ),
-      cell: ({ row }) => (
-        <div className="text-sm text-muted-foreground">{row.getValue("created_at")}</div>
-      ),
+      cell: ({ row }) => {
+        const date = new Date(row.getValue("created_at") as string)
+        return (
+          <div className="text-sm text-muted-foreground">
+            {date.toLocaleDateString("es-CL", { day: "numeric", month: "short", year: "numeric" })}
+          </div>
+        )
+      },
     },
     {
       id: "actions",
       enableHiding: false,
-      cell: () => (
+      cell: ({ row }) => (
         <DropdownMenu>
           <DropdownMenuTrigger render={<Button variant="ghost" className="h-8 w-8 p-0" />}>
             <span className="sr-only">Abrir menú</span>
-            <MoreHorizontal className="size-4" />
+            <MoreHorizontalIcon className="size-4" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="min-w-44">
             <DropdownMenuGroup>
               <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-              <DropdownMenuItem><DownloadIcon /> Descargar</DropdownMenuItem>
-              <DropdownMenuItem><PencilIcon />   Editar</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onDownload(row.original)}>
+                <DownloadIcon /> Descargar
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onEdit(row.original)}>
+                <PencilIcon /> Editar
+              </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive focus:text-destructive">
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onClick={() => onDelete(row.original)}
+            >
               <Trash2Icon /> Eliminar
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -232,47 +216,96 @@ function getColumns(): ColumnDef<DealDocument>[] {
   ]
 }
 
-// ─── Filter options ────────────────────────────────────────────────────────────
-
-const CATEGORY_OPTIONS = [
-  { label: "Contrato",     value: "contrato"     },
-  { label: "Factura",      value: "factura"      },
-  { label: "Presentación", value: "presentacion" },
-  { label: "Manual",       value: "manual"       },
-  { label: "Otro",         value: "otro"         },
-]
-
 // ─── Component ────────────────────────────────────────────────────────────────
 
 interface Props {
-  deal: DealDetail
+  opportunityId: number
 }
 
-export function DocumentosTab({ deal }: Props) {
-  const [sorting, setSorting]                   = React.useState<SortingState>([])
-  const [columnFilters, setColumnFilters]        = React.useState<ColumnFiltersState>([])
-  const [columnVisibility, setColumnVisibility]  = React.useState<VisibilityState>({
-    uploaded_by: false, created_at: false,
-  })
-  const [rowSelection, setRowSelection] = React.useState({})
+export function DocumentosTab({ opportunityId }: Props) {
+  const [data, setData]               = React.useState<FileOpportunityRaw[]>([])
+  const [loading, setLoading]         = React.useState(true)
+  const [downloading, setDownloading] = React.useState<number | null>(null)
+  const [createOpen, setCreateOpen]   = React.useState(false)
+  const [editEntity, setEditEntity]   = React.useState<FileOpportunityRaw | null>(null)
+  const [sorting, setSorting]         = React.useState<SortingState>([])
+  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
+  const [rowSelection, setRowSelection]         = React.useState({})
+  const [filter, setFilter]           = React.useState("")
+  const [refreshKey, setRefreshKey]   = React.useState(0)
 
-  const columns = React.useMemo(() => getColumns(), [])
+  // Evento real es "opportunity_file" (con guion bajo, no "-") — ver
+  // fileOpportunity.service.ts. Trae opportunity_id en las 3 acciones.
+  useEntityRealtime("opportunity_file", (payload) => {
+    const changedOppId = (payload.data as { opportunity_id?: number | null })?.opportunity_id
+    if (changedOppId !== opportunityId) return
+    setRefreshKey((k) => k + 1)
+  })
+
+  React.useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+
+    fileOpportunityService
+      .list(opportunityId)
+      .then((res) => { if (!cancelled) setData(res.data) })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(false) })
+
+    return () => { cancelled = true }
+  }, [opportunityId, refreshKey])
+
+  async function handleDownload(row: FileOpportunityRaw) {
+    if (downloading) return
+    setDownloading(row.id)
+    try {
+      const url = await fileOpportunityService.getUrl(row.id)
+      window.open(url, "_blank")
+    } catch {
+    } finally {
+      setDownloading(null)
+    }
+  }
+
+  async function handleDelete(row: FileOpportunityRaw) {
+    const confirmed = await orgConfirm.delete(row.name)
+    if (!confirmed) return
+    setData((prev) => prev.filter((d) => d.id !== row.id))
+    const t0 = Date.now()
+    console.log(`[file-opp] delete start id=${row.id}`)
+    fileOpportunityService.delete(row.id)
+      .then(() => {
+        console.log(`[file-opp] delete OK → ${Date.now() - t0}ms`)
+        notify.success({ title: "Archivo eliminado", description: `"${row.name}" fue eliminado.` })
+      })
+      .catch(() => {
+        setData((prev) => [row, ...prev])
+        notify.error({ title: "Algo salió mal", description: "No se pudo eliminar el archivo." })
+      })
+  }
+
+  const columns = React.useMemo(
+    () => getColumns(handleDownload, setEditEntity, handleDelete),
+    [downloading],
+  )
 
   const table = useReactTable({
-    data: deal.documents,
+    data,
     columns,
-    onSortingChange:           setSorting,
-    onColumnFiltersChange:     setColumnFilters,
-    onColumnVisibilityChange:  setColumnVisibility,
-    onRowSelectionChange:      setRowSelection,
-    getCoreRowModel:           getCoreRowModel(),
-    getPaginationRowModel:     getPaginationRowModel(),
-    getSortedRowModel:         getSortedRowModel(),
-    getFilteredRowModel:       getFilteredRowModel(),
-    getFacetedRowModel:        getFacetedRowModel(),
-    getFacetedUniqueValues:    getFacetedUniqueValues(),
-    state: { sorting, columnFilters, columnVisibility, rowSelection },
+    onSortingChange:          setSorting,
+    onColumnVisibilityChange: setColumnVisibility,
+    onRowSelectionChange:     setRowSelection,
+    getCoreRowModel:          getCoreRowModel(),
+    getPaginationRowModel:    getPaginationRowModel(),
+    getSortedRowModel:        getSortedRowModel(),
+    state: { sorting, columnVisibility, rowSelection },
+    globalFilterFn: (row, _id, value: string) =>
+      row.original.name.toLowerCase().includes(value.toLowerCase()),
   })
+
+  React.useEffect(() => {
+    table.setGlobalFilter(filter)
+  }, [filter])
 
   return (
     <div className="p-4">
@@ -282,19 +315,15 @@ export function DocumentosTab({ deal }: Props) {
         <Input
           className="h-8 max-w-45 text-sm"
           placeholder="Filtrar por nombre..."
-          value={(table.getColumn("name")?.getFilterValue() as string) ?? ""}
-          onChange={(e) => table.getColumn("name")?.setFilterValue(e.target.value)}
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
         />
-        <DataTableFacetedFilter column={table.getColumn("category")!} title="Categoría" options={CATEGORY_OPTIONS} />
-        {table.getState().columnFilters.length > 0 && (
-          <Button variant="ghost" size="sm" className="h-8" onClick={() => table.resetColumnFilters()}>
-            Reset <XIcon className="ml-1 size-4" />
-          </Button>
-        )}
-        <div className="ml-auto flex items-center gap-2">
+        {!loading && (
           <span className="text-sm text-muted-foreground">
             {table.getFilteredRowModel().rows.length} documento(s)
           </span>
+        )}
+        <div className="ml-auto flex items-center gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8 text-xs" />}>
               Columnas <ChevronDown className="ml-1 size-3.5" />
@@ -304,39 +333,61 @@ export function DocumentosTab({ deal }: Props) {
                 <DropdownMenuCheckboxItem
                   key={col.id}
                   checked={col.getIsVisible()}
-                  onCheckedChange={(value) => col.toggleVisibility(!!value)}
+                  onCheckedChange={(v) => col.toggleVisibility(!!v)}
                 >
-                  {columnLabels[col.id] ?? col.id}
+                  {COLUMN_LABELS[col.id] ?? col.id}
                 </DropdownMenuCheckboxItem>
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button size="sm" className="h-8 gap-1.5 text-xs">
+          <Button size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setCreateOpen(true)}>
             <PlusIcon className="size-3.5" /> Documento
           </Button>
         </div>
       </div>
 
+      {/* Downloading indicator */}
+      {downloading && (
+        <div className="mb-3 flex items-center gap-2 rounded-lg border bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+          <Loader2Icon className="size-3.5 animate-spin" />
+          Generando enlace de descarga...
+        </div>
+      )}
+
       {/* Table */}
       <div className="overflow-auto rounded-md border">
-        <Table>
+        <Table className="table-fixed w-full">
           <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id}>
-                    {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+            {table.getHeaderGroups().map((hg) => (
+              <TableRow key={hg.id}>
+                {hg.headers.map((h) => (
+                  <TableHead
+                    key={h.id}
+                    className={
+                      h.column.id === "select"     ? "w-10"  :
+                      h.column.id === "id"         ? "w-14"  :
+                      h.column.id === "created_at" ? "w-36"  :
+                      h.column.id === "actions"    ? "w-12"  :
+                      undefined
+                    }
+                  >
+                    {h.isPlaceholder ? null : flexRender(h.column.columnDef.header, h.getContext())}
                   </TableHead>
                 ))}
               </TableRow>
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows?.length ? (
+            {loading ? (
+              <TableSkeleton visibleIds={table.getVisibleLeafColumns().map((c) => c.id)} />
+            ) : table.getRowModel().rows.length ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell
+                      key={cell.id}
+                      className={cell.column.id === "name" ? "overflow-hidden" : undefined}
+                    >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
@@ -345,7 +396,7 @@ export function DocumentosTab({ deal }: Props) {
             ) : (
               <TableRow>
                 <TableCell className="h-24 text-center" colSpan={columns.length}>
-                  Sin resultados.
+                  Sin documentos cargados.
                 </TableCell>
               </TableRow>
             )}
@@ -354,9 +405,33 @@ export function DocumentosTab({ deal }: Props) {
       </div>
 
       {/* Pagination */}
-      <div className="pt-4">
-        <DataTablePagination table={table} />
-      </div>
+      {!loading && (
+        <div className="pt-4">
+          <DataTablePagination table={table} />
+        </div>
+      )}
+
+      {createOpen && (
+        <FileOpportunitySheet
+          open
+          onOpenChange={setCreateOpen}
+          opportunityId={opportunityId}
+          onSuccess={(created) => setData((prev) => [created, ...prev])}
+        />
+      )}
+
+      {editEntity !== null && (
+        <FileOpportunitySheet
+          open
+          onOpenChange={(v) => { if (!v) setEditEntity(null) }}
+          opportunityId={opportunityId}
+          entity={editEntity}
+          onSuccess={(updated) => {
+            setData((prev) => prev.map((d) => d.id === updated.id ? updated : d))
+            setEditEntity(null)
+          }}
+        />
+      )}
 
     </div>
   )

@@ -17,10 +17,10 @@ import {
   DownloadIcon,
   EyeIcon,
   Link2,
+  ListIcon,
   MoreHorizontal,
   PencilIcon,
-  PlusCircleIcon,
-  PlusIcon,
+  SearchIcon,
   Trash2Icon,
   XIcon,
 } from "lucide-react"
@@ -50,6 +50,7 @@ import {
 import { DataTablePagination } from "@/components/ui/data-table-pagination"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
+import { SingleSelectFilter, type SingleSelectOption } from "@/components/ui/single-select-filter"
 import {
   Table,
   TableBody,
@@ -59,15 +60,20 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { DocumentPreviewSheet } from "./DocumentPreviewSheet"
+import { UploadDocumentSheet, type DocumentToEdit } from "./UploadDocumentSheet"
 import { documentService } from "@/services/document.service"
 import type { DocumentRaw } from "@/types/document"
 import { getSortIcon } from "@/lib/table-utils"
+import { notify } from "@/lib/notify"
+import { orgConfirm } from "@/lib/confirm"
+import { useEntityRealtime } from "@/hooks/useEntityRealtime"
 
 export interface Document {
   id: number
   name: string
   description: string
   fileType: string
+  filePath: string
   fileSize: number | null
   category: string
   visibility: string
@@ -81,6 +87,7 @@ function mapDocument(d: DocumentRaw): Document {
     name: d.name,
     description: d.description ?? "",
     fileType: d.file_type,
+    filePath: d.file_path ?? "",
     fileSize: d.file_size,
     category: d.category ?? "",
     visibility: d.visibility,
@@ -138,7 +145,8 @@ const categoryLabels: Record<string, string> = {
 
 // ─── Filtros ──────────────────────────────────────────────────────────────────
 
-const CATEGORY_OPTIONS = [
+const CATEGORY_OPTIONS: SingleSelectOption[] = [
+  { value: "all",          label: "Todas"         },
   { value: "contrato",     label: "Contrato"      },
   { value: "factura",      label: "Factura"       },
   { value: "presentacion", label: "Presentación"  },
@@ -146,65 +154,11 @@ const CATEGORY_OPTIONS = [
   { value: "otro",         label: "Otro"          },
 ]
 
-const VISIBILITY_OPTIONS = [
+const VISIBILITY_OPTIONS: SingleSelectOption[] = [
+  { value: "all",     label: "Todas"    },
   { value: "public",  label: "Público"  },
   { value: "private", label: "Privado"  },
 ]
-
-function SimpleFilter({
-  title,
-  options,
-  selected,
-  onChange,
-}: {
-  title: string
-  options: { value: string; label: string }[]
-  selected: string | null
-  onChange: (v: string | null) => void
-}) {
-  const selectedLabel = options.find((o) => o.value === selected)?.label
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={<Button variant="outline" size="sm" className="h-8 border-dashed" />}
-      >
-        <PlusCircleIcon className="size-4" />
-        {title}
-        {selected !== null && (
-          <>
-            <Separator orientation="vertical" className="mx-1 data-vertical:h-4 data-vertical:self-auto" />
-            <span className="inline-block max-w-28 truncate align-middle rounded bg-muted px-1.5 py-0.5 text-xs font-medium">
-              {selectedLabel ?? selected}
-            </span>
-          </>
-        )}
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="min-w-40">
-        {options.map((opt) => (
-          <DropdownMenuCheckboxItem
-            key={opt.value}
-            checked={selected === opt.value}
-            onCheckedChange={() => onChange(selected === opt.value ? null : opt.value)}
-          >
-            {opt.label}
-          </DropdownMenuCheckboxItem>
-        ))}
-        {selected !== null && (
-          <>
-            <DropdownMenuSeparator />
-            <button
-              className="w-full px-2 py-1.5 text-center text-xs text-muted-foreground transition-colors hover:text-foreground"
-              onClick={() => onChange(null)}
-            >
-              Limpiar filtro
-            </button>
-          </>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
-}
 
 // ─── Tabla ────────────────────────────────────────────────────────────────────
 
@@ -223,7 +177,12 @@ const DEFAULT_COLUMN_VISIBILITY: VisibilityState = {
   fileSize: false,
 }
 
-function getColumns(onPreview: (doc: Document) => void): ColumnDef<Document>[] {
+function getColumns(
+  onPreview: (doc: Document) => void,
+  onDownload: (doc: Document) => void,
+  onEdit: (doc: Document) => void,
+  onDelete: (doc: Document) => void,
+): ColumnDef<Document>[] {
   return [
     {
       id: "select",
@@ -389,17 +348,20 @@ function getColumns(onPreview: (doc: Document) => void): ColumnDef<Document>[] {
                   <EyeIcon />
                   Vista Previa
                 </DropdownMenuItem>
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onDownload(doc)}>
                   <DownloadIcon />
                   Descargar
                 </DropdownMenuItem>
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onEdit(doc)}>
                   <PencilIcon />
                   Editar
                 </DropdownMenuItem>
               </DropdownMenuGroup>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive focus:text-destructive">
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onClick={() => onDelete(doc)}
+              >
                 <Trash2Icon />
                 Eliminar
               </DropdownMenuItem>
@@ -447,6 +409,7 @@ export function DocumentsTable() {
   const [total, setTotal] = React.useState(0)
   const [loading, setLoading] = React.useState(true)
   const [searchInput, setSearchInput] = React.useState("")
+  const [refreshKey, setRefreshKey] = React.useState(0)
   const [query, setQuery] = React.useState<QueryState>({
     page: 1,
     pageSize: 10,
@@ -460,11 +423,23 @@ export function DocumentsTable() {
   )
   const [rowSelection, setRowSelection] = React.useState({})
   const [selectedDocument, setSelectedDocument] = React.useState<Document | null>(null)
+  const selectedDocumentRef = React.useRef<Document | null>(null)
   const [sheetOpen, setSheetOpen] = React.useState(false)
+  const [uploadOpen, setUploadOpen] = React.useState(false)
+  const [editDoc, setEditDoc] = React.useState<DocumentToEdit | undefined>(undefined)
+  const [editOpen, setEditOpen] = React.useState(false)
+
+  // Tiempo real: si otra sesión sube/edita/elimina un documento en este
+  // workspace, refresca la tabla sin esperar a un F5 manual. El evento vive
+  // en workspaceDocument.service.ts, no en el controller.
+  useEntityRealtime("workspace_document", () => setRefreshKey((k) => k + 1))
 
   React.useEffect(() => {
     const t = setTimeout(
-      () => setQuery((q) => ({ ...q, page: 1, search: searchInput })),
+      () => setQuery((q) => {
+        if (q.search === searchInput) return q
+        return { ...q, page: 1, search: searchInput }
+      }),
       400
     )
     return () => clearTimeout(t)
@@ -493,7 +468,7 @@ export function DocumentsTable() {
     return () => {
       cancelled = true
     }
-  }, [query])
+  }, [query, refreshKey])
 
   const pagination: PaginationState = { pageIndex: query.page - 1, pageSize: query.pageSize }
 
@@ -511,8 +486,53 @@ export function DocumentsTable() {
     setQuery((q) => ({ ...q, page: 1, search: "", category: null, visibility: null }))
   }
 
+  async function handleDownload(doc: Document) {
+    if (doc.fileType === "link") {
+      window.open(doc.filePath, "_blank")
+      return
+    }
+    try {
+      const url = await documentService.getUrl(doc.id)
+      window.open(url, "_blank")
+    } catch {
+      notify.error({ title: "No se pudo obtener el enlace de descarga", description: "Intenta de nuevo." })
+    }
+  }
+
+  function handleEdit(doc: Document) {
+    setEditDoc({
+      id: doc.id,
+      name: doc.name,
+      description: doc.description,
+      category: doc.category,
+      visibility: doc.visibility,
+    })
+    setEditOpen(true)
+  }
+
+  async function handleDelete(doc: Document) {
+    const confirmed = await orgConfirm.delete(doc.name)
+    if (!confirmed) return
+    setDocuments((ds) => ds.filter((d) => d.id !== doc.id))
+    setTotal((t) => t - 1)
+    if (selectedDocumentRef.current?.id === doc.id) setSheetOpen(false)
+    try {
+      await documentService.delete(doc.id)
+      notify.success({ title: "Documento eliminado", description: "El archivo fue eliminado correctamente." })
+    } catch {
+      setRefreshKey((k) => k + 1)
+      notify.error({ title: "No se pudo eliminar el documento", description: "Intenta de nuevo." })
+    }
+  }
+
   const columns = React.useMemo(
-    () => getColumns((doc) => { setSelectedDocument(doc); setSheetOpen(true) }),
+    () => getColumns(
+      (doc) => { selectedDocumentRef.current = doc; setSelectedDocument(doc); setSheetOpen(true) },
+      handleDownload,
+      handleEdit,
+      handleDelete,
+    ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   )
 
@@ -534,36 +554,57 @@ export function DocumentsTable() {
 
   return (
     <div className="w-full">
-      <div className="flex items-center gap-2 py-4">
-        <Input
-          className="max-w-sm"
-          placeholder="Buscar documento..."
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-        />
-        <SimpleFilter
+      {/* Row 1 — view toggle + create */}
+      <div className="flex items-center justify-between border-b px-4 py-2">
+        <div className="flex items-center gap-0.5 rounded-lg border bg-muted/40 p-0.5">
+          <span className="flex items-center gap-1.5 rounded-md bg-background px-2.5 py-1 text-xs font-medium shadow-sm">
+            <ListIcon className="size-3.5" />
+            Lista
+          </span>
+        </div>
+        <Button size="sm" onClick={() => setUploadOpen(true)}>+ Subir Documento</Button>
+      </div>
+
+      {/* Row 2 — filters */}
+      <div className="flex items-center gap-2 border-b px-4 py-2">
+        <div className="relative w-44 shrink-0">
+          <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Buscar documento..."
+            className="h-8 pl-8 text-xs"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+          />
+        </div>
+
+        <SingleSelectFilter
           title="Categoría"
           options={CATEGORY_OPTIONS}
-          selected={query.category}
-          onChange={(v) => setQuery((q) => ({ ...q, page: 1, category: v }))}
+          selected={query.category ?? "all"}
+          onChange={(v) => setQuery((q) => ({ ...q, page: 1, category: v === "all" ? null : v }))}
         />
-        <SimpleFilter
+
+        <Separator orientation="vertical" className="mx-0.5 data-[orientation=vertical]:h-5 data-[orientation=vertical]:self-auto" />
+
+        <SingleSelectFilter
           title="Visibilidad"
           options={VISIBILITY_OPTIONS}
-          selected={query.visibility}
-          onChange={(v) => setQuery((q) => ({ ...q, page: 1, visibility: v }))}
+          selected={query.visibility ?? "all"}
+          onChange={(v) => setQuery((q) => ({ ...q, page: 1, visibility: v === "all" ? null : v }))}
         />
+
         {hasActiveFilters && (
-          <Button variant="ghost" size="sm" className="h-8" onClick={resetFilters}>
-            Reset
-            <XIcon className="ml-1 size-4" />
+          <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={resetFilters}>
+            <XIcon className="size-3.5" />
+            Restablecer
           </Button>
         )}
+
         <div className="ml-auto flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">{total} documentos</span>
+          <span className="text-xs text-muted-foreground">{total} documentos</span>
           <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="outline" />}>
-              Columnas <ChevronDown className="ml-2 size-4" />
+            <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8" />}>
+              Columnas <ChevronDown className="ml-1.5 size-3.5" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               {table
@@ -581,14 +622,10 @@ export function DocumentsTable() {
                 ))}
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button>
-            <PlusIcon className="size-4" />
-            Subir Documento
-          </Button>
         </div>
       </div>
 
-      <div className="rounded-md border">
+      <div className="mx-4 mt-3 rounded-md border">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -635,7 +672,7 @@ export function DocumentsTable() {
         </Table>
       </div>
 
-      <div className="py-4">
+      <div className="px-4 py-3">
         <DataTablePagination table={table} />
       </div>
 
@@ -643,6 +680,22 @@ export function DocumentsTable() {
         document={selectedDocument}
         open={sheetOpen}
         onOpenChange={setSheetOpen}
+        onDownload={() => selectedDocument && handleDownload(selectedDocument)}
+        onEdit={() => selectedDocument && handleEdit(selectedDocument)}
+        onDelete={() => selectedDocument && handleDelete(selectedDocument)}
+      />
+
+      <UploadDocumentSheet
+        open={uploadOpen}
+        onOpenChange={setUploadOpen}
+        onSuccess={() => setRefreshKey((k) => k + 1)}
+      />
+
+      <UploadDocumentSheet
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        initialDoc={editDoc}
+        onSuccess={() => setRefreshKey((k) => k + 1)}
       />
     </div>
   )

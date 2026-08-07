@@ -1,37 +1,39 @@
-import { Video, Users, CheckSquare, TrendingUp, Phone, CalendarIcon } from 'lucide-react'
-import { cn } from '@/lib/utils'
-import type { CalendarEvent, EventType } from './types'
+import { FcGoogle } from "react-icons/fc"
+import { cn } from "@/lib/utils"
+import { ACTIVITY_TYPE_CONFIG, DEFAULT_TYPE_CONFIG, type Activity } from "@/lib/activity-utils"
 
-const CONFIG: Record<EventType, { icon: React.ComponentType<{ className?: string }>, className: string }> = {
-  reunion:     { icon: Users,        className: 'bg-orange-50 text-orange-600 border-orange-100' },
-  llamada:     { icon: Phone,        className: 'bg-yellow-50 text-yellow-600 border-yellow-100' },
-  video:       { icon: Video,        className: 'bg-blue-50 text-blue-600 border-blue-100' },
-  tarea:       { icon: CheckSquare,  className: 'bg-green-50 text-green-600 border-green-100' },
-  oportunidad: { icon: TrendingUp,   className: 'bg-purple-50 text-purple-600 border-purple-100' },
-  otro:        { icon: CalendarIcon, className: 'bg-muted text-muted-foreground border-border' },
-}
+export type PillPosition = "single" | "start" | "middle" | "end"
 
 interface EventPillProps {
-  event: CalendarEvent
-  onClick?: () => void
+  activity: Activity
+  position?: PillPosition
 }
 
-export function EventPill({ event, onClick }: EventPillProps) {
-  const { icon: Icon, className } = CONFIG[event.type]
+export function EventPill({ activity, position = "single" }: EventPillProps) {
+  const { icon: Icon, iconClass, bgClass } = ACTIVITY_TYPE_CONFIG[activity.type] ?? DEFAULT_TYPE_CONFIG
+  const isSpan = position !== "single"
+  const showIcon = position === "single" || position === "start"
+  const synced = !!activity.googleEventId
 
   return (
-    <button
-      onClick={(e) => {
-        e.stopPropagation()
-        onClick?.()
-      }}
+    <div
+      title={
+        (isSpan ? `${activity.title} (${position === "start" ? "inicia" : position === "end" ? "termina" : "continúa"})` : activity.title)
+        + (synced ? " · sincronizado con Google Calendar" : "")
+      }
       className={cn(
-        'flex w-full items-center gap-1 rounded border px-1.5 py-0.5 text-left text-xs font-medium truncate cursor-pointer',
-        className,
+        "flex w-full items-center gap-1 px-1.5 py-0.5 text-xs font-medium truncate",
+        isSpan
+          ? cn(bgClass, position === "start" ? "rounded-l" : "rounded-l-none", position === "end" ? "rounded-r" : "rounded-r-none")
+          : "rounded border bg-muted/40",
       )}
     >
-      <Icon className="size-3 shrink-0" />
-      <span className="truncate">{event.title}</span>
-    </button>
+      {showIcon && <Icon className={cn("size-3 shrink-0", iconClass)} />}
+      <span className={cn("truncate", isSpan && iconClass)}>{activity.title}</span>
+      {position === "single" && synced && <FcGoogle className="size-2.5 shrink-0" />}
+      {position === "single" && activity.startTime && (
+        <span className="ml-auto shrink-0 text-muted-foreground">{activity.startTime}</span>
+      )}
+    </div>
   )
 }

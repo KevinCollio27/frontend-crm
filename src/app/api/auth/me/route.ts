@@ -26,6 +26,7 @@ export async function GET() {
     return NextResponse.json({
       user: data.user ?? null,
       workspaceId: wsId ? parseInt(wsId, 10) : null,
+      isPlatformAdmin: data.is_platform_admin ?? false,
     });
   } catch {
     return NextResponse.json({ user: null });

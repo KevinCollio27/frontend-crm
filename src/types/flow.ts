@@ -15,3 +15,11 @@ export interface Flow {
   updated_at: string
   flow_stage: FlowStage[]
 }
+
+export interface FlowPage {
+  data: Flow[]
+  total: number
+  totalPages: number
+  page: number
+  pageSize: number
+}

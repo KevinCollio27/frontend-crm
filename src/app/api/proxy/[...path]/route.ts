@@ -86,9 +86,12 @@ async function handler(
 
       jar.set("session_token", sessionToken, { ...COOKIE_BASE, maxAge });
 
+      // El workspace explícito en la respuesta (join-by-invite-link, accept-invite-*) es siempre
+      // el workspace correcto al que se acaba de unir — tiene prioridad sobre el primer
+      // user_workspace del usuario, que puede ser cualquier otro workspace previo suyo.
       const wsId =
-        (responseData.user as { user_workspace?: { workspace_id: number }[] })?.user_workspace?.[0]?.workspace_id ??
-        (responseData.workspace as { id?: number })?.id;
+        (responseData.workspace as { id?: number })?.id ??
+        (responseData.user as { user_workspace?: { workspace_id: number }[] })?.user_workspace?.[0]?.workspace_id;
       if (wsId) jar.set("workspace_id", String(wsId), { ...COOKIE_BASE, maxAge });
 
       const { token: _t, newToken: _nt, ...safeData } = responseData;

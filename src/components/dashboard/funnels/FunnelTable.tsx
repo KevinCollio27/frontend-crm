@@ -16,8 +16,11 @@ import {
   ExternalLinkIcon,
   MoreHorizontalIcon,
   PencilIcon,
+  RotateCcwIcon,
   Trash2Icon,
   TrendingUpIcon,
+  TrophyIcon,
+  XCircleIcon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { getSortIcon, getInitials } from "@/lib/table-utils"
@@ -43,9 +46,11 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { opportunityService } from "@/services/opportunity.service"
+import { opportunityNotify } from "@/lib/notify"
 import type { OpportunityRaw } from "@/types/opportunity"
 import { FunnelPreviewSheet } from "./FunnelPreviewSheet"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { EntityAccentBar } from "@/components/ui/entity-accent-bar"
 
 // ─── Entity ──────────────────────────────────────────────────────────────────
 
@@ -53,6 +58,7 @@ export interface Opportunity {
   id: number
   name: string
   status: string
+  stageId: number | null
   stageName: string
   flowName: string
   company: string
@@ -62,11 +68,13 @@ export interface Opportunity {
   currency: string
   closeDate: string | null
   createdAt: string
+  activityCount: number
+  quotationCount: number
 }
 
 // ─── Map ─────────────────────────────────────────────────────────────────────
 
-function mapOpportunity(d: OpportunityRaw): Opportunity {
+export function mapOpportunity(d: OpportunityRaw): Opportunity {
   const status = d.is_won
     ? "ganada"
     : d.is_lost
@@ -84,6 +92,7 @@ function mapOpportunity(d: OpportunityRaw): Opportunity {
     id:        d.id,
     name:      d.name,
     status,
+    stageId:   d.flow_stage?.id ?? null,
     stageName: d.flow_stage?.name ?? "—",
     flowName:  d.flow?.name ?? "—",
     company:   d.organization?.name ?? "—",
@@ -94,7 +103,9 @@ function mapOpportunity(d: OpportunityRaw): Opportunity {
     closeDate: d.planned_clousure_date
       ? new Date(d.planned_clousure_date).toLocaleDateString("es-CL", { day: "numeric", month: "short", year: "numeric" })
       : null,
-    createdAt: new Date(d.created_at).toLocaleDateString("es-CL", { day: "numeric", month: "short", year: "numeric" }),
+    createdAt:     new Date(d.created_at).toLocaleDateString("es-CL", { day: "numeric", month: "short", year: "numeric" }),
+    activityCount: d._count.opportunity_activity,
+    quotationCount: d._count.quotation,
   }
 }
 
@@ -167,8 +178,11 @@ interface QueryState {
 // ─── Columns ─────────────────────────────────────────────────────────────────
 
 function getColumns(
-  onPreview: (opp: Opportunity) => void,
-  onDetail:  (opp: Opportunity) => void,
+  onPreview:      (opp: Opportunity) => void,
+  onDetail:       (opp: Opportunity) => void,
+  onEdit:         (opp: Opportunity) => void,
+  onDelete:       (opp: Opportunity) => void,
+  onStatusChange: (opp: Opportunity, status: "ganada" | "perdida" | "en_progreso") => void,
 ): ColumnDef<Opportunity>[] {
   return [
     {
@@ -212,10 +226,13 @@ function getColumns(
       cell: ({ row }) => {
         const opp = row.original
         return (
-          <div className="leading-tight min-w-0">
-            <span className="text-sm font-medium truncate">{opp.name}</span>
-            <div className="mt-0.5 text-xs text-muted-foreground truncate">
-              {opp.company} · {opp.contact}
+          <div className="flex items-stretch gap-2.5">
+            <EntityAccentBar seed={opp.id} />
+            <div className="leading-tight min-w-0">
+              <span className="text-sm font-medium truncate">{opp.name}</span>
+              <div className="mt-0.5 text-xs text-muted-foreground truncate">
+                {opp.company} · {opp.contact}
+              </div>
             </div>
           </div>
         )
@@ -346,13 +363,37 @@ function getColumns(
                   <TrendingUpIcon />
                   Vista Previa
                 </DropdownMenuItem>
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onEdit(opp)}>
                   <PencilIcon />
                   Editar
                 </DropdownMenuItem>
               </DropdownMenuGroup>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive focus:text-destructive">
+              <DropdownMenuGroup>
+                {(opp.status === "en_progreso" || opp.status === "reabierta") && (
+                  <>
+                    <DropdownMenuItem onClick={() => onStatusChange(opp, "ganada")} className="text-emerald-600 focus:text-emerald-600">
+                      <TrophyIcon />
+                      Ganada
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onStatusChange(opp, "perdida")} className="text-red-500 focus:text-red-500">
+                      <XCircleIcon />
+                      Perdida
+                    </DropdownMenuItem>
+                  </>
+                )}
+                {(opp.status === "ganada" || opp.status === "perdida") && (
+                  <DropdownMenuItem onClick={() => onStatusChange(opp, "en_progreso")}>
+                    <RotateCcwIcon />
+                    Reabrir
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onClick={() => onDelete(opp)}
+              >
                 <Trash2Icon />
                 Eliminar
               </DropdownMenuItem>
@@ -373,6 +414,9 @@ interface FunnelTableProps {
   columnVisibility:         VisibilityState
   onColumnVisibilityChange: React.Dispatch<React.SetStateAction<VisibilityState>>
   onTotalChange:            (n: number) => void
+  refreshKey?:              number
+  onEdit?:                  (opp: Opportunity) => void
+  onDelete?:                (opp: Opportunity) => void
 }
 
 export function FunnelTable({
@@ -382,12 +426,40 @@ export function FunnelTable({
   columnVisibility,
   onColumnVisibilityChange,
   onTotalChange,
+  refreshKey = 0,
+  onEdit,
+  onDelete,
 }: FunnelTableProps) {
   const router = useRouter()
 
   const [data, setData]       = React.useState<Opportunity[]>([])
   const [total, setTotal]     = React.useState(0)
   const [loading, setLoading] = React.useState(true)
+
+  const dataRef = React.useRef<Opportunity[]>([])
+  React.useEffect(() => { dataRef.current = data }, [data])
+
+  const handleStatusChange = React.useCallback((opp: Opportunity, newStatus: "ganada" | "perdida" | "en_progreso") => {
+    const originalStatus = dataRef.current.find((o) => o.id === opp.id)?.status ?? opp.status
+    if (originalStatus === newStatus) return
+
+    setData((prev) => prev.map((o) => o.id === opp.id ? { ...o, status: newStatus } : o))
+
+    if (newStatus === "ganada") opportunityNotify.won(opp.name)
+    else if (newStatus === "perdida") opportunityNotify.lost(opp.name)
+    else opportunityNotify.reopened(opp.name)
+
+    const apiCall = newStatus === "ganada"
+      ? opportunityService.won(opp.id)
+      : newStatus === "perdida"
+      ? opportunityService.lost(opp.id)
+      : opportunityService.reOpen(opp.id)
+
+    apiCall.catch(() => {
+        setData((prev) => prev.map((o) => o.id === opp.id ? { ...o, status: originalStatus } : o))
+        opportunityNotify.error()
+      })
+  }, [])
 
   const [query, setQuery] = React.useState<QueryState>({ page: 1, pageSize: 20, search: searchProp })
 
@@ -426,24 +498,22 @@ export function FunnelTable({
       .finally(() => { if (!cancelled) setLoading(false) })
 
     return () => { cancelled = true }
-  }, [query])
+  }, [query, refreshKey])
 
   const visibleData = React.useMemo(() => {
     if (statusFilter === "all") return data
-    return data.filter((d) => {
-      if (statusFilter === "won")  return d.status === "ganada"
-      if (statusFilter === "lost") return d.status === "perdida"
-      if (statusFilter === "open") return d.status === "en_progreso" || d.status === "reabierta"
-      return true
-    })
+    return data.filter((d) => d.status === statusFilter)
   }, [data, statusFilter])
 
   const columns = React.useMemo(
     () => getColumns(
       (opp) => { setSelectedOpp(opp); setSheetOpen(true) },
       (opp) => router.push(`/crm/funnels/${opp.id}`),
+      (opp) => onEdit?.(opp),
+      (opp) => onDelete?.(opp),
+      handleStatusChange,
     ),
-    [router],
+    [router, onEdit, onDelete, handleStatusChange],
   )
 
   const table = useReactTable({

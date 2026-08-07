@@ -1,5 +1,6 @@
 "use client"
 
+import { useRouter } from "next/navigation"
 import {
   type ColumnDef,
   flexRender,
@@ -11,11 +12,13 @@ import {
 } from "@tanstack/react-table"
 import {
   BookOpenIcon,
+  CheckCircle2Icon,
   ChevronDown,
   FileTextIcon,
+  ListIcon,
   MoreHorizontal,
   PencilIcon,
-  PlusIcon,
+  SearchIcon,
   Trash2Icon,
   XIcon,
 } from "lucide-react"
@@ -35,6 +38,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
+import { SingleSelectFilter, type SingleSelectOption } from "@/components/ui/single-select-filter"
 import {
   Table,
   TableBody,
@@ -44,9 +48,13 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { getSortIcon } from "@/lib/table-utils"
+import { EntityAccentBar } from "@/components/ui/entity-accent-bar"
 import { cn } from "@/lib/utils"
+import { notify } from "@/lib/notify"
+import { confirmDialog } from "@/lib/confirm"
 import { blogService, type BlogListParams } from "@/services/blog.service"
 import type { BlogRaw } from "@/types/blog"
+import { CreateBlogSheet, blogRawToFormValues, type BlogFormValues } from "./CreateBlogSheet"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -102,47 +110,13 @@ type QueryState = {
   isActive: boolean | null
 }
 
-// ─── SimpleFilter ─────────────────────────────────────────────────────────────
+// ─── Filtros ──────────────────────────────────────────────────────────────────
 
-function SimpleFilter({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string
-  value: string | null
-  options: { label: string; value: string }[]
-  onChange: (v: string | null) => void
-}) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger render={
-        <Button variant="outline" size="sm" className={cn("h-8 gap-1", value && "border-primary/50 bg-primary/5")} />
-      }>
-        {label}
-        {value && <span className="ml-1 text-primary">·</span>}
-        <ChevronDown className="size-3.5" />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="min-w-32">
-        {value && (
-          <DropdownMenuItem onClick={() => onChange(null)}>
-            <XIcon className="size-3.5" /> Todos
-          </DropdownMenuItem>
-        )}
-        {options.map((opt) => (
-          <DropdownMenuItem
-            key={opt.value}
-            onClick={() => onChange(opt.value === value ? null : opt.value)}
-            className={opt.value === value ? "font-medium" : ""}
-          >
-            {opt.label}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
-}
+const STATUS_OPTIONS: SingleSelectOption[] = [
+  { value: "all",   label: "Todos"    },
+  { value: "true",  label: "Activo"   },
+  { value: "false", label: "Inactivo" },
+]
 
 // ─── Skeleton ────────────────────────────────────────────────────────────────
 
@@ -150,8 +124,8 @@ const skeletonCell: Record<string, React.ReactNode> = {
   select: <div className="size-4 animate-pulse rounded bg-muted" />,
   id:     <div className="h-3 w-8 animate-pulse rounded bg-muted" />,
   name: (
-    <div className="flex items-center gap-2.5">
-      <div className="size-7 shrink-0 animate-pulse rounded-md bg-muted" />
+    <div className="flex items-center gap-3">
+      <div className="size-10 shrink-0 animate-pulse rounded-xl bg-muted" />
       <div className="h-4 w-32 animate-pulse rounded bg-muted" />
     </div>
   ),
@@ -176,7 +150,12 @@ const skeletonCell: Record<string, React.ReactNode> = {
 
 // ─── Columns ─────────────────────────────────────────────────────────────────
 
-const columns: ColumnDef<Blog>[] = [
+function getColumns(
+  onEdit: (blog: Blog) => void,
+  onManage: (blog: Blog) => void,
+  onToggleActive: (blog: Blog) => void,
+): ColumnDef<Blog>[] {
+  return [
   {
     id: "select",
     header: ({ table }) => (
@@ -216,13 +195,12 @@ const columns: ColumnDef<Blog>[] = [
       </Button>
     ),
     cell: ({ row }) => {
+      const blog = row.original
       const name: string = row.getValue("name")
       return (
-        <div className="flex items-center gap-2.5">
-          <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-orange-500/10">
-            <BookOpenIcon className="size-3.5 text-orange-600 dark:text-orange-400" />
-          </div>
-          <div className="text-sm font-medium">{name}</div>
+        <div className="flex items-stretch gap-2.5">
+          <EntityAccentBar seed={blog.id} />
+          <div className="text-sm font-medium self-center">{name}</div>
         </div>
       )
     },
@@ -283,7 +261,8 @@ const columns: ColumnDef<Blog>[] = [
     accessorKey: "brandColor",
     header: "Color",
     cell: ({ row }) => {
-      const color: string | null = row.getValue("brandColor")
+      const raw: string | null = row.getValue("brandColor")
+      const color = raw?.split(";")[0]
       if (!color) return <span className="text-xs text-muted-foreground">—</span>
       return (
         <div className="flex items-center gap-2">
@@ -312,38 +291,46 @@ const columns: ColumnDef<Blog>[] = [
   {
     id: "actions",
     enableHiding: false,
-    cell: () => (
-      <DropdownMenu>
-        <DropdownMenuTrigger render={<Button className="h-8 w-8 p-0" variant="ghost" />}>
-          <span className="sr-only">Abrir menú</span>
-          <MoreHorizontal className="size-4" />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="min-w-48">
-          <DropdownMenuGroup>
-            <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-            <DropdownMenuItem>
-              <BookOpenIcon />
-              Ver posts
+    cell: ({ row }) => {
+      const blog = row.original
+      return (
+        <DropdownMenu>
+          <DropdownMenuTrigger render={<Button className="h-8 w-8 p-0" variant="ghost" />}>
+            <span className="sr-only">Abrir menú</span>
+            <MoreHorizontal className="size-4" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="min-w-48">
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => onManage(blog)}>
+                <BookOpenIcon />
+                Gestionar Blog
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onEdit(blog)}>
+                <PencilIcon />
+                Editar blog
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className={blog.isActive ? "text-destructive focus:text-destructive" : "text-emerald-600 focus:text-emerald-600"}
+              onClick={() => onToggleActive(blog)}
+            >
+              {blog.isActive ? <Trash2Icon /> : <CheckCircle2Icon />}
+              {blog.isActive ? "Desactivar" : "Activar"}
             </DropdownMenuItem>
-            <DropdownMenuItem>
-              <PencilIcon />
-              Editar blog
-            </DropdownMenuItem>
-          </DropdownMenuGroup>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem className="text-destructive focus:text-destructive">
-            <Trash2Icon />
-            Desactivar
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    ),
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )
+    },
   },
-]
+  ]
+}
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function BlogsTable() {
+  const router = useRouter()
   const [data, setData] = React.useState<Blog[]>([])
   const [total, setTotal] = React.useState(0)
   const [loading, setLoading] = React.useState(true)
@@ -356,6 +343,60 @@ export function BlogsTable() {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>(DEFAULT_COLUMN_VISIBILITY)
   const [rowSelection, setRowSelection] = React.useState({})
+  const [refreshKey, setRefreshKey] = React.useState(0)
+  const [createOpen, setCreateOpen] = React.useState(false)
+  const [editingBlog, setEditingBlog] = React.useState<BlogFormValues | undefined>(undefined)
+  const [editingBlogId, setEditingBlogId] = React.useState<number | undefined>(undefined)
+
+  const columns = React.useMemo(
+    () =>
+      getColumns(
+        (blog) => {
+          setEditingBlog(blogRawToFormValues({
+            id: blog.id,
+            name: blog.name,
+            brand_color: blog.brandColor,
+            is_active: blog.isActive,
+            logo_url: blog.logoUrl,
+            allowed_domains: blog.allowedDomains,
+            created_at: blog.createdAt,
+            updated_at: blog.createdAt,
+            workspace_id: 0,
+            _count: { blog_post: blog.postCount },
+          }))
+          setEditingBlogId(blog.id)
+          setCreateOpen(true)
+        },
+        (blog) => router.push(`/marketing/blogs/${blog.id}`),
+        async (blog) => {
+          const activating = !blog.isActive
+          const ok = await confirmDialog({
+            title: activating ? "¿Activar blog?" : "¿Desactivar blog?",
+            description: activating
+              ? `"${blog.name}" volverá a estar activo.`
+              : `"${blog.name}" dejará de estar activo. Podrás reactivarlo desde este mismo menú.`,
+            confirmText: activating ? "Activar" : "Desactivar",
+            cancelText: "Cancelar",
+            tone: activating ? "info" : "warning",
+          })
+          if (!ok) return
+          setData((prev) => prev.map((b) => b.id === blog.id ? { ...b, isActive: activating } : b))
+          try {
+            if (activating) {
+              await blogService.update(blog.id, { is_active: true })
+              notify.success({ title: "Blog activado", description: "El blog ya está visible públicamente." })
+            } else {
+              await blogService.deactivate(blog.id)
+              notify.success({ title: "Blog desactivado", description: "El blog ya no es visible públicamente." })
+            }
+          } catch {
+            notify.error({ title: `No se pudo ${activating ? "activar" : "desactivar"} el blog`, description: "Intenta de nuevo." })
+            setData((prev) => prev.map((b) => b.id === blog.id ? { ...b, isActive: blog.isActive } : b))
+          }
+        },
+      ),
+    [router]
+  )
 
   React.useEffect(() => {
     let cancelled = false
@@ -383,7 +424,7 @@ export function BlogsTable() {
       cancelled = true
       clearTimeout(timer)
     }
-  }, [query])
+  }, [query, refreshKey])
 
   const table = useReactTable({
     data,
@@ -414,25 +455,49 @@ export function BlogsTable() {
   const hasFilters = !!query.search || query.isActive !== null
 
   const activeFilterValue =
-    query.isActive === true ? "true" : query.isActive === false ? "false" : null
+    query.isActive === true ? "true" : query.isActive === false ? "false" : "all"
+
+  function resetFilters() {
+    setQuery((q) => ({ ...q, search: "", isActive: null, page: 1 }))
+  }
 
   return (
     <div className="w-full">
-      {/* Toolbar */}
-      <div className="flex items-center gap-2 py-4">
-        <Input
-          className="max-w-sm h-8"
-          placeholder="Buscar blogs..."
-          value={query.search}
-          onChange={(e) => setQuery((q) => ({ ...q, search: e.target.value, page: 1 }))}
-        />
-        <SimpleFilter
-          label="Estado"
-          value={activeFilterValue}
-          options={[
-            { label: "Activo",   value: "true"  },
-            { label: "Inactivo", value: "false" },
-          ]}
+      {/* Row 1 — view toggle + create */}
+      <div className="flex items-center justify-between border-b px-4 py-2">
+        <div className="flex items-center gap-0.5 rounded-lg border bg-muted/40 p-0.5">
+          <span className="flex items-center gap-1.5 rounded-md bg-background px-2.5 py-1 text-xs font-medium shadow-sm">
+            <ListIcon className="size-3.5" />
+            Lista
+          </span>
+        </div>
+        <Button
+          size="sm"
+          onClick={() => {
+            setEditingBlog(undefined)
+            setCreateOpen(true)
+          }}
+        >
+          + Nuevo Blog
+        </Button>
+      </div>
+
+      {/* Row 2 — filters */}
+      <div className="flex items-center gap-2 border-b px-4 py-2">
+        <div className="relative w-44 shrink-0">
+          <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Buscar blogs..."
+            className="h-8 pl-8 text-xs"
+            value={query.search}
+            onChange={(e) => setQuery((q) => ({ ...q, search: e.target.value, page: 1 }))}
+          />
+        </div>
+
+        <SingleSelectFilter
+          title="Estado"
+          options={STATUS_OPTIONS}
+          selected={activeFilterValue}
           onChange={(v) =>
             setQuery((q) => ({
               ...q,
@@ -441,23 +506,21 @@ export function BlogsTable() {
             }))
           }
         />
+
         {hasFilters && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8"
-            onClick={() => setQuery((q) => ({ ...q, search: "", isActive: null, page: 1 }))}
-          >
-            Reset <XIcon className="ml-1 size-4" />
+          <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={resetFilters}>
+            <XIcon className="size-3.5" />
+            Restablecer
           </Button>
         )}
+
         <div className="ml-auto flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">
+          <span className="text-xs text-muted-foreground">
             {loading ? "…" : `${total} blogs`}
           </span>
           <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="outline" />}>
-              Columnas <ChevronDown className="ml-2 size-4" />
+            <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8" />}>
+              Columnas <ChevronDown className="ml-1.5 size-3.5" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               {table
@@ -475,14 +538,11 @@ export function BlogsTable() {
                 ))}
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button>
-            <PlusIcon className="size-4" /> Nuevo Blog
-          </Button>
         </div>
       </div>
 
       {/* Table */}
-      <div className="rounded-md border">
+      <div className="mx-4 mt-3 rounded-md border">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((hg) => (
@@ -527,9 +587,20 @@ export function BlogsTable() {
         </Table>
       </div>
 
-      <div className="py-4">
+      <div className="px-4 py-3">
         <DataTablePagination table={table} />
       </div>
+
+      <CreateBlogSheet
+        open={createOpen}
+        onOpenChange={(v) => {
+          setCreateOpen(v)
+          if (!v) { setEditingBlog(undefined); setEditingBlogId(undefined) }
+        }}
+        blog={editingBlog}
+        blogId={editingBlogId}
+        onSuccess={() => setRefreshKey((k) => k + 1)}
+      />
     </div>
   )
 }

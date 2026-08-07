@@ -81,7 +81,7 @@ export function SearchableSelect({
           open && "border-ring ring-3 ring-ring/50"
         )}
       >
-        <span className={cn("flex items-center gap-2", selected ? "text-foreground" : "text-muted-foreground")}>
+        <span className={cn("flex min-w-0 items-center gap-2", selected ? "text-foreground" : "text-muted-foreground")}>
           {selected?.flag && (
             <img
               src={`https://flagcdn.com/w40/${selected.flag.toLowerCase()}.png`}
@@ -91,7 +91,9 @@ export function SearchableSelect({
               height={15}
             />
           )}
-          {selected?.label ?? placeholder}
+          <span className="truncate" title={selected?.label}>
+            {selected?.label ?? placeholder}
+          </span>
         </span>
         <ChevronDown
           className={cn(
@@ -115,7 +117,7 @@ export function SearchableSelect({
               className="w-full bg-transparent px-2 py-1 text-sm outline-none placeholder:text-muted-foreground"
             />
           </div>
-          <div className="max-h-56 overflow-y-auto p-1">
+          <div className="max-h-56 overflow-x-hidden overflow-y-auto p-1">
             {filtered.length === 0 ? (
               <p className="py-2 text-center text-sm text-muted-foreground">
                 Sin resultados
@@ -125,13 +127,14 @@ export function SearchableSelect({
                 <button
                   key={opt.value}
                   type="button"
+                  title={opt.label}
                   onClick={() => {
                     onChange(opt.value);
                     setOpen(false);
                     setSearch("");
                   }}
                   className={cn(
-                    "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground",
+                    "flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground",
                     value === opt.value && "bg-accent/50 font-medium"
                   )}
                 >
@@ -150,7 +153,7 @@ export function SearchableSelect({
                       height={15}
                     />
                   )}
-                  {opt.label}
+                  <span className="truncate">{opt.label}</span>
                 </button>
               ))
             )}

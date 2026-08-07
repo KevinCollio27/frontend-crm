@@ -1,55 +1,41 @@
-import {
-  CheckCircle2Icon,
-  InboxIcon,
-  MessagesSquareIcon,
-  UserXIcon,
-} from "lucide-react"
+import { InboxIcon, MessageSquareTextIcon } from "lucide-react"
+import { SiFacebook, SiInstagram, SiWhatsapp } from "react-icons/si"
 import { cn } from "@/lib/utils"
 import type { MessagingView } from "./data"
-import { VIEW_COUNTS } from "./data"
 
-interface NavItem {
-  id: MessagingView
-  label: string
-  icon: React.ElementType
+export interface AgentNavItem {
+  id: number
+  name: string
+  count: number
 }
-
-const BANDEJA_ITEMS: NavItem[] = [
-  { id: "my_inbox",   label: "Mi bandeja",   icon: InboxIcon          },
-  { id: "all",        label: "Todos",         icon: MessagesSquareIcon },
-  { id: "unassigned", label: "Sin asignar",   icon: UserXIcon          },
-  { id: "resolved",   label: "Resueltos",     icon: CheckCircle2Icon   },
-]
-
-function WhatsAppIcon({ className }: { className?: string }) {
-  return <img src="/images/WhatsApp.svg" alt="WhatsApp" className={className} />
-}
-
-function AsistenteAIIcon({ className }: { className?: string }) {
-  return <img src="/images/Asistente AI.svg" alt="Asistente AI" className={className} />
-}
-
-const CHANNEL_ITEMS: NavItem[] = [
-  { id: "whatsapp", label: "WhatsApp",   icon: WhatsAppIcon    },
-  { id: "widget",   label: "Widget web", icon: AsistenteAIIcon },
-]
 
 interface MessagingNavProps {
   activeView: MessagingView
   onViewChange: (view: MessagingView) => void
+  inboxCount: number
+  whatsappCount: number
+  instagramCount: number
+  facebookCount: number
+  agents: AgentNavItem[]
 }
 
-function NavButton({ item, active, onViewChange }: {
-  item: NavItem
+function NavButton({
+  icon: Icon,
+  label,
+  count,
+  active,
+  onClick,
+}: {
+  icon: React.ElementType
+  label: string
+  count: number
   active: boolean
-  onViewChange: (view: MessagingView) => void
+  onClick: () => void
 }) {
-  const Icon = item.icon
-  const count = VIEW_COUNTS[item.id]
   return (
     <button
       type="button"
-      onClick={() => onViewChange(item.id)}
+      onClick={onClick}
       className={cn(
         "flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors",
         active
@@ -58,7 +44,7 @@ function NavButton({ item, active, onViewChange }: {
       )}
     >
       <Icon className="size-4 shrink-0" />
-      <span className="flex-1 text-left">{item.label}</span>
+      <span className="flex-1 truncate text-left">{label}</span>
       {count > 0 && (
         <span className={cn(
           "ml-auto text-xs tabular-nums",
@@ -71,33 +57,57 @@ function NavButton({ item, active, onViewChange }: {
   )
 }
 
-export function MessagingNav({ activeView, onViewChange }: MessagingNavProps) {
+export function MessagingNav({ activeView, onViewChange, inboxCount, whatsappCount, instagramCount, facebookCount, agents }: MessagingNavProps) {
   return (
     <nav className="flex flex-col gap-4 p-2">
       <div className="flex flex-col gap-1">
-        {BANDEJA_ITEMS.map((item) => (
-          <NavButton
-            key={item.id}
-            item={item}
-            active={activeView === item.id}
-            onViewChange={onViewChange}
-          />
-        ))}
+        <NavButton
+          icon={InboxIcon}
+          label="Mi bandeja"
+          count={inboxCount}
+          active={activeView === "my_inbox"}
+          onClick={() => onViewChange("my_inbox")}
+        />
+        <NavButton
+          icon={SiWhatsapp}
+          label="WhatsApp"
+          count={whatsappCount}
+          active={activeView === "whatsapp"}
+          onClick={() => onViewChange("whatsapp")}
+        />
+        <NavButton
+          icon={SiInstagram}
+          label="Instagram"
+          count={instagramCount}
+          active={activeView === "instagram"}
+          onClick={() => onViewChange("instagram")}
+        />
+        <NavButton
+          icon={SiFacebook}
+          label="Messenger"
+          count={facebookCount}
+          active={activeView === "facebook"}
+          onClick={() => onViewChange("facebook")}
+        />
       </div>
 
-      <div className="flex flex-col gap-1">
-        <p className="px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-          Por canal
-        </p>
-        {CHANNEL_ITEMS.map((item) => (
-          <NavButton
-            key={item.id}
-            item={item}
-            active={activeView === item.id}
-            onViewChange={onViewChange}
-          />
-        ))}
-      </div>
+      {agents.length > 0 && (
+        <div className="flex flex-col gap-1">
+          <p className="px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Por agente
+          </p>
+          {agents.map((agent) => (
+            <NavButton
+              key={agent.id}
+              icon={MessageSquareTextIcon}
+              label={agent.name}
+              count={agent.count}
+              active={activeView === agent.id}
+              onClick={() => onViewChange(agent.id)}
+            />
+          ))}
+        </div>
+      )}
     </nav>
   )
 }

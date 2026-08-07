@@ -1,51 +1,166 @@
 "use client"
 
 import * as React from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { SparklesIcon } from "lucide-react"
+import { toast } from "sonner"
 import { PageHeader } from "@/components/dashboard/PageHeader"
 import { ChatSidebar } from "@/components/dashboard/chat/ChatSidebar"
 import { ChatView } from "@/components/dashboard/chat/ChatView"
-import { mockConversations, type ChatConversation, type ChatMessage } from "@/components/dashboard/chat/data"
+import { type ChatConversation, type ChatMessage, type ChatDateGroup } from "@/components/dashboard/chat/data"
+import { notify } from "@/lib/notify"
+import { aiChatService } from "@/services/ai-chat.service"
+import type { AiConversationGrouped, AiConversationListItem } from "@/types/ai-chat"
+
+function groupedToList(grouped: AiConversationGrouped): ChatConversation[] {
+  const entries: [ChatDateGroup, AiConversationListItem[]][] = [
+    ["today", grouped.today],
+    ["yesterday", grouped.yesterday],
+    ["thisWeek", grouped.thisWeek],
+    ["thisMonth", grouped.thisMonth],
+    ["older", grouped.older],
+  ]
+  return entries.flatMap(([group, items]) =>
+    items.map((item) => ({
+      id: String(item.id),
+      title: item.title,
+      lastMessageAt: item.last_message_at,
+      dateGroup: group,
+      preview: item.last_message_preview ?? "",
+      messages: [],
+    }))
+  )
+}
 
 export default function ChatPage() {
-  const [conversations, setConversations] = React.useState<ChatConversation[]>(mockConversations)
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const [conversations, setConversations] = React.useState<ChatConversation[]>([])
   const [selectedId, setSelectedId]       = React.useState<string | null>(null)
+  const [currentMessages, setCurrentMessages] = React.useState<ChatMessage[]>([])
+  const [sending, setSending]             = React.useState(false)
 
-  const selected = conversations.find((c) => c.id === selectedId)
+  React.useEffect(() => {
+    if (searchParams.get("welcome") !== "1") return
+    notify.success({
+      title: "¡Tu workspace está listo!",
+      description: "Ya puedes empezar a gestionar tus ventas.",
+    })
+    router.replace("/chat")
+  }, [searchParams, router])
 
-  const handleNew = () => setSelectedId(null)
+  const loadConversations = React.useCallback(async () => {
+    try {
+      const grouped = await aiChatService.listConversations()
+      setConversations(groupedToList(grouped))
+    } catch (err) {
+      console.error("[ChatPage] Error cargando conversaciones:", err)
+    }
+  }, [])
 
-  const handleSubmit = (prompt: string, _files: File[]) => {
-    if (!prompt) return
+  React.useEffect(() => { loadConversations() }, [loadConversations])
 
-    if (selectedId) {
-      const userMsg: ChatMessage = {
-        id: Date.now().toString(),
-        role: "user",
-        content: prompt,
-        createdAt: "ahora",
-      }
-      setConversations((prev) =>
-        prev.map((c) =>
-          c.id === selectedId
-            ? { ...c, messages: [...c.messages, userMsg], preview: prompt, lastMessageAt: "ahora" }
-            : c
-        )
+  const handleSelect = async (id: string | null) => {
+    if (id === selectedId) return
+    setSelectedId(id)
+    setCurrentMessages([])
+    if (!id) return
+    try {
+      const detail = await aiChatService.getConversation(Number(id))
+      setCurrentMessages(
+        detail.messages
+          .filter((m) => m.role !== "system")
+          .map((m) => ({
+            id: String(m.id),
+            role: m.role as "user" | "assistant",
+            content: m.content,
+            createdAt: m.created_at,
+          }))
       )
-    } else {
-      const id = Date.now().toString()
-      const newConv: ChatConversation = {
-        id,
-        title: prompt.length > 48 ? prompt.slice(0, 48) + "…" : prompt,
-        lastMessageAt: "ahora",
-        dateGroup: "today",
-        preview: prompt,
-        messages: [{ id: "m1", role: "user", content: prompt, createdAt: "ahora" }],
-      }
-      setConversations((prev) => [newConv, ...prev])
-      setSelectedId(id)
+    } catch {
+      toast.error("No se pudo cargar la conversación")
     }
   }
+
+  const handleNew = () => {
+    setSelectedId(null)
+    setCurrentMessages([])
+  }
+
+  const handleSubmit = async (prompt: string, _files: File[]) => {
+    if (!prompt.trim() || sending) return
+    setSending(true)
+
+    const userMsg: ChatMessage = {
+      id: `tmp-${Date.now()}`,
+      role: "user",
+      content: prompt,
+      createdAt: "ahora",
+    }
+    const history = [...currentMessages, userMsg]
+    setCurrentMessages(history)
+
+    try {
+      const response = await aiChatService.chat({
+        messages: history.map((m) => ({ role: m.role, content: m.content })),
+        conversationId: selectedId ? Number(selectedId) : undefined,
+      })
+
+      const assistantMsg: ChatMessage = {
+        id: `ai-${Date.now()}`,
+        role: "assistant",
+        content: response.content,
+        createdAt: "ahora",
+      }
+      setCurrentMessages((prev) => [...prev, assistantMsg])
+
+      const newId = String(response.conversationId)
+      if (selectedId !== newId) setSelectedId(newId)
+
+      await loadConversations()
+    } catch {
+      toast.error("Error al enviar el mensaje")
+      setCurrentMessages((prev) => prev.filter((m) => m.id !== userMsg.id))
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    try {
+      await aiChatService.deleteConversation(Number(id))
+      if (selectedId === id) handleNew()
+      setConversations((prev) => prev.filter((c) => c.id !== id))
+    } catch {
+      toast.error("No se pudo eliminar la conversación")
+    }
+  }
+
+  const handleRename = async (id: string, newTitle: string) => {
+    if (!newTitle.trim()) return
+    try {
+      await aiChatService.updateTitle(Number(id), newTitle.trim())
+      setConversations((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, title: newTitle.trim() } : c))
+      )
+    } catch {
+      toast.error("No se pudo renombrar la conversación")
+    }
+  }
+
+  const selectedConv = conversations.find((c) => c.id === selectedId)
+
+  const conversationForView: ChatConversation | undefined =
+    currentMessages.length === 0 && selectedId === null
+      ? undefined
+      : {
+          id: selectedId ?? "new",
+          title: selectedConv?.title ?? "Nueva conversación",
+          lastMessageAt: selectedConv?.lastMessageAt ?? "",
+          dateGroup: "today" as ChatDateGroup,
+          preview: selectedConv?.preview ?? "",
+          messages: currentMessages,
+        }
 
   return (
     <>
@@ -55,19 +170,22 @@ export default function ChatPage() {
         description="Asistente inteligente para gestión CRM"
       />
       <div className="flex flex-1 min-h-0 overflow-hidden">
-        {/* Col 1 — historial */}
         <div className="flex w-64 shrink-0 flex-col overflow-hidden border-r">
           <ChatSidebar
             conversations={conversations}
             selectedId={selectedId}
-            onSelect={setSelectedId}
+            onSelect={handleSelect}
             onNew={handleNew}
+            onDelete={handleDelete}
+            onRename={handleRename}
           />
         </div>
-
-        {/* Col 2 — chat */}
         <div className="flex flex-1 flex-col overflow-hidden">
-          <ChatView conversation={selected} onSubmit={handleSubmit} />
+          <ChatView
+            conversation={conversationForView}
+            onSubmit={handleSubmit}
+            sending={sending}
+          />
         </div>
       </div>
     </>

@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "sonner";
 import { SessionProvider } from "@/components/providers/SessionProvider";
+import { ThemeProvider } from "@/components/providers/ThemeProvider";
+import { ConfirmHost } from "@/lib/confirm";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -26,12 +28,16 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="en"
+      lang="es"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">
-        <SessionProvider>{children}</SessionProvider>
-        <Toaster position="bottom-right" richColors duration={6000} closeButton />
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <SessionProvider>{children}</SessionProvider>
+          <Toaster position="bottom-right" richColors duration={6000} closeButton />
+          <ConfirmHost />
+        </ThemeProvider>
       </body>
     </html>
   );

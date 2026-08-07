@@ -1,9 +1,17 @@
 "use client"
 
+import * as React from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { ArrowLeftIcon, ChevronDownIcon, ChevronRightIcon, DownloadIcon, FileSpreadsheetIcon, PrinterIcon } from "lucide-react"
-import { SidebarTrigger } from "@/components/ui/sidebar"
+import { useRouter, useSearchParams } from "next/navigation"
+import {
+  ArrowLeftIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
+  DownloadIcon,
+  FileSpreadsheetIcon,
+  PrinterIcon,
+} from "lucide-react"
+import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
 import {
@@ -15,31 +23,45 @@ import {
 import { Col1Info } from "./detail/Col1Info"
 import { Col2Tabs } from "./detail/Col2Tabs"
 import { Col3Related } from "./detail/Col3Related"
-import type { ActivityDetail as ActivityDetailType } from "./data"
+import type { ActivityRaw } from "@/types/activity"
 
 interface Props {
-  activity: ActivityDetailType
+  activity: ActivityRaw
 }
 
-export function ActivityDetail({ activity }: Props) {
-  const router = useRouter()
+export function ActivityDetail({ activity: initialActivity }: Props) {
+  const router          = useRouter()
+  const { setOpen }     = useSidebar()
+  const searchParams    = useSearchParams()
+  const backHref        = searchParams.get("from") === "board"
+    ? "/crm/activities?view=board"
+    : "/crm/activities"
+  const [activity, setActivity] = React.useState<ActivityRaw>(initialActivity)
+
+  React.useEffect(() => {
+    setOpen(false)
+    return () => setOpen(true)
+  }, [])
+
+  function handleStatusChange(updates: Partial<ActivityRaw>) {
+    setActivity((prev) => ({ ...prev, ...updates }))
+  }
 
   return (
     <>
-      {/* Top bar */}
-      <header className="flex h-12 shrink-0 items-center justify-between border-b px-4 gap-3">
-        <div className="flex items-center gap-2 min-w-0">
+      <header className="flex h-12 shrink-0 items-center justify-between gap-3 border-b px-4">
+        <div className="flex min-w-0 items-center gap-2">
           <SidebarTrigger className="shrink-0" />
           <Separator orientation="vertical" className="data-vertical:h-4 data-vertical:self-auto shrink-0" />
-          <Button variant="ghost" size="icon" className="size-7 shrink-0" onClick={() => router.back()}>
+          <Button variant="ghost" size="icon" className="size-7 shrink-0" onClick={() => router.push(backHref)}>
             <ArrowLeftIcon className="size-4" />
           </Button>
-          <div className="flex items-center gap-1 min-w-0 text-sm">
-            <Link href="/crm/activities" className="shrink-0 text-xs text-muted-foreground hover:text-foreground transition-colors">
+          <div className="flex min-w-0 items-center gap-1 text-sm">
+            <Link href={backHref} className="shrink-0 text-xs text-muted-foreground transition-colors hover:text-foreground">
               Actividades
             </Link>
             <ChevronRightIcon className="size-3.5 shrink-0 text-muted-foreground" />
-            <span className="truncate text-xs font-medium">{activity.title}</span>
+            <span className="truncate text-xs font-medium">{activity.title ?? "Actividad"}</span>
           </div>
         </div>
         <DropdownMenu>
@@ -54,21 +76,15 @@ export function ActivityDetail({ activity }: Props) {
         </DropdownMenu>
       </header>
 
-      {/* 3 columns */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
-        {/* Col 1 */}
+      <div className="flex min-h-0 flex-1 overflow-hidden">
         <div className="flex w-[25%] shrink-0 flex-col overflow-y-auto border-r [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <Col1Info activity={activity} />
         </div>
-
-        {/* Col 2 */}
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-r">
-          <Col2Tabs activity={activity} />
+          <Col2Tabs activityId={activity.id} />
         </div>
-
-        {/* Col 3 */}
         <div className="flex w-[25%] shrink-0 flex-col overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <Col3Related activity={activity} />
+          <Col3Related activity={activity} onStatusChange={handleStatusChange} />
         </div>
       </div>
     </>

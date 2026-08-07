@@ -3,174 +3,223 @@
 import * as React from "react"
 import { format, isToday, isYesterday } from "date-fns"
 import { es } from "date-fns/locale"
-import { ClockIcon, SearchIcon } from "lucide-react"
+import { BotIcon, ChevronDown, ClockIcon, Loader2Icon } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { systemLogService } from "@/services/system-log.service"
+import { teamService } from "@/services/team.service"
+import type { SystemLogRaw } from "@/types/system-log"
+import { useSessionStore } from "@/store/session.store"
+import { getInitials } from "@/lib/table-utils"
 
-type EventType = "create" | "update" | "delete" | "login" | "export"
-type EntityType =
-  | "contact"
-  | "organization"
-  | "opportunity"
-  | "activity"
-  | "funnel"
-  | "product"
-  | "user"
-  | "workspace"
+// ─── Configuración de entidades ──────────────────────────────────────────────
 
-interface ActivityEvent {
-  id: string
-  type: EventType
-  entity: EntityType
-  user: { name: string; avatar: string }
-  description: string
-  target: string
-  timestamp: Date
+const ENTITY_CONFIG: Record<string, { label: string; className: string }> = {
+  person:              { label: "Contacto",    className: "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400" },
+  organization:        { label: "Empresa",     className: "bg-violet-50 text-violet-700 dark:bg-violet-950/40 dark:text-violet-400" },
+  opportunity:         { label: "Oportunidad", className: "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400" },
+  opportunityActivity: { label: "Actividad",   className: "bg-green-50 text-green-700 dark:bg-green-950/40 dark:text-green-400" },
+  flow:                { label: "Embudo",      className: "bg-orange-50 text-orange-700 dark:bg-orange-950/40 dark:text-orange-400" },
+  product:             { label: "Producto",    className: "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400" },
+  userWorkspace:       { label: "Usuario",     className: "bg-cyan-50 text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-400" },
+  workspace:           { label: "Workspace",   className: "bg-muted text-muted-foreground" },
 }
 
-const USERS = {
-  kevin: { name: "Kevin Collio", avatar: "https://github.com/shadcn.png" },
-  maria: { name: "María García", avatar: "https://github.com/leerob.png" },
-  carlos: { name: "Carlos López", avatar: "https://github.com/shadcn.png" },
-}
-
-const now = new Date()
-const h = (n: number) => new Date(now.getTime() - n * 36e5)
-const d = (n: number, hh = 12, mm = 0) => {
-  const t = new Date(now)
-  t.setDate(t.getDate() - n)
-  t.setHours(hh, mm, 0, 0)
-  return t
-}
-
-const MOCK_EVENTS: ActivityEvent[] = [
-  { id: "1", type: "create", entity: "contact", user: USERS.kevin, description: "creó el contacto", target: "Juan Pérez", timestamp: h(1) },
-  { id: "2", type: "update", entity: "opportunity", user: USERS.maria, description: "actualizó la oportunidad", target: "Empresa ABC — Renovación 2025", timestamp: h(2) },
-  { id: "3", type: "create", entity: "organization", user: USERS.kevin, description: "creó la empresa", target: "Transportes del Norte S.A.", timestamp: h(4) },
-  { id: "4", type: "delete", entity: "activity", user: USERS.carlos, description: "eliminó la actividad", target: "Llamada de seguimiento — Carlos Ruiz", timestamp: h(5) },
-  { id: "5", type: "login", entity: "workspace", user: USERS.maria, description: "inició sesión en el workspace", target: "", timestamp: h(7) },
-  { id: "6", type: "create", entity: "opportunity", user: USERS.kevin, description: "creó la oportunidad", target: "Propuesta logística Q2", timestamp: d(1, 16, 45) },
-  { id: "7", type: "update", entity: "contact", user: USERS.carlos, description: "actualizó el contacto", target: "Ana Martínez", timestamp: d(1, 14, 30) },
-  { id: "8", type: "export", entity: "contact", user: USERS.kevin, description: "exportó la lista de contactos", target: "contactos-abril-2025.csv", timestamp: d(1, 10, 0) },
-  { id: "9", type: "create", entity: "funnel", user: USERS.maria, description: "creó el embudo", target: "Prospección Transporte", timestamp: d(1, 9, 15) },
-  { id: "10", type: "create", entity: "product", user: USERS.kevin, description: "creó el producto", target: "Plan Empresarial — Anual", timestamp: d(3, 16, 0) },
-  { id: "11", type: "update", entity: "workspace", user: USERS.kevin, description: "actualizó la configuración del workspace", target: "", timestamp: d(3, 11, 30) },
-  { id: "12", type: "create", entity: "user", user: USERS.kevin, description: "invitó al usuario", target: "carlos.lopez@goxt.io", timestamp: d(3, 10, 0) },
-  { id: "13", type: "update", entity: "funnel", user: USERS.maria, description: "renombró el embudo", target: "Pipeline de Ventas", timestamp: d(5, 15, 20) },
-  { id: "14", type: "create", entity: "contact", user: USERS.carlos, description: "creó el contacto", target: "Roberto Silva", timestamp: d(5, 11, 45) },
-  { id: "15", type: "delete", entity: "product", user: USERS.maria, description: "eliminó el producto", target: "Plan Básico — Prueba", timestamp: d(5, 9, 30) },
+const ENTITY_FILTERS = [
+  { key: "",               label: "Todo" },
+  { key: "person",         label: "Contactos" },
+  { key: "organization",   label: "Empresas" },
+  { key: "opportunity",    label: "Oportunidades" },
+  { key: "opportunityActivity", label: "Actividades" },
+  { key: "flow",           label: "Embudos" },
+  { key: "product",        label: "Productos" },
+  { key: "userWorkspace",  label: "Usuarios" },
+  { key: "workspace",      label: "Workspace" },
 ]
 
-const ENTITY_CONFIG: Record<EntityType, { label: string; className: string }> = {
-  contact: { label: "Contacto", className: "bg-blue-50 text-blue-700" },
-  organization: { label: "Empresa", className: "bg-violet-50 text-violet-700" },
-  opportunity: { label: "Oportunidad", className: "bg-amber-50 text-amber-700" },
-  activity: { label: "Actividad", className: "bg-green-50 text-green-700" },
-  funnel: { label: "Embudo", className: "bg-orange-50 text-orange-700" },
-  product: { label: "Producto", className: "bg-rose-50 text-rose-700" },
-  user: { label: "Usuario", className: "bg-cyan-50 text-cyan-700" },
-  workspace: { label: "Workspace", className: "bg-muted text-muted-foreground" },
-}
+const PAGE_SIZE = 25
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const ENTITY_FILTERS: Array<{ key: EntityType | "all"; label: string }> = [
-  { key: "all", label: "Todo" },
-  { key: "contact", label: "Contactos" },
-  { key: "organization", label: "Empresas" },
-  { key: "opportunity", label: "Oportunidades" },
-  { key: "activity", label: "Actividades" },
-  { key: "funnel", label: "Embudos" },
-  { key: "product", label: "Productos" },
-  { key: "user", label: "Usuarios" },
-]
-
-function groupByDay(events: ActivityEvent[]) {
-  const groups: { label: string; key: string; events: ActivityEvent[] }[] = []
+function groupByDay(logs: SystemLogRaw[]) {
+  const groups: { label: string; key: string; logs: SystemLogRaw[] }[] = []
   const map = new Map<string, (typeof groups)[0]>()
 
-  for (const event of events) {
-    const key = format(event.timestamp, "yyyy-MM-dd")
+  for (const log of logs) {
+    const date = new Date(log.createdAt)
+    const key = format(date, "yyyy-MM-dd")
     if (!map.has(key)) {
       let label: string
-      if (isToday(event.timestamp)) {
+      if (isToday(date)) {
         label = "Hoy"
-      } else if (isYesterday(event.timestamp)) {
+      } else if (isYesterday(date)) {
         label = "Ayer"
       } else {
-        const raw = format(event.timestamp, "EEEE, d 'de' MMMM", { locale: es })
+        const raw = format(date, "EEEE, d 'de' MMMM", { locale: es })
         label = raw.charAt(0).toUpperCase() + raw.slice(1)
       }
-      const group = { label, key, events: [] }
+      const group = { label, key, logs: [] }
       map.set(key, group)
       groups.push(group)
     }
-    map.get(key)!.events.push(event)
+    map.get(key)!.logs.push(log)
   }
-
   return groups
 }
 
+// ─── Skeleton ────────────────────────────────────────────────────────────────
+
+function TimelineSkeleton() {
+  return (
+    <div className="mx-auto max-w-2xl space-y-6">
+      {[5, 3, 4].map((count, gi) => (
+        <div key={gi}>
+          <div className="mb-4 flex items-center gap-3">
+            <div className="h-4 w-16 animate-pulse rounded bg-muted" />
+            <div className="flex-1 border-t" />
+          </div>
+          <div className="relative ml-3">
+            <div className="absolute bottom-0 left-0 top-3 border-l-2" />
+            {Array.from({ length: count }).map((_, i) => (
+              <div key={i} className="relative pb-6 pl-7 last:pb-0">
+                <div className="absolute left-px top-2.5 h-2.5 w-2.5 -translate-x-1/2 rounded-full border-2 border-primary bg-background" />
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="size-7 animate-pulse rounded-full bg-muted" />
+                    <div className="h-3.5 w-28 animate-pulse rounded bg-muted" />
+                  </div>
+                  <div className="h-4 w-3/4 animate-pulse rounded bg-muted" />
+                  <div className="h-3 w-16 animate-pulse rounded bg-muted" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ─── Componente principal ─────────────────────────────────────────────────────
+
 export function ActivityTimeline() {
-  const [search, setSearch] = React.useState("")
-  const [userFilter, setUserFilter] = React.useState("all")
-  const [entityFilter, setEntityFilter] = React.useState<EntityType | "all">("all")
+  const currentUser = useSessionStore((s) => s.user)
 
-  const filtered = React.useMemo(() => {
-    return MOCK_EVENTS.filter((e) => {
-      if (userFilter !== "all" && e.user.name !== userFilter) return false
-      if (entityFilter !== "all" && e.entity !== entityFilter) return false
-      if (search) {
-        const q = search.toLowerCase()
-        if (
-          !e.description.toLowerCase().includes(q) &&
-          !e.target.toLowerCase().includes(q) &&
-          !e.user.name.toLowerCase().includes(q)
-        )
-          return false
-      }
-      return true
+  const [logs, setLogs] = React.useState<SystemLogRaw[]>([])
+  const [page, setPage] = React.useState(1)
+  const [hasMore, setHasMore] = React.useState(false)
+  const [loading, setLoading] = React.useState(true)
+  const [loadingMore, setLoadingMore] = React.useState(false)
+
+  const [userFilter, setUserFilter] = React.useState<number | "">("")
+  const [entityFilter, setEntityFilter] = React.useState("")
+  const [members, setMembers] = React.useState<{ userId: number; name: string }[]>([])
+
+  React.useEffect(() => {
+    teamService.list({ take: 100 }).then((res) => {
+      setMembers(res.data.map((m) => ({ userId: m.user_id, name: m.user?.name ?? m.user?.email ?? "—" })))
+    }).catch(() => {})
+  }, [])
+
+  React.useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    setLogs([])
+    setPage(1)
+
+    systemLogService.list({
+      page: 1,
+      take: PAGE_SIZE,
+      user_id: userFilter !== "" ? userFilter : undefined,
+      keyEntity: entityFilter || undefined,
+    }).then((res) => {
+      if (cancelled) return
+      setLogs(res.data)
+      setHasMore(res.nextPage !== null)
+      setLoading(false)
+    }).catch(() => {
+      if (!cancelled) setLoading(false)
     })
-  }, [search, userFilter, entityFilter])
 
-  const groups = groupByDay(filtered)
+    return () => { cancelled = true }
+  }, [userFilter, entityFilter])
+
+  function loadMore() {
+    const nextPage = page + 1
+    setLoadingMore(true)
+    systemLogService.list({
+      page: nextPage,
+      take: PAGE_SIZE,
+      user_id: userFilter !== "" ? userFilter : undefined,
+      keyEntity: entityFilter || undefined,
+    }).then((res) => {
+      setLogs((prev) => [...prev, ...res.data])
+      setHasMore(res.nextPage !== null)
+      setPage(nextPage)
+      setLoadingMore(false)
+    }).catch(() => setLoadingMore(false))
+  }
+
+  const groups = React.useMemo(() => groupByDay(logs), [logs])
+
+  const selectedUserLabel = React.useMemo(() => {
+    if (userFilter === "") return "Todos los usuarios"
+    if (userFilter === currentUser?.id) return `Yo (${currentUser?.name})`
+    return members.find((m) => m.userId === userFilter)?.name ?? "Usuario"
+  }, [userFilter, currentUser, members])
 
   return (
     <div className="space-y-6">
-      {/* Filters */}
+      {/* Filtros */}
       <div className="space-y-3">
         <div className="flex items-center gap-3">
-          <div className="relative max-w-xs flex-1">
-            <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Buscar en el historial..."
-              className="pl-8"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          <select
-            value={userFilter}
-            onChange={(e) => setUserFilter(e.target.value)}
-            className="h-8 rounded-lg border border-input bg-transparent px-3 text-sm text-foreground outline-none"
-          >
-            <option value="all">Todos los usuarios</option>
-            {Object.values(USERS).map((u) => (
-              <option key={u.name} value={u.name}>
-                {u.name}
-              </option>
-            ))}
-          </select>
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button variant="outline" size="sm" />}>
+              {selectedUserLabel}
+              <ChevronDown className="ml-1 size-4 opacity-50" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="min-w-52">
+              <DropdownMenuRadioGroup
+                value={String(userFilter)}
+                onValueChange={(v) => setUserFilter(v === "" ? "" : Number(v))}
+              >
+                <DropdownMenuRadioItem value="">Todos los usuarios</DropdownMenuRadioItem>
+                <DropdownMenuSeparator />
+                {currentUser && (
+                  <DropdownMenuRadioItem value={String(currentUser.id)}>
+                    Yo ({currentUser.name})
+                  </DropdownMenuRadioItem>
+                )}
+                {members
+                  .filter((m) => m.userId !== currentUser?.id)
+                  .map((m) => (
+                    <DropdownMenuRadioItem key={m.userId} value={String(m.userId)}>
+                      {m.name}
+                    </DropdownMenuRadioItem>
+                  ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
-        <div className="flex gap-1.5 overflow-x-auto">
+        <div className="flex gap-1.5 overflow-x-auto pb-0.5">
           {ENTITY_FILTERS.map((f) => (
             <button
               key={f.key}
               type="button"
               onClick={() => setEntityFilter(f.key)}
               className={cn(
-                "rounded-full px-3 py-1 text-xs font-medium transition-colors",
+                "whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium transition-colors",
                 entityFilter === f.key
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted text-muted-foreground hover:text-foreground"
@@ -183,68 +232,61 @@ export function ActivityTimeline() {
       </div>
 
       {/* Timeline */}
-      {groups.length === 0 ? (
+      {loading ? (
+        <TimelineSkeleton />
+      ) : groups.length === 0 ? (
         <p className="py-12 text-center text-sm text-muted-foreground">
-          No hay actividad que coincida con los filtros.
+          No hay actividad registrada.
         </p>
       ) : (
         <div className="mx-auto max-w-2xl space-y-6">
           {groups.map((group) => (
             <div key={group.key}>
-              {/* Day header */}
               <div className="mb-4 flex items-center gap-3">
                 <span className="text-sm font-semibold">{group.label}</span>
                 <div className="flex-1 border-t" />
-                <span className="text-xs text-muted-foreground">{group.events.length} eventos</span>
+                <span className="text-xs text-muted-foreground">{group.logs.length} eventos</span>
               </div>
 
-              {/* Timeline entries */}
               <div className="relative ml-3">
-                <div className="absolute top-3 bottom-0 left-0 border-l-2" />
+                <div className="absolute bottom-0 left-0 top-3 border-l-2" />
 
-                {group.events.map((event) => {
-                  const entity = ENTITY_CONFIG[event.entity]
-                  const title =
-                    event.description.charAt(0).toUpperCase() + event.description.slice(1)
+                {group.logs.map((log) => {
+                  const entity = ENTITY_CONFIG[log.keyEntity] ?? { label: log.keyEntity, className: "bg-muted text-muted-foreground" }
+                  const time = format(new Date(log.createdAt), "HH:mm")
+                  const userName = log.userName
+                  const isSystem = !userName
+                  const message = isSystem
+                    ? log.message.replace(/El usuario\s+""\s*/i, "El widget ")
+                    : log.message
 
                   return (
-                    <div key={event.id} className="relative pb-6 pl-7 last:pb-0">
-                      {/* Dot */}
-                      <div className="absolute top-2.5 left-px h-2.5 w-2.5 -translate-x-1/2 rounded-full border-2 border-primary bg-background" />
+                    <div key={log.id} className="relative pb-6 pl-7 last:pb-0">
+                      <div className="absolute left-px top-2.5 h-2.5 w-2.5 -translate-x-1/2 rounded-full border-2 border-primary bg-background" />
 
-                      {/* Content */}
                       <div className="space-y-1.5">
-                        {/* User avatar + name */}
                         <div className="flex items-center gap-2">
-                          <div className="flex size-7 shrink-0 overflow-hidden rounded-full bg-accent">
-                            <img
-                              src={event.user.avatar}
-                              alt={event.user.name}
-                              className="size-full object-cover"
-                            />
-                          </div>
-                          <span className="text-sm font-medium">{event.user.name}</span>
+                          {isSystem ? (
+                            <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted">
+                              <BotIcon className="size-4 text-muted-foreground" />
+                            </div>
+                          ) : (
+                            <Avatar size="sm">
+                              <AvatarImage src="https://github.com/shadcn.png" />
+                              <AvatarFallback className="text-base">
+                              </AvatarFallback>
+                            </Avatar>
+                          )}
+                          <span className={cn("text-sm font-medium", isSystem && "text-muted-foreground")}>
+                            {isSystem ? "Widget | Sistema" : userName}
+                          </span>
                         </div>
-
-                        {/* Title + timestamp */}
-                        <div>
-                          <p className="text-sm font-medium">
-                            {title}
-                            {event.target && (
-                              <span className="font-normal text-muted-foreground">
-                                {" "}
-                                {event.target}
-                              </span>
-                            )}
-                          </p>
-                          <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <p className="text-sm text-muted-foreground">{message}</p>
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
                             <ClockIcon className="size-3.5" />
-                            <span>{format(event.timestamp, "HH:mm")}</span>
+                            <span>{time}</span>
                           </div>
-                        </div>
-
-                        {/* Entity badge */}
-                        <div>
                           <Badge
                             className={cn("rounded-full border-0 text-xs", entity.className)}
                             variant="secondary"
@@ -259,6 +301,15 @@ export function ActivityTimeline() {
               </div>
             </div>
           ))}
+
+          {hasMore && (
+            <div className="flex justify-center pt-2">
+              <Button variant="outline" size="sm" onClick={loadMore} disabled={loadingMore}>
+                {loadingMore && <Loader2Icon className="mr-2 size-4 animate-spin" />}
+                {loadingMore ? "Cargando..." : "Cargar más"}
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -3,10 +3,10 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowRight, Eye, EyeOff, Lock } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { notify } from "@/lib/notify";
 import { authService } from "@/services/auth.service";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,25 +40,26 @@ export const ResetPasswordForm = ({ token }: ResetPasswordFormProps) => {
     setIsLoading(true);
     try {
       await authService.resetPassword(token, values.password, values.confirmPassword);
-      toast.success("Contraseña actualizada", { description: "Ya puedes iniciar sesión" });
+      notify.success({ title: "Contraseña actualizada", description: "Ya puedes iniciar sesión" });
       router.replace("/login");
     } catch (err: unknown) {
       const msg = (err as { message?: string }).message ?? "Error inesperado";
-      toast.error("Error al restablecer", { description: msg });
+      notify.error({ title: "Error al restablecer", description: msg });
     } finally {
       setIsLoading(false);
     }
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
-      <div className="space-y-1.5">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" autoComplete="off">
+      <div className="space-y-2">
         <Label htmlFor="password" className={errors.password ? "text-destructive" : ""}>Nueva contraseña</Label>
         <div className="relative">
           <Lock className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
             id="password"
             type={showPassword ? "text" : "password"}
+            autoComplete="new-password"
             placeholder="Crea una contraseña"
             className={`pl-9 pr-9 ${errors.password ? "border-destructive focus-visible:border-destructive/70 focus-visible:ring-destructive/25" : ""}`}
             {...register("password")}
@@ -74,13 +75,14 @@ export const ResetPasswordForm = ({ token }: ResetPasswordFormProps) => {
         {errors.password && <p className="text-[0.8rem] text-destructive">{errors.password.message}</p>}
       </div>
 
-      <div className="space-y-1.5">
+      <div className="space-y-2">
         <Label htmlFor="confirmPassword" className={errors.confirmPassword ? "text-destructive" : ""}>Confirmar contraseña</Label>
         <div className="relative">
           <Lock className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
             id="confirmPassword"
             type={showConfirm ? "text" : "password"}
+            autoComplete="new-password"
             placeholder="Repite tu contraseña"
             className={`pl-9 pr-9 ${errors.confirmPassword ? "border-destructive focus-visible:border-destructive/70 focus-visible:ring-destructive/25" : ""}`}
             {...register("confirmPassword")}
@@ -96,7 +98,7 @@ export const ResetPasswordForm = ({ token }: ResetPasswordFormProps) => {
         {errors.confirmPassword && <p className="text-[0.8rem] text-destructive">{errors.confirmPassword.message}</p>}
       </div>
 
-      <Button className="mt-2 w-full" size="lg" type="submit" disabled={isLoading}>
+      <Button className="w-full" size="lg" type="submit" disabled={isLoading}>
         <ArrowRight />
         {isLoading ? "Guardando..." : "Restablecer contraseña"}
       </Button>

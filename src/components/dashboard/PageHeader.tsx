@@ -4,6 +4,7 @@ import { Separator } from "@/components/ui/separator";
 import { AIAssistantToggle } from "@/components/dashboard/ai/AIAssistantToggle";
 import { BellButton } from "@/components/dashboard/BellButton";
 import { CreateQuickMenu } from "@/components/dashboard/CreateQuickMenu";
+import { ThemeToggle } from "@/components/dashboard/ThemeToggle";
 
 interface PageHeaderProps {
   icon: LucideIcon;
@@ -29,12 +30,14 @@ export function PageHeader({ icon: Icon, title, description }: PageHeaderProps) 
       </div>
 
       <div className="flex items-center gap-2">
-        <div className="flex items-center gap-2 rounded-full border bg-muted/40 px-15 py-1.5 text-sm text-muted-foreground">
+        {/* Ocultos por ahora: falta conectar. Descomentar cuando se retomen. */}
+        {/* <div className="flex items-center gap-2 rounded-full border bg-muted/40 px-15 py-1.5 text-sm text-muted-foreground">
           <SearchIcon className="size-3.5" />
           <span>Buscar en CRM</span>
-        </div>
-        <CreateQuickMenu />
-        <AIAssistantToggle />
+        </div> */}
+        {/* <CreateQuickMenu /> */}
+        <ThemeToggle />
+        {/* <AIAssistantToggle /> */}
         <BellButton />
       </div>
     </header>

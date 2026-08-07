@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
@@ -8,6 +9,7 @@ import {
   DatabaseIcon,
   FilterIcon,
   KeyIcon,
+  LayoutTemplateIcon,
   LineChartIcon,
   PackageIcon,
   PlugIcon,
@@ -17,6 +19,7 @@ import {
   UsersIcon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useSidebar } from "@/components/ui/sidebar"
 
 type NavItem = {
   label: string
@@ -51,6 +54,7 @@ const navGroups: NavGroup[] = [
       { label: "Catálogos", href: "/settings/catalogs", icon: TagIcon },
       { label: "Productos", href: "/settings/products", icon: PackageIcon },
       { label: "Embudos", href: "/settings/funnels", icon: FilterIcon },
+      { label: "Plantillas", href: "/settings/pdf-templates", icon: LayoutTemplateIcon },
     ],
   },
   {
@@ -66,9 +70,15 @@ const navGroups: NavGroup[] = [
 
 export function SettingsNav() {
   const pathname = usePathname()
+  const { setOpen } = useSidebar()
+
+  useEffect(() => {
+    setOpen(false)
+    return () => setOpen(true)
+  }, [])
 
   return (
-    <nav className="w-52 shrink-0 border-r p-3 flex flex-col gap-5">
+    <nav className="w-52 shrink-0 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden border-r p-3 flex flex-col gap-5">
       {navGroups.map((group, i) => (
         <div key={i} className="flex flex-col gap-0.5">
           {group.label && (

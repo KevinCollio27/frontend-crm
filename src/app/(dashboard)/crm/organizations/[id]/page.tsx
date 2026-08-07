@@ -1,5 +1,4 @@
-import { redirect } from "next/navigation"
-import { ORGANIZATION_DETAILS } from "@/components/dashboard/organizations/data"
+import { Suspense } from "react"
 import { OrganizationDetail } from "@/components/dashboard/organizations/OrganizationDetail"
 
 export default async function OrganizationDetailPage({
@@ -8,7 +7,9 @@ export default async function OrganizationDetailPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const detail = ORGANIZATION_DETAILS[id]
-  if (!detail) redirect("/crm/organizations")
-  return <OrganizationDetail organization={detail} />
+  return (
+    <Suspense>
+      <OrganizationDetail id={Number(id)} />
+    </Suspense>
+  )
 }

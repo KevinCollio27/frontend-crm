@@ -1,11 +1,13 @@
 "use client"
 
+import * as React from "react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetFooter } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
-import { getFlag } from "@/lib/table-utils"
+import { getFlag, getInitials } from "@/lib/table-utils"
 import {
+  BadgeCheck,
   BriefcaseIcon,
   ChevronsUpIcon,
   Eye,
@@ -16,6 +18,7 @@ import {
   UsersIcon,
   UserPlusIcon,
 } from "lucide-react"
+import { contactService } from "@/services/contact.service"
 import type { Organization } from "./OrganizationsTable"
 
 const countryNames: Record<string, string> = {
@@ -61,11 +64,26 @@ interface Props {
   organization: Organization | null
   open: boolean
   onOpenChange: (open: boolean) => void
+  onViewDetails?: () => void
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function OrganizationPreviewSheet({ organization, open, onOpenChange }: Props) {
+export function OrganizationPreviewSheet({ organization, open, onOpenChange, onViewDetails }: Props) {
+  const [contacts, setContacts]       = React.useState<{ id: number; name: string }[]>([])
+  const [loadingContacts, setLoadingContacts] = React.useState(false)
+
+  React.useEffect(() => {
+    if (!open || !organization) return
+    setContacts([])
+    setLoadingContacts(true)
+    contactService
+      .list({ organization_id: organization.id, take: 5 })
+      .then((res) => setContacts(res.data.map((p) => ({ id: p.id, name: p.name }))))
+      .catch(() => {})
+      .finally(() => setLoadingContacts(false))
+  }, [open, organization?.id])
+
   if (!organization) return null
 
   return (
@@ -74,12 +92,15 @@ export function OrganizationPreviewSheet({ organization, open, onOpenChange }: P
 
         {/* Identity */}
         <div className="flex shrink-0 items-center gap-4 border-b px-5 py-4">
-          <Avatar className="size-16 shrink-0">
-            <AvatarImage src="/images/avatar-org.svg" alt={organization.name} />
-            <AvatarFallback className="text-base font-medium">
-              {organization.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)}
-            </AvatarFallback>
-          </Avatar>
+          <div className = "relative">
+            <Avatar className="size-16 shrink-0">
+              <AvatarImage src="https://github.com/shadcn.png" alt={organization.name} />
+              <AvatarFallback className="text-base font-medium">
+                {organization.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)}
+              </AvatarFallback>
+            </Avatar>
+            <BadgeCheck className="absolute -right-1 -bottom-1 size-4.5 rounded-full fill-blue-500 text-white" />
+          </div>
           <div className="flex min-w-0 flex-col gap-1">
             <span className="truncate text-sm font-medium">
               {organization.name}
@@ -87,19 +108,6 @@ export function OrganizationPreviewSheet({ organization, open, onOpenChange }: P
             <span className="truncate text-xs text-muted-foreground">
               {organization.taxId}
             </span>
-            <div className="flex gap-1.5 flex-wrap mt-0.5">
-              <span className="w-fit rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                {organization.industry || "Organización"}
-              </span>
-              <span className={cn(
-                "w-fit rounded-full px-2 py-0.5 text-xs font-medium",
-                organization.source === "CRM"
-                  ? "bg-blue-50 text-blue-600"
-                  : "bg-emerald-50 text-emerald-600"
-              )}>
-                {organization.source}
-              </span>
-            </div>
           </div>
         </div>
 
@@ -154,27 +162,34 @@ export function OrganizationPreviewSheet({ organization, open, onOpenChange }: P
           {/* Contactos */}
           <SectionHeader icon={UsersIcon} label="Contactos Asociados" />
           <div className="flex flex-col gap-1.5 px-4 py-3">
-            <div className="flex items-center gap-2.5 px-3 py-2 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition-colors">
-              <Avatar className="size-7 shrink-0">
-                <AvatarImage src="https://github.com/shadcn.png" alt="Kevin Collio" />
-                <AvatarFallback className="text-[10px] font-medium">KC</AvatarFallback>
-              </Avatar>
-              <div className="flex flex-col min-w-0">
-                <p className="text-xs font-medium">Kevin Collio</p>
-                <p className="text-xs text-muted-foreground">Director ejecutivo</p>
-              </div>
-              <span className="ml-auto text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full shrink-0">
-                Alto valor
-              </span>
-            </div>
+            {loadingContacts ? (
+              Array.from({ length: 2 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-2.5 px-3 py-2 bg-muted/50 rounded-lg">
+                  <div className="size-7 shrink-0 animate-pulse rounded-full bg-muted" />
+                  <div className="h-3.5 w-28 animate-pulse rounded bg-muted" />
+                </div>
+              ))
+            ) : contacts.length === 0 ? (
+              <p className="px-3 py-2 text-xs text-muted-foreground">Sin contactos asociados.</p>
+            ) : (
+              contacts.map((c) => (
+                <div key={c.id} className="flex items-center gap-2.5 px-3 py-2 bg-muted/50 rounded-lg">
+                  <Avatar className="size-7 shrink-0">
+                    <AvatarImage src="https://github.com/shadcn.png" alt={c.name} />
+                    <AvatarFallback className="text-[10px] font-medium">{getInitials(c.name)}</AvatarFallback>
+                  </Avatar>
+                  <p className="truncate text-xs font-medium">{c.name}</p>
+                </div>
+              ))
+            )}
           </div>
 
         </div>
 
         {/* Footer */}
         <SheetFooter className="flex-col gap-2 border-t px-4 py-3 shrink-0">
-          <Button variant="outline" className="w-full justify-start text-xs h-8">
-            <Eye className="size-3.5" /> Ver Registro
+          <Button variant="outline" className="w-full justify-start text-xs h-8" onClick={onViewDetails}>
+            <Eye className="size-3.5" /> Ver Detalles
           </Button>
           <Button
             variant="outline"

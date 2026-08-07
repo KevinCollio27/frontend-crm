@@ -29,6 +29,8 @@ interface ChatSidebarProps {
   selectedId: string | null
   onSelect: (id: string | null) => void
   onNew: () => void
+  onDelete: (id: string) => void
+  onRename: (id: string, newTitle: string) => void
 }
 
 export function ChatSidebar({
@@ -36,6 +38,8 @@ export function ChatSidebar({
   selectedId,
   onSelect,
   onNew,
+  onDelete,
+  onRename,
 }: ChatSidebarProps) {
   const [search, setSearch] = React.useState("")
 
@@ -95,6 +99,8 @@ export function ChatSidebar({
                     conversation={conv}
                     isActive={selectedId === conv.id}
                     onSelect={onSelect}
+                    onDelete={onDelete}
+                    onRename={onRename}
                   />
                 ))}
               </div>
@@ -110,11 +116,38 @@ function ConversationItem({
   conversation,
   isActive,
   onSelect,
+  onDelete,
+  onRename,
 }: {
   conversation: ChatConversation
   isActive: boolean
   onSelect: (id: string | null) => void
+  onDelete: (id: string) => void
+  onRename: (id: string, newTitle: string) => void
 }) {
+  const [editing, setEditing]     = React.useState(false)
+  const [editValue, setEditValue] = React.useState("")
+  const inputRef                  = React.useRef<HTMLInputElement>(null)
+
+  const startEdit = () => {
+    setEditValue(conversation.title)
+    setEditing(true)
+    setTimeout(() => inputRef.current?.select(), 0)
+  }
+
+  const commitEdit = () => {
+    const trimmed = editValue.trim()
+    if (trimmed && trimmed !== conversation.title) {
+      onRename(conversation.id, trimmed)
+    }
+    setEditing(false)
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") { e.preventDefault(); commitEdit() }
+    if (e.key === "Escape") setEditing(false)
+  }
+
   return (
     <div
       className={cn(
@@ -122,35 +155,50 @@ function ConversationItem({
         isActive ? "bg-accent text-accent-foreground" : "hover:bg-muted/60"
       )}
     >
-      <button
-        type="button"
-        className="flex-1 min-w-0 truncate px-2 py-1.5 text-left text-sm"
-        onClick={() => onSelect(conversation.id)}
-      >
-        {conversation.title}
-      </button>
+      {editing ? (
+        <input
+          ref={inputRef}
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          onBlur={commitEdit}
+          onKeyDown={handleKeyDown}
+          autoFocus
+          className="flex-1 min-w-0 bg-transparent px-2 py-1.5 text-sm outline-none"
+        />
+      ) : (
+        <button
+          type="button"
+          className="flex-1 min-w-0 truncate px-2 py-1.5 text-left text-sm"
+          onClick={() => onSelect(conversation.id)}
+        >
+          {conversation.title}
+        </button>
+      )}
 
-      <div className="mr-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={
-              <Button variant="ghost" size="icon" className="size-6" />
-            }
-          >
-            <MoreHorizontalIcon className="size-3.5" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="min-w-36">
-            <DropdownMenuItem>
-              <PencilIcon className="size-3.5" />
-              Renombrar
-            </DropdownMenuItem>
-            <DropdownMenuItem className="text-destructive focus:text-destructive">
-              <Trash2Icon className="size-3.5" />
-              Eliminar
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+      {!editing && (
+        <div className="mr-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={<Button variant="ghost" size="icon" className="size-6" />}
+            >
+              <MoreHorizontalIcon className="size-3.5" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-36">
+              <DropdownMenuItem onClick={startEdit}>
+                <PencilIcon className="size-3.5" />
+                Renombrar
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onClick={() => onDelete(conversation.id)}
+              >
+                <Trash2Icon className="size-3.5" />
+                Eliminar
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      )}
     </div>
   )
 }

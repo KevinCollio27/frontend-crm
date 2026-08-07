@@ -108,7 +108,7 @@ export const VerifyOTP = ({
         {canResend ? (
           <button
             onClick={handleResend}
-            className="text-blue-600 hover:text-blue-700 font-medium"
+            className="font-medium underline-offset-2 hover:underline"
           >
             Reenviar
           </button>

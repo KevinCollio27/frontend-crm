@@ -1,6 +1,5 @@
 import {
   ArchiveIcon,
-  FileIcon,
   InboxIcon,
   SendIcon,
   ShieldAlertIcon,
@@ -17,8 +16,7 @@ interface FolderItem {
 }
 
 const folders: FolderItem[] = [
-  { id: "inbox", label: "Inbox", icon: InboxIcon, count: 128 },
-  { id: "drafts", label: "Borradores", icon: FileIcon, count: 9 },
+  { id: "inbox", label: "Recibidos", icon: InboxIcon, count: 128 },
   { id: "sent", label: "Enviado", icon: SendIcon },
   { id: "junk", label: "Correo no deseado", icon: ShieldAlertIcon, count: 23 },
   { id: "trash", label: "Eliminados", icon: Trash2Icon },

@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
+import { MarkdownContent } from "@/components/dashboard/MarkdownContent"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,9 +45,10 @@ interface AttachedFile {
 interface InputBarProps {
   onSubmit: (prompt: string, files: File[]) => void
   autoFocus?: boolean
+  disabled?: boolean
 }
 
-function InputBar({ onSubmit, autoFocus }: InputBarProps) {
+function InputBar({ onSubmit, autoFocus, disabled = false }: InputBarProps) {
   const [prompt, setPrompt]           = React.useState("")
   const [isDragOver, setIsDragOver]   = React.useState(false)
   const [attached, setAttached]       = React.useState<AttachedFile[]>([])
@@ -103,7 +105,7 @@ function InputBar({ onSubmit, autoFocus }: InputBarProps) {
         setIsDragOver(false)
         processFiles(Array.from(e.dataTransfer.files))
       }}
-      className="relative overflow-visible rounded-xl border transition-colors duration-150 focus-within:border-ring p-2"
+      className={cn("relative overflow-visible rounded-xl border transition-colors duration-150 focus-within:border-ring p-2", disabled && "opacity-60 pointer-events-none")}
     >
       {/* Drag overlay */}
       <div className={cn(
@@ -263,8 +265,8 @@ function AssistantBubble({ content }: { content: string }) {
       <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-violet-100 dark:bg-violet-950/40">
         <IconSparkles size={14} className="text-violet-600" />
       </div>
-      <div className="flex-1 pt-0.5 text-sm leading-relaxed text-foreground whitespace-pre-wrap">
-        {content}
+      <div className="flex-1 pt-0.5 text-sm leading-relaxed text-foreground">
+        <MarkdownContent content={content} />
       </div>
     </div>
   )
@@ -275,14 +277,15 @@ function AssistantBubble({ content }: { content: string }) {
 interface ChatViewProps {
   conversation: ChatConversation | undefined
   onSubmit: (prompt: string, files: File[]) => void
+  sending?: boolean
 }
 
-export function ChatView({ conversation, onSubmit }: ChatViewProps) {
+export function ChatView({ conversation, onSubmit, sending = false }: ChatViewProps) {
   const messagesEndRef = React.useRef<HTMLDivElement>(null)
 
   React.useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [conversation?.messages.length])
+  }, [conversation?.messages.length, sending])
 
   // ── Empty state ──────────────────────────────────────────────────────────
   if (!conversation) {
@@ -303,7 +306,7 @@ export function ChatView({ conversation, onSubmit }: ChatViewProps) {
             className="w-full animate-[fade-up_0.4s_ease-out_both]"
             style={{ animationDelay: "100ms" }}
           >
-            <InputBar onSubmit={onSubmit} autoFocus />
+            <InputBar onSubmit={onSubmit} autoFocus disabled={sending} />
           </div>
 
           <div
@@ -341,13 +344,25 @@ export function ChatView({ conversation, onSubmit }: ChatViewProps) {
               <AssistantBubble key={msg.id} content={msg.content} />
             )
           )}
+          {sending && (
+            <div className="flex items-start gap-3">
+              <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-violet-100 dark:bg-violet-950/40">
+                <IconSparkles size={14} className="text-violet-600" />
+              </div>
+              <div className="flex gap-1 pt-3">
+                <span className="size-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:0ms]" />
+                <span className="size-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:150ms]" />
+                <span className="size-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:300ms]" />
+              </div>
+            </div>
+          )}
           <div ref={messagesEndRef} />
         </div>
       </div>
 
       <div className="shrink-0 px-4 pb-4">
         <div className="mx-auto max-w-2xl">
-          <InputBar onSubmit={onSubmit} />
+          <InputBar onSubmit={onSubmit} disabled={sending} />
           <p className="mt-2 text-center text-[10px] text-muted-foreground">
             El Agente de IA puede cometer errores. Verifica la información importante.
           </p>

@@ -54,13 +54,13 @@ export function DataTableFacetedFilter<TData, TValue>({
           <Button variant="outline" size="sm" className="h-8 border-dashed" />
         }
       >
-        <PlusCircleIcon className="size-4" />
+        <PlusCircleIcon className="size-3.5" />
         {title}
         {selectedValues.size > 0 && (
           <>
             <Separator
               orientation="vertical"
-              className="mx-1 data-vertical:h-4 data-vertical:self-auto"
+              className="mx-1 data-[orientation=vertical]:h-4 data-[orientation=vertical]:self-auto"
             />
             <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium">
               {selectedArray.length}

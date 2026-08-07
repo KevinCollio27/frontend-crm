@@ -1,0 +1,76 @@
+"use client"
+
+import { useState } from "react"
+import { UserPlusIcon } from "lucide-react"
+
+import {
+  ChannelsSection,
+  GeneralSection,
+  ProfessionalSection,
+} from "@/components/contact-form/contact-form-sections"
+import { CrmBackdrop } from "@/components/contact-form/crm-backdrop"
+import { useContactForm } from "@/components/contact-form/use-contact-form"
+import { Button } from "@/components/ui/button"
+import { FieldSeparator } from "@/components/ui/field"
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
+
+export default function SheetIdeaPage() {
+  const form = useContactForm()
+  const [open, setOpen] = useState(false)
+
+  return (
+    <CrmBackdrop
+      title="Idea 2 — Panel lateral"
+      description="Un panel deslizante desde la derecha que mantiene visible el contexto del CRM mientras completas el formulario."
+      action={
+        <Sheet open={open} onOpenChange={setOpen}>
+          <SheetTrigger
+            render={
+              <Button>
+                <UserPlusIcon data-icon="inline-start" />
+                Crear Nuevo Contacto
+              </Button>
+            }
+          />
+          <SheetContent
+            side="right"
+            className="flex w-full flex-col gap-0 p-0 sm:max-w-md"
+          >
+            <SheetHeader className="border-b">
+              <SheetTitle>Crear Nuevo Contacto</SheetTitle>
+              <SheetDescription>
+                Agrega un nuevo contacto a tu CRM
+              </SheetDescription>
+            </SheetHeader>
+
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <div className="flex flex-col gap-6 px-4 py-6">
+                <GeneralSection form={form} />
+                <FieldSeparator />
+                <ChannelsSection form={form} />
+                <FieldSeparator />
+                <ProfessionalSection form={form} />
+              </div>
+            </div>
+
+            <SheetFooter className="flex-row justify-end border-t">
+              <SheetClose
+                render={<Button variant="outline">Cancelar</Button>}
+              />
+              <Button onClick={() => setOpen(false)}>Guardar contacto</Button>
+            </SheetFooter>
+          </SheetContent>
+        </Sheet>
+      }
+    />
+  )
+}

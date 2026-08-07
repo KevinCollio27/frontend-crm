@@ -20,15 +20,13 @@ import {
   UsersIcon,
   ZapIcon,
 } from "lucide-react"
-import { STAGES } from "./data"
-
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface DealLike {
   name: string
   status: string
   stageName?: string
-  stageId?: string
+  stageId?: number | string | null
   company: string
   contact: string
   value: number
@@ -110,7 +108,7 @@ export function FunnelPreviewSheet({ deal, open, onOpenChange }: Props) {
   const statusConf   = STATUS_CONFIG[deal.status] ?? STATUS_CONFIG.en_progreso
   const priorityConf = deal.priority ? PRIORITY_CONFIG[deal.priority] : null
   const PriorityIcon = priorityConf?.icon
-  const stageName    = deal.stageName ?? STAGES.find((s) => s.id === deal.stageId)?.name ?? deal.stageId ?? "—"
+  const stageName    = deal.stageName ?? "—"
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>

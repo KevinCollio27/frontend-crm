@@ -17,16 +17,27 @@ import {
   HashIcon,
   TrendingUpIcon,
 } from "lucide-react"
-import type { ContactDetail } from "../data"
+import type { ContactDetailData } from "@/types/contact"
+import { opportunityService } from "@/services/opportunity.service"
+import type { OpportunityRaw } from "@/types/opportunity"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function formatCLP(value: number) {
+function formatValue(value: number) {
   return new Intl.NumberFormat("es-CL", {
     style: "currency",
     currency: "CLP",
     maximumFractionDigits: 0,
   }).format(value)
+}
+
+function normalizeUrl(raw: string): string | null {
+  const url = raw.trim()
+  if (!url) return null
+  // Must look like a real domain (word.tld with at least 2-char TLD)
+  if (!/\w+\.\w{2,}/.test(url)) return null
+  if (/^https?:\/\//i.test(url)) return url
+  return `https://${url}`
 }
 
 function CopyButton({ value }: { value: string }) {
@@ -68,95 +79,130 @@ function CollapsibleSection({ title, children }: { title: string; children: Reac
 // ─── Component ────────────────────────────────────────────────────────────────
 
 interface Props {
-  contact: ContactDetail
+  data: ContactDetailData
 }
 
-export function Col3Related({ contact }: Props) {
-  const totalValue = contact.opportunities.reduce((sum, o) => sum + o.value, 0)
-  const openCount  = contact.opportunities.filter((o) => o.status === "open").length
-  const wonCount   = contact.opportunities.filter((o) => o.status === "won").length
+export function Col3Related({ data }: Props) {
+  const org = data.organization
+  const [opps, setOpps] = React.useState<OpportunityRaw[] | null>(null)
+
+  React.useEffect(() => {
+    opportunityService
+      .list({ personId: data.id, take: 100 })
+      .then((page) => setOpps(page.data))
+      .catch(() => setOpps([]))
+  }, [data.id])
+
+  const loading      = opps === null
+  const totalValue   = opps?.reduce((sum, o) => sum + (o.opportunity_net_sales[0]?.value ?? 0), 0) ?? 0
+  const openCount    = opps?.filter((o) => !o.is_won && !o.is_lost).length ?? 0
+  const wonCount     = opps?.filter((o) => o.is_won).length ?? 0
+  const actCount     = opps?.reduce((sum, o) => sum + o._count.opportunity_activity, 0) ?? 0
+  const oppCount     = opps?.length ?? 0
 
   return (
     <div className="flex flex-col gap-4 p-4">
 
-      {/* ── Resumen ───────────────────────────────────────────────────────── */}
+      {/* ── Resumen ─────────────────────────────────────────────────────── */}
       <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
         <div className="px-3.5 pb-3 pt-3.5">
           <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
             Resumen
           </span>
-          <p className="mt-1.5 text-2xl font-bold tabular-nums">{formatCLP(totalValue)}</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Valor total · {contact.opportunities.length} oportunidad{contact.opportunities.length !== 1 ? "es" : ""}
-          </p>
+          {loading ? (
+            <>
+              <div className="mt-1.5 h-8 w-36 animate-pulse rounded bg-muted" />
+              <div className="mt-1 h-3 w-28 animate-pulse rounded bg-muted" />
+            </>
+          ) : (
+            <>
+              <p className="mt-1.5 text-2xl font-bold tabular-nums">{formatValue(totalValue)}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Valor total · {oppCount} oportunidad{oppCount !== 1 ? "es" : ""}
+              </p>
+            </>
+          )}
         </div>
         <div className="grid grid-cols-3 divide-x border-t">
           <div className="flex flex-col items-center gap-0.5 py-3">
             <div className="flex items-center gap-1 text-blue-600">
               <TrendingUpIcon className="size-3.5" />
-              <span className="text-base font-bold">{openCount}</span>
+              <span className="text-base font-bold">{loading ? "—" : openCount}</span>
             </div>
             <span className="text-[10px] text-muted-foreground">Abiertas</span>
           </div>
           <div className="flex flex-col items-center gap-0.5 py-3">
             <div className="flex items-center gap-1 text-emerald-600">
               <HashIcon className="size-3.5" />
-              <span className="text-base font-bold">{wonCount}</span>
+              <span className="text-base font-bold">{loading ? "—" : wonCount}</span>
             </div>
             <span className="text-[10px] text-muted-foreground">Ganadas</span>
           </div>
           <div className="flex flex-col items-center gap-0.5 py-3">
             <div className="flex items-center gap-1 text-indigo-600">
               <ActivityIcon className="size-3.5" />
-              <span className="text-base font-bold">{contact.activities.length}</span>
+              <span className="text-base font-bold">{loading ? "—" : actCount}</span>
             </div>
             <span className="text-[10px] text-muted-foreground">Actividades</span>
           </div>
         </div>
       </div>
 
-      {/* ── Organización ──────────────────────────────────────────────────── */}
-      {contact.organization && (
+      {/* ── Organización ─────────────────────────────────────────────────── */}
+      {org && (
         <CollapsibleSection title="Organización">
           <div className="p-3.5">
             <div className="flex items-center gap-3">
               <div className="relative">
-                <Avatar>
-                  <AvatarImage src="/images/avatar-org.svg" alt={contact.organization.name} />
-                  <AvatarFallback>
-                    {contact.organization.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)}
+                <Avatar size="default">
+                  <AvatarImage src="https://github.com/shadcn.png"/>
+                  <AvatarFallback className="text-base">
                   </AvatarFallback>
                 </Avatar>
                 <BadgeCheck className="absolute -right-1 -bottom-1 size-4.5 rounded-full fill-blue-500 text-white" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold">{contact.organization.name}</p>
-                {contact.organization.industry && (
-                  <p className="truncate text-xs text-muted-foreground">{contact.organization.industry}</p>
+                <p className="truncate text-sm font-semibold">{org.name}</p>
+                {org.industry && (
+                  <p className="truncate text-xs text-muted-foreground">{org.industry}</p>
                 )}
               </div>
             </div>
 
             <div className="mt-2 divide-y border-t">
-              {contact.organization.taxId && (
+              {org.taxId && (
                 <div className="flex items-center gap-3 py-2.5">
                   <HashIcon className="size-3.5 shrink-0 text-muted-foreground" />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{contact.organization.taxId}</p>
+                    <p className="truncate text-sm font-medium">{org.taxId}</p>
                     <p className="text-xs text-muted-foreground">RUT Empresa</p>
                   </div>
-                  <CopyButton value={contact.organization.taxId} />
+                  <CopyButton value={org.taxId} />
                 </div>
               )}
-              {contact.organization.website && (
-                <div className="flex items-center gap-3 py-2.5">
-                  <GlobeIcon className="size-3.5 shrink-0 text-muted-foreground" />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-blue-500">{contact.organization.website}</p>
-                    <p className="text-xs text-muted-foreground">Sitio web</p>
+              {org.website && (() => {
+                const href = normalizeUrl(org.website)
+                return (
+                  <div className="flex items-center gap-3 py-2.5">
+                    <GlobeIcon className="size-3.5 shrink-0 text-muted-foreground" />
+                    <div className="min-w-0 flex-1">
+                      {href ? (
+                        <a
+                          href={href}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="truncate text-sm font-medium text-blue-500 hover:underline"
+                        >
+                          {org.website}
+                        </a>
+                      ) : (
+                        <p className="truncate text-sm font-medium text-muted-foreground">{org.website}</p>
+                      )}
+                      <p className="text-xs text-muted-foreground">Sitio web</p>
+                    </div>
                   </div>
-                </div>
-              )}
+                )
+              })()}
             </div>
           </div>
         </CollapsibleSection>

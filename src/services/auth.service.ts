@@ -29,8 +29,43 @@ export const authService = {
     return data;
   },
 
-  async register(name: string, email: string, password: string, phone?: string): Promise<ApiResponse> {
-    return api.post("auth/register", { name, email, password, phone });
+  async register(name: string, email: string, password: string, phone?: string, workspaceId?: number): Promise<ApiResponse> {
+    return api.post("auth/register", { name, email, password, phone, ...(workspaceId ? { workspaceId } : {}) });
+  },
+
+  async acceptInviteUserToWorkspace(token: string, email: string): Promise<ApiResponse> {
+    const data = await api.post<never, ApiResponse>("auth/accept-invite-user-to-workspace", { token, email });
+    if (data.success && data.user && data.workspace) {
+      // El user de esta respuesta se busca antes de crear el user_workspace, así que
+      // llega incompleto (sin el workspace nuevo en user_workspace) — hidratamos desde
+      // /auth/me para tener los datos completos sin necesidad de recargar la página.
+      useSessionStore.getState().setSession(data.user, data.workspace.id);
+      await useSessionStore.getState().hydrate();
+    }
+    return data;
+  },
+
+  async getInviteLinkInfo(code: string): Promise<ApiResponse> {
+    return api.get(`auth/invite-link/${code}`);
+  },
+
+  async acceptInviteLink(code: string, name: string, email: string, password: string): Promise<ApiResponse> {
+    const data = await api.post<never, ApiResponse>("auth/accept-invite-link", { code, name, email, password });
+    if (data.success && data.user && data.workspace) {
+      useSessionStore.getState().setSession(data.user, data.workspace.id);
+      await useSessionStore.getState().hydrate();
+    }
+    return data;
+  },
+
+  async joinByInviteLink(code: string): Promise<ApiResponse> {
+    const data = await api.post<never, ApiResponse>("auth/join-by-invite-link", { code });
+    if (data.success && data.workspace) {
+      const current = useSessionStore.getState();
+      if (current.user) useSessionStore.getState().setSession(current.user, data.workspace.id);
+      await useSessionStore.getState().hydrate();
+    }
+    return data;
   },
 
   async verifyEmail(email: string, code: string): Promise<ApiResponse> {

@@ -1,38 +1,24 @@
 "use client"
 
+import * as React from "react"
 import {
   type ColumnDef,
-  type ColumnFiltersState,
   flexRender,
   getCoreRowModel,
-  getFacetedRowModel,
-  getFacetedUniqueValues,
-  getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
   type SortingState,
   useReactTable,
   type VisibilityState,
 } from "@tanstack/react-table"
-import {
-  ArrowDownIcon,
-  ArrowUpDown,
-  ArrowUpIcon,
-  ChevronDown,
-  FileTextIcon,
-  MoreHorizontal,
-  PencilIcon,
-  PlusIcon,
-  Trash2Icon,
-  XIcon,
-} from "lucide-react"
-import * as React from "react"
-
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { EntityAccentBar } from "@/components/ui/entity-accent-bar"
+import { ChevronDown, CopyIcon, DownloadIcon, EyeIcon, FileSearchIcon, FileTextIcon, HistoryIcon, Loader2Icon, MailIcon, MoreHorizontalIcon, PencilIcon, PlusIcon, ShipIcon, Trash2Icon } from "lucide-react"
+import { cn } from "@/lib/utils"
+import { getSortIcon, getInitials } from "@/lib/table-utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import { DataTableFacetedFilter } from "@/components/ui/data-table-faceted-filter"
 import { DataTablePagination } from "@/components/ui/data-table-pagination"
 import {
   DropdownMenu,
@@ -53,53 +39,180 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { cn } from "@/lib/utils"
-import type { DealDetail, DealQuotation, QuotationStatus } from "../../data"
-import { id } from "date-fns/locale"
+import { quotationService } from "@/services/quotation.service"
+import { productService } from "@/services/product.service"
+import { opportunityService } from "@/services/opportunity.service"
+import type { QuotationRaw } from "@/types/quotation"
+import { CreateQuotationSheet } from "@/components/dashboard/quotations/CreateQuotationSheet"
+import { QuotationPreviewSheet } from "@/components/dashboard/quotations/QuotationPreviewSheet"
+import { QuotationPdfPreviewSheet } from "@/components/dashboard/quotations/QuotationPdfPreviewSheet"
+import { QuotationHistorySheet } from "@/components/dashboard/quotations/QuotationHistorySheet"
+import { SendQuotationSheet } from "@/components/dashboard/quotations/SendQuotationSheet"
+import { TemplateAssignmentSheet } from "@/components/dashboard/quotations/TemplateAssignmentSheet"
+import { downloadQuotationPdf, warmPdfCache, clearPdfCache, clearAllPdfCache } from "@/components/dashboard/quotations/shared/download-pdf"
+import { confirmAndSendToCargo, isAcceptedStatus } from "@/components/dashboard/quotations/shared/send-to-cargo"
+import { notify } from "@/lib/notify"
+import { orgConfirm } from "@/lib/confirm"
+import { useEntityRealtime } from "@/hooks/useEntityRealtime"
+import { useCargoIntegration } from "@/hooks/useCargoIntegration"
+
+// ─── Entity ───────────────────────────────────────────────────────────────────
+
+interface TabQuotation {
+  id:          number
+  name:        string
+  itemCount:   number
+  status:      string
+  type:        string
+  amount:      number
+  currency:    string
+  validUntil:  string | null
+  createdAt:   string
+  responsible: string | null
+  isSentToCargo: boolean
+  pdfTemplateId: number | null
+}
+
+// ─── Map ──────────────────────────────────────────────────────────────────────
+
+function mapQuotation(q: QuotationRaw): TabQuotation {
+  return {
+    id:          q.id,
+    name:        q.name,
+    itemCount:   q.quotation_fields?.length ?? 0,
+    status:      q.status,
+    type:        q.type,
+    amount:      q.amount,
+    currency:    q.currency?.symbol ?? "CLP",
+    validUntil:  q.valid_until
+      ? new Date(q.valid_until).toLocaleDateString("es-CL", {
+          day: "2-digit", month: "2-digit", year: "2-digit",
+        })
+      : null,
+    createdAt:   new Date(q.created_at).toLocaleDateString("es-CL", {
+      day: "numeric", month: "short", year: "numeric",
+    }),
+    responsible: q.created_user?.name ?? null,
+    isSentToCargo: q.is_sent_to_cargo ?? false,
+    pdfTemplateId: q.pdf_template_id ?? null,
+  }
+}
 
 // ─── Configs ──────────────────────────────────────────────────────────────────
 
-function formatCLP(value: number) {
-  return new Intl.NumberFormat("es-CL", {
-    style: "currency",
-    currency: "CLP",
-    maximumFractionDigits: 0,
-  }).format(value)
+const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
+  draft:    { label: "Borrador", className: "bg-muted text-muted-foreground border-border"           },
+  sent:     { label: "Enviada",  className: "bg-blue-50 text-blue-700 border-blue-200"               },
+  accepted: { label: "Aceptada", className: "bg-emerald-50 text-emerald-700 border-emerald-200"      },
+  rejected: { label: "Rechazada",className: "bg-red-50 text-red-600 border-red-200"                  },
+  // fallbacks for Spanish keys (legacy)
+  borrador: { label: "Borrador", className: "bg-muted text-muted-foreground border-border"           },
+  enviada:  { label: "Enviada",  className: "bg-blue-50 text-blue-700 border-blue-200"               },
+  aceptada: { label: "Aceptada", className: "bg-emerald-50 text-emerald-700 border-emerald-200"      },
+  rechazada:{ label: "Rechazada",className: "bg-red-50 text-red-600 border-red-200"                  },
 }
 
-const STATUS_CONFIG: Record<QuotationStatus, { label: string; className: string }> = {
-  borrador:  { label: "Borrador",  className: "bg-muted text-muted-foreground border-border"              },
-  enviada:   { label: "Enviada",   className: "bg-blue-50 text-blue-700 border-blue-200"                  },
-  aceptada:  { label: "Aceptada",  className: "bg-emerald-50 text-emerald-700 border-emerald-200"          },
-  rechazada: { label: "Rechazada", className: "bg-red-50 text-red-600 border-red-200"                     },
+const STATUSES = [
+  { key: "draft",    label: "Borrador",  dot: "bg-muted-foreground/60" },
+  { key: "sent",     label: "Enviada",   dot: "bg-blue-500"            },
+  { key: "accepted", label: "Aceptada",  dot: "bg-emerald-500"         },
+  { key: "rejected", label: "Rechazada", dot: "bg-red-500"             },
+]
+
+const LEGACY_STATUS: Record<string, string> = {
+  borrador: "draft", enviada: "sent", aceptada: "accepted", rechazada: "rejected",
 }
 
-const TYPE_CONFIG: Record<"sale" | "purchase", { label: string; className: string }> = {
-  sale:     { label: "Venta",  className: "bg-violet-50 text-violet-700 border-violet-200" },
-  purchase: { label: "Compra", className: "bg-orange-50 text-orange-700 border-orange-200" },
+const TYPE_LABEL: Record<string, string> = {
+  sale:     "Venta",
+  purchase: "Compra",
 }
 
-const columnLabels: Record<string, string> = {
-  id:           "ID",
-  name:         "Nombre",
-  type:         "Tipo",
-  status:       "Estado",
-  amount:       "Monto",
-  valid_until:  "Válida hasta",
-  created_by:   "Creado por",
-  created_at:   "Creado",
-  apply_discounts: "Descuentos",
+const COLUMN_LABELS: Record<string, string> = {
+  id:          "ID",
+  name:        "Nombre",
+  status:      "Estado",
+  amount:      "Monto",
+  responsible: "Responsable",
+  type:        "Tipo",
+  validUntil:  "Válida hasta",
+  createdAt:   "Creado",
 }
 
-const getSortIcon = (sorted: false | "asc" | "desc") => {
-  if (sorted === "asc")  return <ArrowUpIcon   className="ml-2 size-3.5" />
-  if (sorted === "desc") return <ArrowDownIcon  className="ml-2 size-3.5" />
-  return <ArrowUpDown className="ml-2 size-3.5" />
+const DEFAULT_VISIBILITY: VisibilityState = {
+  type:       false,
+  validUntil: false,
+  createdAt:  false,
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function formatCurrency(amount: number, symbol: string) {
+  const n = new Intl.NumberFormat("es-CL", { maximumFractionDigits: 0 }).format(amount)
+  return symbol === "CLP" ? `$${n}` : `${symbol} ${n}`
+}
+
+// ─── Skeleton ─────────────────────────────────────────────────────────────────
+
+const skeletonCell: Record<string, React.ReactNode> = {
+  select: <div className="size-4 animate-pulse rounded bg-muted" />,
+  id:     <div className="h-3 w-6 animate-pulse rounded bg-muted" />,
+  name: (
+    <div className="flex items-center gap-2.5">
+      <div className="size-7 shrink-0 animate-pulse rounded-lg bg-muted" />
+      <div className="space-y-1.5">
+        <div className="h-3.5 w-28 animate-pulse rounded bg-muted" />
+        <div className="h-3 w-16 animate-pulse rounded bg-muted" />
+      </div>
+    </div>
+  ),
+  status:      <div className="h-5 w-20 animate-pulse rounded-full bg-muted" />,
+  amount:      <div className="h-4 w-20 animate-pulse rounded bg-muted" />,
+  responsible: (
+    <div className="flex items-center gap-2">
+      <div className="size-6 animate-pulse rounded-full bg-muted" />
+      <div className="h-3.5 w-20 animate-pulse rounded bg-muted" />
+    </div>
+  ),
+  type:       <div className="h-3.5 w-14 animate-pulse rounded bg-muted" />,
+  validUntil: <div className="h-3.5 w-20 animate-pulse rounded bg-muted" />,
+  createdAt:  <div className="h-3.5 w-20 animate-pulse rounded bg-muted" />,
+  actions:    <div className="size-7 animate-pulse rounded bg-muted" />,
+}
+
+function TableSkeleton({ visibleIds }: { visibleIds: string[] }) {
+  return (
+    <>
+      {Array.from({ length: 5 }).map((_, i) => (
+        <TableRow key={i}>
+          {visibleIds.map((id) => (
+            <TableCell key={id}>
+              {skeletonCell[id] ?? <div className="h-3.5 w-20 animate-pulse rounded bg-muted" />}
+            </TableCell>
+          ))}
+        </TableRow>
+      ))}
+    </>
+  )
 }
 
 // ─── Columns ──────────────────────────────────────────────────────────────────
 
-function getColumns(): ColumnDef<DealQuotation>[] {
+function getColumns(
+  onEdit:         (id: number) => void,
+  onDelete:       (row: TabQuotation) => void,
+  onHistory:      (row: TabQuotation) => void,
+  onDownload:     (row: TabQuotation) => void,
+  onStatusChange: (row: TabQuotation, status: string) => void,
+  onSend:         (row: TabQuotation) => void,
+  downloading:    number | null,
+  onPreview:      (id: number) => void,
+  onSendToCargo:  (row: TabQuotation) => void,
+  hasCargoIntegration: boolean,
+  onDuplicate:    (row: TabQuotation) => void,
+  onTemplate:     (row: TabQuotation) => void,
+  onPdfPreview:   (row: TabQuotation) => void,
+): ColumnDef<TabQuotation>[] {
   return [
     {
       id: "select",
@@ -108,14 +221,14 @@ function getColumns(): ColumnDef<DealQuotation>[] {
           aria-label="Select all"
           checked={table.getIsAllPageRowsSelected()}
           indeterminate={table.getIsSomePageRowsSelected() && !table.getIsAllPageRowsSelected()}
-          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+          onCheckedChange={(v) => table.toggleAllPageRowsSelected(!!v)}
         />
       ),
       cell: ({ row }) => (
         <Checkbox
           aria-label="Select row"
           checked={row.getIsSelected()}
-          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          onCheckedChange={(v) => row.toggleSelected(!!v)}
         />
       ),
       enableSorting: false,
@@ -138,43 +251,54 @@ function getColumns(): ColumnDef<DealQuotation>[] {
       cell: ({ row }) => {
         const q = row.original
         return (
-          <div className="flex items-center gap-2.5">
-            <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-600">
-              <FileTextIcon className="size-3.5" />
-            </div>
+          <div className="flex items-stretch gap-2.5">
+            <EntityAccentBar seed={q.id} />
             <div className="leading-tight">
               <div className="text-sm font-medium">{q.name}</div>
-              <div className="text-xs text-muted-foreground">{q.items_count} ítem(s)</div>
+              <div className="text-xs text-muted-foreground">{q.itemCount} item(s)</div>
             </div>
           </div>
         )
       },
     },
     {
-      accessorKey: "type",
-      header: "Tipo",
-      cell: ({ row }) => {
-        const conf = TYPE_CONFIG[row.getValue("type") as "sale" | "purchase"]
-        return (
-          <Badge className={cn("rounded-full border px-2.5 py-0.5 text-xs", conf.className)}>
-            {conf.label}
-          </Badge>
-        )
-      },
-      filterFn: (row, id, value: string[]) => value.includes(row.getValue(id)),
-    },
-    {
       accessorKey: "status",
       header: "Estado",
       cell: ({ row }) => {
-        const conf = STATUS_CONFIG[row.getValue("status") as QuotationStatus]
+        const current = row.getValue("status") as string
+        const conf = STATUS_CONFIG[current]
+          ?? { label: current, className: "bg-muted text-muted-foreground border-border" }
+        const normalizedCurrent = LEGACY_STATUS[current] ?? current
+        const options = STATUSES.filter((s) => s.key !== normalizedCurrent)
         return (
-          <Badge className={cn("rounded-full border px-2.5 py-0.5 text-xs", conf.className)}>
-            {conf.label}
-          </Badge>
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              nativeButton={false}
+              render={
+                <Badge
+                  className={cn(
+                    "rounded-full border px-2.5 py-0.5 text-xs cursor-pointer hover:opacity-75 transition-opacity",
+                    conf.className,
+                  )}
+                />
+              }
+            >
+              {conf.label}
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="min-w-36">
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>Cambiar estado</DropdownMenuLabel>
+                {options.map((s) => (
+                  <DropdownMenuItem key={s.key} onClick={() => onStatusChange(row.original, s.key)}>
+                    <span className={cn("size-2 rounded-full", s.dot)} />
+                    {s.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )
       },
-      filterFn: (row, id, value: string[]) => value.includes(row.getValue(id)),
     },
     {
       accessorKey: "amount",
@@ -184,130 +308,339 @@ function getColumns(): ColumnDef<DealQuotation>[] {
         </Button>
       ),
       cell: ({ row }) => (
-        <div className="text-sm font-semibold tabular-nums text-emerald-600">
-          {formatCLP(row.getValue("amount"))}
-        </div>
+        <span className="text-sm font-semibold tabular-nums text-emerald-600">
+          {formatCurrency(row.getValue("amount") as number, row.original.currency)}
+        </span>
       ),
     },
     {
-      accessorKey: "valid_until",
+      id: "responsible",
+      accessorFn: (row) => row.responsible,
       header: ({ column }) => (
         <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
-          Válida hasta {getSortIcon(column.getIsSorted())}
-        </Button>
-      ),
-      cell: ({ row }) => (
-        <div className="text-sm text-muted-foreground">
-          {(row.getValue("valid_until") as string | undefined) ?? "—"}
-        </div>
-      ),
-    },
-    {
-      id: "created_by",
-      accessorFn: (row) => row.created_by.name,
-      header: ({ column }) => (
-        <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
-          Creado por {getSortIcon(column.getIsSorted())}
+          Responsable {getSortIcon(column.getIsSorted())}
         </Button>
       ),
       cell: ({ row }) => {
-        const u = row.original.created_by
+        const name = row.original.responsible
+        if (!name) return <span className="text-sm text-muted-foreground">—</span>
         return (
           <div className="flex items-center gap-2">
             <Avatar className="size-6 shrink-0">
-              <AvatarImage src={u.avatar} alt={u.name} />
-              <AvatarFallback className="text-[9px] font-semibold">{u.initials}</AvatarFallback>
+              <AvatarImage src="https://github.com/shadcn.png" alt={name} />
+              <AvatarFallback className="text-[9px] font-semibold">{getInitials(name)}</AvatarFallback>
             </Avatar>
-            <span className="text-sm">{u.name}</span>
+            <span className="text-sm">{name}</span>
           </div>
         )
       },
     },
     {
-      accessorKey: "created_at",
+      accessorKey: "type",
+      header: "Tipo",
+      cell: ({ row }) => (
+        <span className="text-sm text-muted-foreground">
+          {TYPE_LABEL[row.getValue("type") as string] ?? row.getValue("type")}
+        </span>
+      ),
+    },
+    {
+      accessorKey: "validUntil",
+      header: "Válida hasta",
+      cell: ({ row }) => (
+        <span className="text-sm text-muted-foreground">
+          {(row.getValue("validUntil") as string) ?? "—"}
+        </span>
+      ),
+    },
+    {
+      accessorKey: "createdAt",
       header: ({ column }) => (
         <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
           Creado {getSortIcon(column.getIsSorted())}
         </Button>
       ),
       cell: ({ row }) => (
-        <div className="text-sm text-muted-foreground">{row.getValue("created_at")}</div>
+        <span className="text-sm text-muted-foreground">{row.getValue("createdAt")}</span>
       ),
     },
     {
       id: "actions",
       enableHiding: false,
-      cell: () => (
-        <DropdownMenu>
-          <DropdownMenuTrigger render={<Button variant="ghost" className="h-8 w-8 p-0" />}>
+      cell: ({ row }) => {
+        const canSendToCargo = hasCargoIntegration && isAcceptedStatus(row.original.status)
+        const showCargoBadge = canSendToCargo && !row.original.isSentToCargo
+        return (
+        <DropdownMenu onOpenChange={(open) => { if (open) warmPdfCache(row.original.id) }}>
+          <DropdownMenuTrigger render={<Button variant="ghost" className="relative h-8 w-8 p-0" />}>
             <span className="sr-only">Abrir menú</span>
-            <MoreHorizontal className="size-4" />
+            <MoreHorizontalIcon className="size-4" />
+            {showCargoBadge && (
+              <span className="absolute top-1 right-1 size-1.5 rounded-full bg-emerald-500" />
+            )}
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="min-w-44">
             <DropdownMenuGroup>
               <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-              <DropdownMenuItem><PencilIcon /> Editar</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onPreview(row.original.id)}>
+                <EyeIcon /> Ver Detalles
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onPdfPreview(row.original)}>
+                <FileSearchIcon /> Vista Previa
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onEdit(row.original.id)}>
+                <PencilIcon /> Editar
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onDuplicate(row.original)}>
+                <CopyIcon /> Duplicar
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onDownload(row.original)} disabled={downloading === row.original.id}>
+                {downloading === row.original.id
+                  ? <Loader2Icon className="animate-spin" />
+                  : <DownloadIcon />
+                }
+                {downloading === row.original.id ? "Generando..." : "Descargar PDF"}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onSend(row.original)}>
+                <MailIcon /> Enviar correo
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onHistory(row.original)}>
+                <HistoryIcon /> Ver historial
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onTemplate(row.original)}>
+                <FileTextIcon /> Plantilla
+              </DropdownMenuItem>
+              {canSendToCargo && (
+                <DropdownMenuItem
+                  onClick={() => onSendToCargo(row.original)}
+                  disabled={row.original.isSentToCargo}
+                >
+                  <ShipIcon /> {row.original.isSentToCargo ? "Ya enviado a Cargo" : "Enviar a Cargo"}
+                </DropdownMenuItem>
+              )}
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive focus:text-destructive">
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onClick={() => onDelete(row.original)}
+            >
               <Trash2Icon /> Eliminar
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-      ),
+        )
+      },
     },
   ]
 }
 
-// ─── Filter options ────────────────────────────────────────────────────────────
-
-const STATUS_OPTIONS = [
-  { label: "Borrador",  value: "borrador"  },
-  { label: "Enviada",   value: "enviada"   },
-  { label: "Aceptada",  value: "aceptada"  },
-  { label: "Rechazada", value: "rechazada" },
-]
-
-const TYPE_OPTIONS = [
-  { label: "Venta",  value: "sale"     },
-  { label: "Compra", value: "purchase" },
-]
-
 // ─── Component ────────────────────────────────────────────────────────────────
 
 interface Props {
-  deal: DealDetail
+  opportunityId:    number
+  opportunityName?: string
+  flowName?:        string | null
+  contactEmail?:    string | null
 }
 
-export function CotizacionesTab({ deal }: Props) {
-  const [sorting, setSorting]                   = React.useState<SortingState>([])
-  const [columnFilters, setColumnFilters]        = React.useState<ColumnFiltersState>([])
-  const [columnVisibility, setColumnVisibility]  = React.useState<VisibilityState>({
-    id: false,
-    type: false, 
-    created_by: false, 
-    created_at: false,
-    valid_until: false,
-  })
+export function CotizacionesTab({ opportunityId, opportunityName, flowName, contactEmail }: Props) {
+  const { hasCargoIntegration, cargoIntegration } = useCargoIntegration()
+  const [createOpen, setCreateOpen]       = React.useState(false)
+  const [editEntity, setEditEntity]       = React.useState<QuotationRaw | null>(null)
+  const [previewEntity, setPreviewEntity] = React.useState<QuotationRaw | null>(null)
+  const [pdfPreviewTarget, setPdfPreviewTarget] = React.useState<TabQuotation | null>(null)
+  const [historyTarget, setHistoryTarget] = React.useState<TabQuotation | null>(null)
+  const [sendTarget, setSendTarget]       = React.useState<TabQuotation | null>(null)
+  const [templateTarget, setTemplateTarget] = React.useState<TabQuotation | null>(null)
+  const [oppTemplateOpen, setOppTemplateOpen] = React.useState(false)
+  const [oppDefaultTemplateId, setOppDefaultTemplateId] = React.useState<number | null>(null)
+  const [downloading, setDownloading]     = React.useState<number | null>(null)
+  const [refreshKey, setRefreshKey]       = React.useState(0)
+  const [data, setData]             = React.useState<TabQuotation[]>([])
+  const [rawItems, setRawItems]     = React.useState<QuotationRaw[]>([])
+  const [loading, setLoading]       = React.useState(true)
+  const [sorting, setSorting]       = React.useState<SortingState>([])
+  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>(DEFAULT_VISIBILITY)
   const [rowSelection, setRowSelection] = React.useState({})
 
-  const columns = React.useMemo(() => getColumns(), [])
+  // Pre-warm products cache al montar el tab — cuando el usuario abra el wizard ya estarán listos
+  React.useEffect(() => { productService.listAll().catch(() => {}) }, [])
+
+  useEntityRealtime("quotation", (payload) => {
+    const changedOppId = (payload.data as { opportunity_id?: number | null })?.opportunity_id
+    if (changedOppId !== opportunityId) return
+    setRefreshKey((k) => k + 1)
+  })
+
+  function handleEdit(id: number) {
+    const raw = rawItems.find((q) => q.id === id)
+    if (raw) setEditEntity(raw)
+  }
+
+  function handlePreview(id: number) {
+    const raw = rawItems.find((q) => q.id === id)
+    if (raw) setPreviewEntity(raw)
+  }
+
+  async function handleDuplicate(row: TabQuotation) {
+    const pendingId = notify.info({ title: "Duplicando cotización", description: "Procesando...", duration: Infinity })
+    try {
+      const duplicated = await quotationService.duplicate(row.id)
+      setRawItems((prev) => [duplicated, ...prev])
+      setData((prev) => [mapQuotation(duplicated), ...prev])
+      notify.dismiss(pendingId)
+      notify.success({ title: "Cotización duplicada", description: `"${duplicated.name}" se creó correctamente.` })
+    } catch (error) {
+      notify.dismiss(pendingId)
+      notify.error({
+        title:       "No se pudo duplicar",
+        description: (error as { message?: string })?.message ?? `No se pudo duplicar "${row.name}".`,
+      })
+    }
+  }
+
+  async function handleSendToCargo(row: TabQuotation) {
+    const raw = rawItems.find((q) => q.id === row.id)
+    if (!raw || !cargoIntegration) return
+    const ok = await confirmAndSendToCargo(raw, cargoIntegration.id)
+    if (ok) {
+      setRawItems((prev) => prev.map((q) => (q.id === row.id ? { ...q, is_sent_to_cargo: true } : q)))
+      setData((prev) => prev.map((q) => (q.id === row.id ? { ...q, isSentToCargo: true } : q)))
+      setPreviewEntity((prev) => (prev && prev.id === row.id ? { ...prev, is_sent_to_cargo: true } : prev))
+    }
+  }
+
+  async function handleDelete(row: TabQuotation) {
+    const confirmed = await orgConfirm.delete(row.name)
+    if (!confirmed) return
+
+    setData((prev) => prev.filter((q) => q.id !== row.id))
+    setRawItems((prev) => prev.filter((q) => q.id !== row.id))
+
+    const t0 = performance.now()
+    console.log(`[quotation] delete start id=${row.id}`)
+    quotationService.delete(row.id)
+      .then(() => {
+        console.log(`[quotation] delete → ${(performance.now() - t0).toFixed(0)}ms`)
+        notify.success({ title: "Cotización eliminada", description: `"${row.name}" fue eliminada.` })
+      })
+      .catch(() => {
+        setRefreshKey((k) => k + 1)
+        notify.error({ title: "Algo salió mal", description: `No se pudo eliminar "${row.name}".` })
+      })
+  }
+
+  function handleSheetSuccess(result: QuotationRaw, mode: "create" | "update") {
+    if (mode === "create") {
+      setRawItems((prev) => [result, ...prev])
+      setData((prev) => [mapQuotation(result), ...prev])
+    } else {
+      clearPdfCache(result.id)
+      setRawItems((prev) => prev.map((q) => (q.id === result.id ? result : q)))
+      setData((prev) => prev.map((q) => (q.id === result.id ? mapQuotation(result) : q)))
+      setEditEntity(null)
+    }
+  }
+
+  async function handleDownload(row: TabQuotation) {
+    if (downloading === row.id) return
+    setDownloading(row.id)
+    try {
+      await downloadQuotationPdf(row.id, row.name)
+    } catch {
+      notify.error({ title: "No se pudo generar el PDF", description: `"${row.name}" falló al generar.` })
+    } finally {
+      setDownloading(null)
+    }
+  }
+
+  function handleStatusChange(row: TabQuotation, newStatus: string) {
+    const prevStatus = row.status
+
+    setData((prev) => prev.map((q) => (q.id === row.id ? { ...q, status: newStatus } : q)))
+    setRawItems((prev) => prev.map((q) => (q.id === row.id ? { ...q, status: newStatus } : q)))
+    clearPdfCache(row.id)
+
+    const t0 = performance.now()
+    quotationService
+      .updateStatus(row.id, newStatus)
+      .then(() => {
+        console.log(`[quotation] status → ${(performance.now() - t0).toFixed(0)}ms`)
+        notify.success({
+          title:       "Estado actualizado",
+          description: `"${row.name}" ahora está ${STATUS_CONFIG[newStatus]?.label ?? newStatus}.`,
+        })
+      })
+      .catch(() => {
+        setData((prev) => prev.map((q) => (q.id === row.id ? { ...q, status: prevStatus } : q)))
+        setRawItems((prev) => prev.map((q) => (q.id === row.id ? { ...q, status: prevStatus } : q)))
+        notify.error({ title: "No se pudo actualizar", description: `No se pudo cambiar el estado de "${row.name}".` })
+      })
+  }
+
+  function openOpportunityTemplateSheet() {
+    setOppTemplateOpen(true)
+    opportunityService.getDefaultPdfTemplate(opportunityId)
+      .then((res) => setOppDefaultTemplateId(res?.default_pdf_template_id ?? null))
+      .catch(() => setOppDefaultTemplateId(null))
+  }
+
+  const columns = React.useMemo(
+    () => getColumns(
+      handleEdit, handleDelete,
+      (row) => setHistoryTarget(row),
+      handleDownload, handleStatusChange,
+      (row) => setSendTarget(row),
+      downloading,
+      handlePreview,
+      handleSendToCargo,
+      hasCargoIntegration,
+      handleDuplicate,
+      (row) => setTemplateTarget(row),
+      (row) => setPdfPreviewTarget(row),
+    ),
+    [rawItems, downloading, hasCargoIntegration],
+  )
+
+  React.useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+
+    const t0 = performance.now()
+    quotationService
+      .listByOpportunity(opportunityId)
+      .then((res) => {
+        if (!cancelled) {
+          console.log(`[quotation-tab] list → ${(performance.now() - t0).toFixed(0)}ms (${res.length} items)`)
+          setRawItems(res)
+          setData(res.map(mapQuotation))
+        }
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(false) })
+
+    return () => { cancelled = true }
+  }, [opportunityId, refreshKey])
 
   const table = useReactTable({
-    data: deal.quotations,
+    data,
     columns,
-    onSortingChange:           setSorting,
-    onColumnFiltersChange:     setColumnFilters,
-    onColumnVisibilityChange:  setColumnVisibility,
-    onRowSelectionChange:      setRowSelection,
-    getCoreRowModel:           getCoreRowModel(),
-    getPaginationRowModel:     getPaginationRowModel(),
-    getSortedRowModel:         getSortedRowModel(),
-    getFilteredRowModel:       getFilteredRowModel(),
-    getFacetedRowModel:        getFacetedRowModel(),
-    getFacetedUniqueValues:    getFacetedUniqueValues(),
-    state: { sorting, columnFilters, columnVisibility, rowSelection },
+    onSortingChange:          setSorting,
+    onColumnVisibilityChange: setColumnVisibility,
+    onRowSelectionChange:     setRowSelection,
+    getCoreRowModel:          getCoreRowModel(),
+    getPaginationRowModel:    getPaginationRowModel(),
+    getSortedRowModel:        getSortedRowModel(),
+    state: { sorting, columnVisibility, rowSelection },
+    globalFilterFn: (row, _id, value: string) =>
+      row.original.name.toLowerCase().includes(value.toLowerCase()),
   })
+
+  const [filter, setFilter] = React.useState("")
+
+  React.useEffect(() => {
+    table.setGlobalFilter(filter)
+  }, [filter])
 
   return (
     <div className="p-4">
@@ -317,20 +650,15 @@ export function CotizacionesTab({ deal }: Props) {
         <Input
           className="h-8 max-w-45 text-sm"
           placeholder="Filtrar por nombre..."
-          value={(table.getColumn("name")?.getFilterValue() as string) ?? ""}
-          onChange={(e) => table.getColumn("name")?.setFilterValue(e.target.value)}
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
         />
-        <DataTableFacetedFilter column={table.getColumn("status")!} title="Estado" options={STATUS_OPTIONS} />
-        <DataTableFacetedFilter column={table.getColumn("type")!}   title="Tipo"   options={TYPE_OPTIONS}   />
-        {table.getState().columnFilters.length > 0 && (
-          <Button variant="ghost" size="sm" className="h-8" onClick={() => table.resetColumnFilters()}>
-            Reset <XIcon className="ml-1 size-4" />
-          </Button>
-        )}
-        <div className="ml-auto flex items-center gap-2">
+        {!loading && (
           <span className="text-sm text-muted-foreground">
             {table.getFilteredRowModel().rows.length} cotización(es)
           </span>
+        )}
+        <div className="ml-auto flex items-center gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8 text-xs" />}>
               Columnas <ChevronDown className="ml-1 size-3.5" />
@@ -340,14 +668,17 @@ export function CotizacionesTab({ deal }: Props) {
                 <DropdownMenuCheckboxItem
                   key={col.id}
                   checked={col.getIsVisible()}
-                  onCheckedChange={(value) => col.toggleVisibility(!!value)}
+                  onCheckedChange={(v) => col.toggleVisibility(!!v)}
                 >
-                  {columnLabels[col.id] ?? col.id}
+                  {COLUMN_LABELS[col.id] ?? col.id}
                 </DropdownMenuCheckboxItem>
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button size="sm" className="h-8 gap-1.5 text-xs">
+          <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={openOpportunityTemplateSheet}>
+            <FileTextIcon className="size-3.5" /> Plantilla de la oportunidad
+          </Button>
+          <Button size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setCreateOpen(true)}>
             <PlusIcon className="size-3.5" /> Cotización
           </Button>
         </div>
@@ -357,18 +688,20 @@ export function CotizacionesTab({ deal }: Props) {
       <div className="overflow-auto rounded-md border">
         <Table>
           <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id}>
-                    {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+            {table.getHeaderGroups().map((hg) => (
+              <TableRow key={hg.id}>
+                {hg.headers.map((h) => (
+                  <TableHead key={h.id}>
+                    {h.isPlaceholder ? null : flexRender(h.column.columnDef.header, h.getContext())}
                   </TableHead>
                 ))}
               </TableRow>
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows?.length ? (
+            {loading ? (
+              <TableSkeleton visibleIds={table.getVisibleLeafColumns().map((c) => c.id)} />
+            ) : table.getRowModel().rows.length ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
                   {row.getVisibleCells().map((cell) => (
@@ -381,7 +714,7 @@ export function CotizacionesTab({ deal }: Props) {
             ) : (
               <TableRow>
                 <TableCell className="h-24 text-center" colSpan={columns.length}>
-                  Sin resultados.
+                  Sin cotizaciones registradas.
                 </TableCell>
               </TableRow>
             )}
@@ -390,9 +723,112 @@ export function CotizacionesTab({ deal }: Props) {
       </div>
 
       {/* Pagination */}
-      <div className="pt-4">
-        <DataTablePagination table={table} />
-      </div>
+      {!loading && (
+        <div className="pt-4">
+          <DataTablePagination table={table} />
+        </div>
+      )}
+
+      <CreateQuotationSheet
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        opportunityId={opportunityId}
+        opportunityName={opportunityName}
+        flowName={flowName}
+        onSuccess={handleSheetSuccess}
+      />
+
+      <CreateQuotationSheet
+        open={!!editEntity}
+        onOpenChange={(open) => { if (!open) setEditEntity(null) }}
+        entity={editEntity ?? undefined}
+        opportunityId={opportunityId}
+        opportunityName={opportunityName}
+        flowName={flowName}
+        onSuccess={handleSheetSuccess}
+      />
+
+      <QuotationPreviewSheet
+        open={!!previewEntity}
+        onOpenChange={(open) => { if (!open) setPreviewEntity(null) }}
+        entity={previewEntity}
+        onEdit={() => {
+          const id = previewEntity!.id
+          setPreviewEntity(null)
+          handleEdit(id)
+        }}
+        onDownload={() => {
+          const row = data.find((d) => d.id === previewEntity!.id)
+          if (row) handleDownload(row)
+        }}
+        downloading={downloading === previewEntity?.id}
+        onSend={() => {
+          const row = data.find((d) => d.id === previewEntity!.id)
+          if (row) setSendTarget(row)
+        }}
+        onSendToCargo={() => {
+          const row = data.find((d) => d.id === previewEntity!.id)
+          if (row) handleSendToCargo(row)
+        }}
+      />
+
+      {historyTarget && (
+        <QuotationHistorySheet
+          open={!!historyTarget}
+          onOpenChange={(open) => { if (!open) setHistoryTarget(null) }}
+          quotationId={historyTarget.id}
+          quotationName={historyTarget.name}
+        />
+      )}
+
+      {sendTarget && (
+        <SendQuotationSheet
+          open={!!sendTarget}
+          onOpenChange={(open) => { if (!open) setSendTarget(null) }}
+          quotationId={sendTarget.id}
+          quotationName={sendTarget.name}
+          contactEmail={contactEmail ?? undefined}
+        />
+      )}
+
+      {templateTarget && (
+        <TemplateAssignmentSheet
+          open={!!templateTarget}
+          onOpenChange={(open) => { if (!open) setTemplateTarget(null) }}
+          title="Plantilla"
+          description="Elige la plantilla PDF de esta cotización."
+          note="Tiene prioridad sobre la plantilla de la oportunidad y la predeterminada del workspace. Si no elegís ninguna, se usa la de la oportunidad o la del workspace."
+          currentTemplateId={templateTarget.pdfTemplateId}
+          onSelect={async (id) => {
+            await quotationService.updatePdfTemplate(templateTarget.id, id)
+            clearPdfCache(templateTarget.id)
+            setData((prev) => prev.map((q) => (q.id === templateTarget.id ? { ...q, pdfTemplateId: id } : q)))
+            setRawItems((prev) => prev.map((q) => (q.id === templateTarget.id ? { ...q, pdf_template_id: id } : q)))
+            setTemplateTarget((prev) => (prev ? { ...prev, pdfTemplateId: id } : prev))
+          }}
+        />
+      )}
+
+      <TemplateAssignmentSheet
+        open={oppTemplateOpen}
+        onOpenChange={setOppTemplateOpen}
+        title="Plantilla"
+        description="Elige la plantilla PDF por defecto de esta oportunidad."
+        note="Las cotizaciones nuevas de esta oportunidad usan esta plantilla por defecto, salvo que tengan su propia plantilla asignada."
+        currentTemplateId={oppDefaultTemplateId}
+        onSelect={async (id) => {
+          await opportunityService.updateDefaultPdfTemplate(opportunityId, id)
+          setOppDefaultTemplateId(id)
+          clearAllPdfCache()
+        }}
+      />
+
+      <QuotationPdfPreviewSheet
+        open={!!pdfPreviewTarget}
+        onOpenChange={(open) => { if (!open) setPdfPreviewTarget(null) }}
+        quotationId={pdfPreviewTarget?.id ?? null}
+        quotationName={pdfPreviewTarget?.name}
+      />
 
     </div>
   )

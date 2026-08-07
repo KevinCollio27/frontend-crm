@@ -9,39 +9,34 @@ import {
 } from "@/components/ui/collapsible"
 import { cn } from "@/lib/utils"
 import { ChevronDownIcon, TrendingUpIcon } from "lucide-react"
-import { STAGES, type DealDetail, type DealStatus, type Priority } from "../data"
+import type { OpportunityDetailData } from "@/types/opportunity"
 
 // ─── Configs ──────────────────────────────────────────────────────────────────
 
-const STATUS_CONFIG: Record<DealStatus, { label: string; className: string }> = {
+const STATUS_CONFIG = {
   open: { label: "Abierta",  className: "bg-blue-50 text-blue-700"       },
   won:  { label: "Ganada",   className: "bg-emerald-50 text-emerald-700" },
   lost: { label: "Perdida",  className: "bg-red-50 text-red-600"         },
 }
 
-const PRIORITY_CONFIG: Record<Priority, { label: string; className: string }> = {
+const PRIORITY_CONFIG = {
   alta:  { label: "Alta",  className: "bg-red-50 text-red-700"         },
   media: { label: "Media", className: "bg-amber-50 text-amber-700"     },
   baja:  { label: "Baja",  className: "bg-emerald-50 text-emerald-700" },
 }
 
-function formatCLP(value: number) {
-  return new Intl.NumberFormat("es-CL", {
+function formatCurrency(value: number, symbol: string) {
+  const formatted = new Intl.NumberFormat("es-CL", {
     style: "currency",
     currency: "CLP",
     maximumFractionDigits: 0,
   }).format(value)
+  return symbol === "CLP" ? formatted : `${symbol} ${new Intl.NumberFormat("es-CL", { maximumFractionDigits: 0 }).format(value)}`
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function CollapsibleSection({
-  title,
-  children,
-}: {
-  title: string
-  children: React.ReactNode
-}) {
+function CollapsibleSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <Collapsible defaultOpen className="overflow-hidden rounded-xl border bg-card shadow-sm">
       <CollapsibleTrigger className="group flex w-full cursor-pointer items-center justify-between px-3.5 py-3 transition-colors hover:bg-muted/30">
@@ -69,15 +64,21 @@ function PropRow({ label, children }: { label: string; children: React.ReactNode
 // ─── Component ────────────────────────────────────────────────────────────────
 
 interface Props {
-  deal: DealDetail
+  data: OpportunityDetailData
 }
 
-export function Col1Info({ deal }: Props) {
-  const statusConf       = STATUS_CONFIG[deal.status]
-  const priorityConf     = PRIORITY_CONFIG[deal.priority]
-  const currentIndex     = STAGES.findIndex((s) => s.id === deal.stageId)
-  const currentStageName = STAGES[currentIndex]?.name ?? deal.stageId
-  const netCost          = deal.products.reduce((sum, p) => sum + p.quantity * p.unitPrice, 0)
+export function Col1Info({ data }: Props) {
+  const statusKey    = data.is_won ? "won" : data.is_lost ? "lost" : "open"
+  const statusConf   = STATUS_CONFIG[statusKey]
+  const priorityConf = data.priority ? PRIORITY_CONFIG[data.priority] : null
+
+  const currentIndex     = data.stages.findIndex((s) => s.id === data.flow_stage_id)
+  const currentStageName = data.stages[currentIndex]?.name ?? "—"
+
+  const formattedCost  = formatCurrency(data.netCost, data.currency)
+  const formattedClose = data.planned_clousure_date
+    ? new Date(data.planned_clousure_date).toLocaleDateString("es-CL", { day: "2-digit", month: "2-digit", year: "2-digit" })
+    : null
 
   return (
     <div className="flex flex-col gap-4 p-4">
@@ -90,9 +91,9 @@ export function Col1Info({ deal }: Props) {
             <TrendingUpIcon className="size-5 text-violet-600" />
           </div>
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold leading-snug">{deal.name}</p>
+            <p className="truncate text-sm font-semibold leading-snug">{data.name}</p>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              {formatCLP(netCost)}&nbsp;·&nbsp;Oportunidad
+              {formattedCost}&nbsp;·&nbsp;Oportunidad
             </p>
           </div>
         </div>
@@ -100,33 +101,48 @@ export function Col1Info({ deal }: Props) {
         {/* Pipeline */}
         <div className="border-t px-3.5 pb-3.5 pt-3">
           <div className="mb-2.5 flex items-center justify-between">
-            <span className="text-sm font-semibold">{currentStageName}</span>
-            <span className="text-xs text-muted-foreground">
-              Etapa {currentIndex + 1} de {STAGES.length}
-            </span>
+            <span className="text-sm font-semibold">{currentStageName || "—"}</span>
+            {data.stages.length > 0 && (
+              <span className="text-xs text-muted-foreground">
+                Etapa {currentIndex + 1} de {data.stages.length}
+              </span>
+            )}
           </div>
-          <div className="flex gap-1">
-            {STAGES.map((stage, i) => (
-              <div key={stage.id} className="flex flex-1 flex-col gap-1.5">
-                <div
-                  className={cn(
-                    "h-1.5 rounded-full transition-colors",
-                    i <= currentIndex ? "bg-primary" : "bg-muted"
-                  )}
-                />
-                <span
-                  className={cn(
-                    "truncate text-center text-[9px] leading-none",
-                    i === currentIndex ? "font-semibold text-primary" : "text-muted-foreground"
-                  )}
-                >
-                  {stage.name}
-                </span>
-              </div>
-            ))}
-          </div>
+          {data.stages.length > 0 ? (
+            <div className="flex gap-1">
+              {data.stages.map((stage, i) => (
+                <div key={stage.id} className="flex flex-1 flex-col gap-1.5">
+                  <div
+                    className={cn(
+                      "h-1.5 rounded-full transition-colors",
+                      i <= currentIndex ? "bg-primary" : "bg-muted"
+                    )}
+                  />
+                  <span
+                    className={cn(
+                      "truncate text-center text-[9px] leading-none",
+                      i === currentIndex ? "font-semibold text-primary" : "text-muted-foreground"
+                    )}
+                  >
+                    {stage.name}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">Sin etapas configuradas</p>
+          )}
         </div>
       </div>
+
+      {/* ── Descripción ──────────────────────────────────────────────────── */}
+      {data.description && (
+        <CollapsibleSection title="Descripción">
+          <p className="px-3.5 py-3 text-sm leading-relaxed text-muted-foreground">
+            {data.description}
+          </p>
+        </CollapsibleSection>
+      )}
 
       {/* ── Propiedades del negocio ──────────────────────────────────────── */}
       <CollapsibleSection title="Propiedades del negocio">
@@ -137,37 +153,31 @@ export function Col1Info({ deal }: Props) {
             </Badge>
           </PropRow>
           <PropRow label="Pipeline">
-            <span className="truncate text-sm font-medium">{deal.pipeline}</span>
+            <span className="truncate text-sm font-medium">{data.flow?.name ?? "—"}</span>
           </PropRow>
           <PropRow label="Fecha de cierre">
             <span className="text-sm font-medium">
-              {deal.closeDate ?? <span className="text-muted-foreground">—</span>}
+              {formattedClose ?? <span className="text-muted-foreground">—</span>}
             </span>
           </PropRow>
           <PropRow label="Propietario">
-            <span className="text-sm font-medium">{deal.responsible.name}</span>
+            <span className="text-sm font-medium">{data.owner?.name ?? "—"}</span>
           </PropRow>
-          <PropRow label="Origen">
-            <span className="text-sm font-medium">{deal.origin}</span>
-          </PropRow>
-          <PropRow label="Prioridad">
-            <Badge className={cn("rounded-full border-0 px-2.5 py-0.5 text-xs", priorityConf.className)}>
-              {priorityConf.label}
-            </Badge>
-          </PropRow>
-          <PropRow label="Etiquetas">
-            <div className="flex flex-wrap justify-end gap-1">
-              <Badge className="rounded-full border bg-muted/60 px-2.5 py-0.5 text-xs text-muted-foreground">
-                Transporte
+          {data.origin && (
+            <PropRow label="Origen">
+              <span className="text-sm font-medium">{data.origin}</span>
+            </PropRow>
+          )}
+          {priorityConf && (
+            <PropRow label="Prioridad">
+              <Badge className={cn("rounded-full border-0 px-2.5 py-0.5 text-xs", priorityConf.className)}>
+                {priorityConf.label}
               </Badge>
-              <Badge className="rounded-full border bg-muted/60 px-2.5 py-0.5 text-xs text-muted-foreground">
-                Refrigerado
-              </Badge>
-            </div>
-          </PropRow>
+            </PropRow>
+          )}
           <PropRow label="Costo neto">
             <span className="text-sm font-semibold tabular-nums text-emerald-600">
-              {formatCLP(netCost)} {deal.currency}
+              {formattedCost}
             </span>
           </PropRow>
         </div>
@@ -176,27 +186,29 @@ export function Col1Info({ deal }: Props) {
       {/* ── Responsables ─────────────────────────────────────────────────── */}
       <CollapsibleSection title="Responsables">
         <div className="divide-y px-3.5">
-          {deal.responsibles.map((r) => (
-            <div key={r.name} className="flex items-center gap-3 py-3">
-              <Avatar className="size-8 shrink-0">
-                <AvatarImage src={r.avatar} alt={r.name} />
-                <AvatarFallback className="text-[10px] font-semibold">
-                  {r.initials}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-sm font-medium">{r.name}</span>
-                <span className="text-xs text-muted-foreground">
-                  {r.isMain ? "Principal" : "Secundario"}
-                </span>
+          {data.responsibles.length === 0 ? (
+            <p className="py-3 text-xs text-muted-foreground">Sin responsables asignados.</p>
+          ) : (
+            data.responsibles.map((r) => (
+              <div key={r.id} className="flex items-center gap-3 py-3">
+                <Avatar className="default shrink-0">
+                  <AvatarImage src="https://github.com/shadcn.png" alt={data.name} />
+                  <AvatarFallback className="text-sm font-semibold"></AvatarFallback>
+                </Avatar>
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate text-sm font-medium">{r.name}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {r.is_main ? "Principal" : "Secundario"}
+                  </span>
+                </div>
+                {r.is_main && (
+                  <Badge className="shrink-0 rounded-full border-0 bg-blue-50 px-2.5 py-0.5 text-xs text-blue-700">
+                    Principal
+                  </Badge>
+                )}
               </div>
-              {r.isMain && (
-                <Badge className="shrink-0 rounded-full border-0 bg-blue-50 px-2.5 py-0.5 text-xs text-blue-700">
-                  Principal
-                </Badge>
-              )}
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </CollapsibleSection>
 

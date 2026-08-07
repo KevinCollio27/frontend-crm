@@ -1,0 +1,459 @@
+"use client"
+
+import {
+  AtSignIcon,
+  CakeIcon,
+  BriefcaseIcon,
+  PlusIcon,
+  Share2Icon,
+  UserRoundIcon,
+  XIcon,
+} from "lucide-react"
+
+import { Button } from "@/components/ui/button"
+import {
+  Field,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+} from "@/components/ui/field"
+import { Input } from "@/components/ui/input"
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/components/ui/input-group"
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+
+import {
+  CHANNEL_TYPES,
+  COUNTRIES,
+  INTERNAL_ROLES,
+  ORGANIZATIONS,
+  PHONE_CODES,
+  ROLES,
+  SOCIAL_NETWORKS,
+  SOURCES,
+  type ContactFormState,
+} from "./use-contact-form"
+
+type Option = { value: string; label: string }
+
+function SimpleSelect({
+  value,
+  onValueChange,
+  placeholder,
+  options,
+  className,
+  ariaLabel,
+}: {
+  value: string | null
+  onValueChange: (v: string) => void
+  placeholder: string
+  options: Option[]
+  className?: string
+  ariaLabel?: string
+}) {
+  return (
+    <Select value={value} onValueChange={(v) => onValueChange(v as string)}>
+      <SelectTrigger className={className ?? "w-full"} aria-label={ariaLabel}>
+        <SelectValue placeholder={placeholder} />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectGroup>
+          {options.map((o) => (
+            <SelectItem key={o.value} value={o.value}>
+              {o.label}
+            </SelectItem>
+          ))}
+        </SelectGroup>
+      </SelectContent>
+    </Select>
+  )
+}
+
+function LabelWithAction({
+  htmlFor,
+  label,
+  actionLabel,
+  onAction,
+}: {
+  htmlFor?: string
+  label: string
+  actionLabel: string
+  onAction?: () => void
+}) {
+  return (
+    <div className="flex min-w-0 items-center justify-between gap-2">
+      <FieldLabel htmlFor={htmlFor} className="truncate">
+        {label}
+      </FieldLabel>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="h-6 shrink-0 px-1.5 text-xs text-muted-foreground"
+        onClick={onAction}
+        aria-label={actionLabel}
+      >
+        <PlusIcon data-icon="inline-start" />
+        {actionLabel}
+      </Button>
+    </div>
+  )
+}
+
+export function GeneralSection({ form }: { form: ContactFormState }) {
+  return (
+    <FieldSet id="seccion-general">
+      <FieldLegend className="flex items-center gap-2">
+        <UserRoundIcon className="size-4 text-muted-foreground" />
+        Perfil General
+      </FieldLegend>
+      <FieldGroup>
+        <Field>
+          <FieldLabel htmlFor="fullName">
+            Nombre Completo <span className="text-destructive">*</span>
+          </FieldLabel>
+          <Input
+            id="fullName"
+            placeholder="Ej. Camila Rojas"
+            value={form.fullName}
+            onChange={(e) => form.setFullName(e.target.value)}
+            required
+          />
+        </Field>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field>
+            <LabelWithAction
+              label="Organización"
+              actionLabel="Crear organización"
+            />
+            <SimpleSelect
+              value={form.organization}
+              onValueChange={form.setOrganization}
+              placeholder="Selecciona una organización"
+              options={ORGANIZATIONS}
+              ariaLabel="Organización"
+            />
+          </Field>
+
+          <Field>
+            <FieldLabel>País de Origen</FieldLabel>
+            <SimpleSelect
+              value={form.country}
+              onValueChange={form.setCountry}
+              placeholder="Selecciona un país"
+              options={COUNTRIES}
+              ariaLabel="País de origen"
+            />
+          </Field>
+        </div>
+
+        <Field>
+          <FieldLabel>Fuente de Contacto</FieldLabel>
+          <SimpleSelect
+            value={form.source}
+            onValueChange={form.setSource}
+            placeholder="¿Cómo llegó este contacto?"
+            options={SOURCES}
+            ariaLabel="Fuente de contacto"
+          />
+        </Field>
+      </FieldGroup>
+    </FieldSet>
+  )
+}
+
+export function ChannelsSection({ form }: { form: ContactFormState }) {
+  return (
+    <FieldSet id="seccion-canales">
+      <FieldLegend className="flex items-center gap-2">
+        <AtSignIcon className="size-4 text-muted-foreground" />
+        Canales de Comunicación
+      </FieldLegend>
+
+      <FieldGroup>
+        {/* Correos */}
+        <Field>
+          <FieldLabel>Correo</FieldLabel>
+          <div className="flex flex-col gap-2">
+            {form.emails.map((email) => (
+              <div key={email.id} className="flex items-center gap-2">
+                <Select
+                  value={email.type}
+                  onValueChange={(v) =>
+                    form.updateEmail(email.id, { type: v as never })
+                  }
+                >
+                  <SelectTrigger
+                    className="w-28 shrink-0"
+                    aria-label="Tipo de correo"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {CHANNEL_TYPES.map((t) => (
+                        <SelectItem key={t.value} value={t.value}>
+                          {t.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+                <InputGroup className="flex-1">
+                  <InputGroupAddon>
+                    <AtSignIcon />
+                  </InputGroupAddon>
+                  <InputGroupInput
+                    type="email"
+                    placeholder="correo@ejemplo.com"
+                    value={email.value}
+                    onChange={(e) =>
+                      form.updateEmail(email.id, { value: e.target.value })
+                    }
+                  />
+                </InputGroup>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0 text-muted-foreground"
+                  onClick={() => form.removeEmail(email.id)}
+                  disabled={form.emails.length === 1}
+                  aria-label="Eliminar correo"
+                >
+                  <XIcon />
+                </Button>
+              </div>
+            ))}
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="w-fit"
+            onClick={form.addEmail}
+          >
+            <PlusIcon data-icon="inline-start" />
+            Añadir correo
+          </Button>
+        </Field>
+
+        {/* Teléfonos */}
+        <Field>
+          <FieldLabel>Teléfono</FieldLabel>
+          <div className="flex flex-col gap-2">
+            {form.phones.map((phone) => (
+              <div key={phone.id} className="flex items-center gap-2">
+                <Select
+                  value={phone.type}
+                  onValueChange={(v) =>
+                    form.updatePhone(phone.id, { type: v as never })
+                  }
+                >
+                  <SelectTrigger
+                    className="w-28 shrink-0"
+                    aria-label="Tipo de teléfono"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {CHANNEL_TYPES.map((t) => (
+                        <SelectItem key={t.value} value={t.value}>
+                          {t.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={phone.code}
+                  onValueChange={(v) =>
+                    form.updatePhone(phone.id, { code: v as string })
+                  }
+                >
+                  <SelectTrigger
+                    className="w-20 shrink-0"
+                    aria-label="Código de país"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {PHONE_CODES.map((c) => (
+                        <SelectItem key={c.value} value={c.value}>
+                          {c.value}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+                <InputGroup className="flex-1">
+                  <InputGroupInput
+                    type="tel"
+                    placeholder="9 1234 5678"
+                    value={phone.value}
+                    onChange={(e) =>
+                      form.updatePhone(phone.id, { value: e.target.value })
+                    }
+                  />
+                </InputGroup>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0 text-muted-foreground"
+                  onClick={() => form.removePhone(phone.id)}
+                  disabled={form.phones.length === 1}
+                  aria-label="Eliminar teléfono"
+                >
+                  <XIcon />
+                </Button>
+              </div>
+            ))}
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="w-fit"
+            onClick={form.addPhone}
+          >
+            <PlusIcon data-icon="inline-start" />
+            Añadir teléfono
+          </Button>
+        </Field>
+      </FieldGroup>
+    </FieldSet>
+  )
+}
+
+export function ProfessionalSection({ form }: { form: ContactFormState }) {
+  return (
+    <FieldSet id="seccion-profesional">
+      <FieldLegend className="flex items-center gap-2">
+        <BriefcaseIcon className="size-4 text-muted-foreground" />
+        Información Profesional
+      </FieldLegend>
+
+      <FieldGroup>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field>
+            <LabelWithAction label="Cargo" actionLabel="Crear cargo" />
+            <SimpleSelect
+              value={form.role}
+              onValueChange={form.setRole}
+              placeholder="Selecciona un cargo"
+              options={ROLES}
+              ariaLabel="Cargo"
+            />
+          </Field>
+
+          <Field>
+            <FieldLabel>Cargo Interno</FieldLabel>
+            <SimpleSelect
+              value={form.internalRole}
+              onValueChange={form.setInternalRole}
+              placeholder="Rol dentro del equipo"
+              options={INTERNAL_ROLES}
+              ariaLabel="Cargo interno"
+            />
+          </Field>
+        </div>
+
+        <Field>
+          <FieldLabel htmlFor="birthDate">Fecha de Nacimiento</FieldLabel>
+          <InputGroup>
+            <InputGroupAddon>
+              <CakeIcon />
+            </InputGroupAddon>
+            <InputGroupInput
+              id="birthDate"
+              type="date"
+              value={form.birthDate}
+              onChange={(e) => form.setBirthDate(e.target.value)}
+            />
+          </InputGroup>
+        </Field>
+
+        {/* Redes sociales */}
+        <Field>
+          <FieldLabel>Redes Sociales</FieldLabel>
+          <div className="flex flex-col gap-2">
+            {form.socials.map((social) => (
+              <div key={social.id} className="flex items-center gap-2">
+                <Select
+                  value={social.network}
+                  onValueChange={(v) =>
+                    form.updateSocial(social.id, { network: v as string })
+                  }
+                >
+                  <SelectTrigger
+                    className="w-36 shrink-0"
+                    aria-label="Red social"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {SOCIAL_NETWORKS.map((n) => (
+                        <SelectItem key={n.value} value={n.value}>
+                          {n.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+                <InputGroup className="flex-1">
+                  <InputGroupAddon>
+                    <Share2Icon />
+                  </InputGroupAddon>
+                  <InputGroupInput
+                    placeholder="usuario o URL"
+                    value={social.value}
+                    onChange={(e) =>
+                      form.updateSocial(social.id, { value: e.target.value })
+                    }
+                  />
+                </InputGroup>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0 text-muted-foreground"
+                  onClick={() => form.removeSocial(social.id)}
+                  disabled={form.socials.length === 1}
+                  aria-label="Eliminar red social"
+                >
+                  <XIcon />
+                </Button>
+              </div>
+            ))}
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="w-fit"
+            onClick={form.addSocial}
+          >
+            <PlusIcon data-icon="inline-start" />
+            Añadir red social
+          </Button>
+        </Field>
+      </FieldGroup>
+    </FieldSet>
+  )
+}

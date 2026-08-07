@@ -9,8 +9,12 @@ export interface CampaignRaw {
   user_id: number
   name: string
   subject: string
+  content: string | null
+  blocks_json: unknown[] | null
   audience_filter: string
+  custom_recipients: { name: string; email: string }[] | null
   status: string
+  total_count: number
   sent_count: number
   delivered_count: number
   opened_count: number
@@ -27,4 +31,5 @@ export interface CampaignPage {
   totalPages: number
   page: number
   pageSize: number
+  dailyUsage: { used: number; limit: number }
 }

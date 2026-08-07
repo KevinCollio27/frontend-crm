@@ -1,9 +1,10 @@
 "use client"
 
+import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { ArrowLeftIcon, ChevronDownIcon, ChevronRightIcon, DownloadIcon, FileSpreadsheetIcon, PrinterIcon } from "lucide-react"
-import { SidebarTrigger } from "@/components/ui/sidebar"
+import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
 import {
@@ -15,14 +16,21 @@ import {
 import { Col1Info } from "./detail/Col1Info"
 import { Col2Tabs } from "./detail/Col2Tabs"
 import { Col3Related } from "./detail/Col3Related"
-import type { DealDetail } from "./data"
+import type { OpportunityDetailData } from "@/types/opportunity"
 
 interface Props {
-  deal: DealDetail
+  data:           OpportunityDetailData
+  onStatusChange: (updates: { is_won: boolean; is_lost: boolean }) => void
 }
 
-export function FunnelDetail({ deal }: Props) {
-  const router = useRouter()
+export function FunnelDetail({ data, onStatusChange }: Props) {
+  const router     = useRouter()
+  const { setOpen } = useSidebar()
+
+  React.useEffect(() => {
+    setOpen(false)
+    return () => setOpen(true)
+  }, [])
 
   return (
     <>
@@ -39,7 +47,7 @@ export function FunnelDetail({ deal }: Props) {
               Oportunidades
             </Link>
             <ChevronRightIcon className="size-3.5 shrink-0 text-muted-foreground" />
-            <span className="truncate text-xs font-medium">{deal.name}</span>
+            <span className="truncate text-xs font-medium">{data.name}</span>
           </div>
         </div>
         <DropdownMenu>
@@ -58,17 +66,24 @@ export function FunnelDetail({ deal }: Props) {
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Col 1 */}
         <div className="flex w-[25%] shrink-0 flex-col overflow-y-auto border-r [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <Col1Info deal={deal} />
+          <Col1Info data={data} />
         </div>
 
         {/* Col 2 */}
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-r">
-          <Col2Tabs deal={deal} />
+          <Col2Tabs
+            opportunityId={data.id}
+            opportunityName={data.name}
+            flowName={data.flow?.name ?? null}
+            contactName={data.person?.name ?? null}
+            contactEmail={data.person_email}
+            contactPhone={data.person_phone}
+          />
         </div>
 
         {/* Col 3 */}
         <div className="flex w-[25%] shrink-0 flex-col overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <Col3Related deal={deal} />
+          <Col3Related data={data} onStatusChange={onStatusChange} />
         </div>
       </div>
     </>

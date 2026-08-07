@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { useSessionStore } from "@/store/session.store";
 
 export const WelcomeToast = () => {
@@ -15,7 +15,8 @@ export const WelcomeToast = () => {
     if (!window.location.search.includes("welcome=google")) return;
 
     const firstName = user?.name?.split(" ")[0] ?? "";
-    toast.success(`¡Bienvenido, ${firstName}!`, {
+    notify.success({
+      title: `¡Bienvenido, ${firstName}!`,
       description: "Comienza a gestionar tus ventas.",
     });
 

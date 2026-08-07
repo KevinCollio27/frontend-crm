@@ -3,10 +3,10 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { AuthHeroPanel } from "@/components/auth/AuthHeroPanel";
 import { RecoveryPasswordForm } from "@/components/auth/RecoveryPasswordForm";
 import { VerifyOTP } from "@/components/auth/VerifyOTP";
-import { Testimonials } from "@/components/auth/Testimonials";
+import { notify } from "@/lib/notify";
 import { authService } from "@/services/auth.service";
 
 const RecoveryPassword = () => {
@@ -30,7 +30,7 @@ const RecoveryPassword = () => {
     } catch (err: unknown) {
       const e = err as { extraMessage?: string; message?: string };
       const msg = e.extraMessage || e.message || "Código inválido";
-      toast.error("Código inválido o expirado", { description: `${msg}. Intenta nuevamente.` });
+      notify.error({ title: "Código inválido o expirado", description: `${msg}. Intenta nuevamente.` });
     } finally {
       setIsVerifying(false);
     }
@@ -39,71 +39,64 @@ const RecoveryPassword = () => {
   const handleResend = async () => {
     try {
       await authService.recoveryPassword(email);
-      toast.success("Código reenviado", { description: `Revisa tu correo ${email}` });
+      notify.success({ title: "Código reenviado", description: `Revisa tu correo ${email}` });
     } catch (err: unknown) {
       const msg = (err as { message?: string }).message ?? "Error inesperado";
-      toast.error(msg);
+      notify.error({ title: "Error inesperado", description: msg });
     }
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 lg:divide-x">
-      <div className="flex h-screen items-center justify-center">
-        <div className="mx-auto w-full max-w-md px-10 py-14 sm:rounded-2xl sm:border sm:bg-card sm:shadow-2xl/5">
-          <img src="/images/goxt-negro.png" alt="GOXT CRM" className="mx-auto h-10 w-auto" />
-
+    <div className="flex min-h-svh flex-col items-center justify-center gap-3 bg-muted p-4 md:p-6">
+      <div className="grid w-full max-w-4xl overflow-hidden rounded-2xl border bg-card shadow-2xl/5 lg:grid-cols-2">
+        <div className="p-6 md:p-8">
           {step === 1 && (
-            <>
-              <h1 className="mt-3 text-center font-medium text-2xl">Recuperar contraseña</h1>
-              <p className="text-center text-muted-foreground text-sm mt-1">
-                Te enviaremos un código de 6 dígitos a tu correo.
-              </p>
-              <div className="mt-2">
-                <RecoveryPasswordForm onSuccess={handleEmailSent} />
+            <div className="flex flex-col gap-5">
+              <div className="flex flex-col items-center gap-2 text-center">
+                <h1 className="text-2xl font-bold">Recuperar contraseña</h1>
+                <p className="text-balance text-muted-foreground">
+                  Te enviaremos un código de 6 dígitos a tu correo.
+                </p>
               </div>
-              <p className="mt-6 text-center text-sm">
+
+              <RecoveryPasswordForm onSuccess={handleEmailSent} />
+
+              <p className="text-center text-sm">
                 ¿Recordaste tu contraseña?{" "}
-                <Link className="text-blue-600 hover:text-blue-700" href="/login">
+                <Link className="underline-offset-2 hover:underline" href="/login">
                   Iniciar sesión
                 </Link>
               </p>
-            </>
+            </div>
           )}
 
           {step === 2 && (
-            <div className="mt-8">
+            <div className="flex flex-col gap-5">
               <VerifyOTP
                 email={email}
                 onVerify={handleVerify}
                 onResend={handleResend}
                 isLoading={isVerifying}
               />
-              <p className="mt-6 text-center text-sm">
+
+              <div className="flex flex-col items-center gap-2">
                 <button
                   onClick={() => setStep(1)}
-                  className="text-muted-foreground hover:text-foreground transition-colors"
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                 >
                   ← Cambiar correo
                 </button>
-              </p>
-              <p className="mt-2 text-center text-sm">
-                ¿Recordaste tu contraseña?{" "}
-                <Link className="text-blue-600 hover:text-blue-700" href="/login">
-                  Inicia sesión
-                </Link>
-              </p>
+                <p className="text-center text-sm">
+                  ¿Recordaste tu contraseña?{" "}
+                  <Link className="underline-offset-2 hover:underline" href="/login">
+                    Iniciar sesión
+                  </Link>
+                </p>
+              </div>
             </div>
           )}
         </div>
-      </div>
-
-      <div className="relative flex h-full w-full flex-col overflow-hidden bg-muted/50 dark:bg-muted/30">
-        <img
-          alt="Login"
-          className="absolute inset-0 size-full object-cover"
-          src="/images/login-hero2.jpg"
-        />
-        <Testimonials />
+        <AuthHeroPanel />
       </div>
     </div>
   );

@@ -14,18 +14,16 @@ import {
   ArrowDownRightIcon,
   ArrowUpIcon,
   ArrowUpRightIcon,
-  ChevronDown,
   ExternalLinkIcon,
   MinusIcon,
   MoreHorizontal,
   PencilIcon,
-  PlusIcon,
   Trash2Icon,
   UserIcon,
-  XIcon,
 } from "lucide-react"
 import * as React from "react"
 import { useRouter } from "next/navigation"
+import { FcGoogle } from "react-icons/fc"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -34,7 +32,6 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { DataTablePagination } from "@/components/ui/data-table-pagination"
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
@@ -42,7 +39,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Input } from "@/components/ui/input"
 import {
   Table,
   TableBody,
@@ -52,47 +48,18 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { ActivityPreviewSheet } from "./ActivityPreviewSheet"
+import { CreateActivitySheet } from "./CreateActivitySheet"
 import { activityService } from "@/services/activity.service"
+import { orgConfirm } from "@/lib/confirm"
+import { notify } from "@/lib/notify"
+import { mapActivity, type Activity } from "@/lib/activity-utils"
+import { useWorkspaceTimezone } from "@/hooks/useWorkspaceTimezone"
 import type { ActivityRaw } from "@/types/activity"
 import { getInitials, getSortIcon } from "@/lib/table-utils"
 import { cn } from "@/lib/utils"
+import { EntityAccentBar } from "@/components/ui/entity-accent-bar"
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-export interface Activity {
-  id: number
-  title: string
-  type: string
-  priority: string
-  startDate: string
-  endDate: string
-  stageId: string
-  createdAt: string
-  responsible: { name: string; initials: string; avatar?: string }
-  opportunityName: string
-  funnelName: string
-}
-
-function mapActivity(d: ActivityRaw): Activity {
-  const typeDetail     = d.opportunity_activity_detail.find((det) => det.label?.key === "activity_type")
-  const priorityDetail = d.opportunity_activity_detail.find((det) => det.label?.key === "priority")
-  return {
-    id:              d.id,
-    title:           d.title ?? "",
-    type:            typeDetail?.option ?? "",
-    priority:        priorityDetail?.option?.toLowerCase() ?? "",
-    startDate:       d.date_from ? d.date_from.slice(0, 10) : "",
-    endDate:         d.date_to   ? d.date_to.slice(0, 10)   : "",
-    stageId:         d.is_completed ? "completada" : "pendiente",
-    createdAt:       (d.created_at ?? "").slice(0, 10),
-    responsible: {
-      name:     d.user?.name ?? "—",
-      initials: getInitials(d.user?.name ?? ""),
-    },
-    opportunityName: d.opportunity?.name ?? "",
-    funnelName:      d.opportunity?.flow?.name ?? "",
-  }
-}
+export type { Activity }
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -105,29 +72,31 @@ const PRIORITY_CONFIG: Record<string, { icon: React.ReactNode; color: string }> 
 }
 
 const STAGE_CONFIG: Record<string, { dot: string; badge: string }> = {
-  pendiente:  { dot: "bg-amber-500",   badge: "bg-amber-500/10 text-amber-600"     },
-  completada: { dot: "bg-emerald-500", badge: "bg-emerald-500/10 text-emerald-600" },
+  pendiente:   { dot: "bg-amber-500",   badge: "bg-amber-500/10 text-amber-600"     },
+  en_progreso: { dot: "bg-blue-500",    badge: "bg-blue-500/10 text-blue-600"       },
+  completada:  { dot: "bg-emerald-500", badge: "bg-emerald-500/10 text-emerald-600" },
+  cancelada:   { dot: "bg-slate-400",   badge: "bg-slate-100 text-slate-500"        },
 }
 
 const STAGE_NAMES: Record<string, string> = {
-  pendiente:  "Pendiente",
-  completada: "Completada",
+  pendiente:   "Pendiente",
+  en_progreso: "En Progreso",
+  completada:  "Completada",
+  cancelada:   "Cancelada",
 }
 
-const columnLabels: Record<string, string> = {
+export const COLUMN_LABELS: Record<string, string> = {
   id:              "ID",
   title:           "Título",
   type:            "Tipo",
   startDate:       "Período",
   stageId:         "Estado / Prioridad",
   responsible:     "Responsable",
-  opportunityName: "Oportunidad",
   createdAt:       "Creada",
 }
 
-const DEFAULT_COLUMN_VISIBILITY: VisibilityState = {
-  opportunityName: false,
-  createdAt:       false,
+export const DEFAULT_COLUMN_VISIBILITY: VisibilityState = {
+  createdAt: false,
 }
 
 // ─── QueryState ───────────────────────────────────────────────────────────────
@@ -135,50 +104,6 @@ const DEFAULT_COLUMN_VISIBILITY: VisibilityState = {
 type QueryState = {
   page: number
   pageSize: number
-  search: string
-  isCompleted: boolean | null
-}
-
-// ─── SimpleFilter ─────────────────────────────────────────────────────────────
-
-function SimpleFilter({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string
-  value: string | null
-  options: { label: string; value: string }[]
-  onChange: (v: string | null) => void
-}) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger render={
-        <Button variant="outline" size="sm" className={cn("h-8 gap-1", value && "border-primary/50 bg-primary/5")} />
-      }>
-        {label}
-        {value && <span className="ml-1 text-primary">·</span>}
-        <ChevronDown className="size-3.5" />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="min-w-32">
-        {value && (
-          <DropdownMenuItem onClick={() => onChange(null)}>
-            <XIcon className="size-3.5" /> Todos
-          </DropdownMenuItem>
-        )}
-        {options.map((opt) => (
-          <DropdownMenuItem
-            key={opt.value}
-            onClick={() => onChange(opt.value === value ? null : opt.value)}
-            className={opt.value === value ? "font-medium" : ""}
-          >
-            {opt.label}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
 }
 
 // ─── Skeleton ────────────────────────────────────────────────────────────────
@@ -186,7 +111,15 @@ function SimpleFilter({
 const skeletonCell: Record<string, React.ReactNode> = {
   select: <div className="size-4 animate-pulse rounded bg-muted" />,
   id:     <div className="h-3 w-8 animate-pulse rounded bg-muted" />,
-  title:  <div className="h-4 w-48 animate-pulse rounded bg-muted" />,
+  title: (
+    <div className="flex items-stretch gap-2.5">
+      <div className="w-1 shrink-0 animate-pulse rounded-full bg-muted" />
+      <div className="space-y-1.5">
+        <div className="h-4 w-40 animate-pulse rounded bg-muted" />
+        <div className="h-3 w-28 animate-pulse rounded bg-muted" />
+      </div>
+    </div>
+  ),
   type:   <div className="h-4 w-20 animate-pulse rounded bg-muted" />,
   startDate: (
     <div className="space-y-1.5">
@@ -206,7 +139,6 @@ const skeletonCell: Record<string, React.ReactNode> = {
       <div className="h-4 w-24 animate-pulse rounded bg-muted" />
     </div>
   ),
-  opportunityName: <div className="h-4 w-32 animate-pulse rounded bg-muted" />,
   createdAt:       <div className="h-4 w-20 animate-pulse rounded bg-muted" />,
   actions:         <div className="size-8 animate-pulse rounded bg-muted" />,
 }
@@ -215,7 +147,9 @@ const skeletonCell: Record<string, React.ReactNode> = {
 
 function getColumns(
   onPreview: (activity: Activity) => void,
-  onDetail: (activity: Activity) => void
+  onDetail: (activity: Activity) => void,
+  onEdit: (activity: Activity) => void,
+  onDelete: (activity: Activity) => void,
 ): ColumnDef<Activity>[] {
   return [
     {
@@ -256,9 +190,27 @@ function getColumns(
           Título {getSortIcon(column.getIsSorted())}
         </Button>
       ),
-      cell: ({ row }) => (
-        <div className="text-sm font-medium">{row.getValue("title")}</div>
-      ),
+      cell: ({ row }) => {
+        const act = row.original
+        return (
+          <div className="flex items-stretch gap-2.5">
+            <EntityAccentBar seed={act.id} />
+            <div className="leading-tight min-w-0">
+              <div className="text-sm font-medium truncate">{act.title}</div>
+              {act.opportunityName ? (
+                <div className="text-xs text-muted-foreground truncate">{act.opportunityName}</div>
+              ) : act.googleEventId ? (
+                <div className="flex items-center gap-1 text-xs text-muted-foreground truncate">
+                  <FcGoogle className="size-3 shrink-0" />
+                  Google Calendar
+                </div>
+              ) : (
+                <div className="text-xs text-muted-foreground truncate">—</div>
+              )}
+            </div>
+          </div>
+        )
+      },
     },
     {
       accessorKey: "type",
@@ -362,19 +314,6 @@ function getColumns(
       },
     },
     {
-      accessorKey: "opportunityName",
-      header: ({ column }) => (
-        <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
-          Oportunidad {getSortIcon(column.getIsSorted())}
-        </Button>
-      ),
-      cell: ({ row }) => (
-        <div className="text-sm text-muted-foreground">
-          {(row.getValue("opportunityName") as string) || "—"}
-        </div>
-      ),
-    },
-    {
       accessorKey: "createdAt",
       header: ({ column }) => (
         <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
@@ -405,12 +344,15 @@ function getColumns(
                 <DropdownMenuItem onClick={() => onPreview(activity)}>
                   <UserIcon /> Vista Previa
                 </DropdownMenuItem>
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onEdit(activity)}>
                   <PencilIcon /> Editar
                 </DropdownMenuItem>
               </DropdownMenuGroup>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive focus:text-destructive">
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onClick={() => onDelete(activity)}
+              >
                 <Trash2Icon /> Eliminar
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -423,22 +365,47 @@ function getColumns(
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function ActivitiesTable() {
+interface ActivitiesTableProps {
+  search:                   string
+  status:                   string | null
+  flowId:                   number | null
+  opportunityId:            number | null
+  columnVisibility:         VisibilityState
+  onColumnVisibilityChange: React.Dispatch<React.SetStateAction<VisibilityState>>
+  onTotalChange:            (n: number) => void
+  refreshKey?:              number
+}
+
+export function ActivitiesTable({
+  search,
+  status,
+  flowId,
+  opportunityId,
+  columnVisibility,
+  onColumnVisibilityChange,
+  onTotalChange,
+  refreshKey = 0,
+}: ActivitiesTableProps) {
   const router = useRouter()
+  const timezone = useWorkspaceTimezone()
+  const [rawItems, setRawItems] = React.useState<ActivityRaw[]>([])
   const [data, setData] = React.useState<Activity[]>([])
   const [total, setTotal] = React.useState(0)
   const [loading, setLoading] = React.useState(true)
-  const [query, setQuery] = React.useState<QueryState>({
-    page: 1,
-    pageSize: 10,
-    search: "",
-    isCompleted: null,
-  })
+  const [query, setQuery] = React.useState<QueryState>({ page: 1, pageSize: 10 })
+  // Solo para forzar un refetch propio si falla un borrado optimista — el
+  // refreshKey compartido (prop) es del Kanban, esto es interno a la tabla.
+  const [localRefreshKey, setLocalRefreshKey] = React.useState(0)
   const [sorting, setSorting] = React.useState<SortingState>([])
-  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>(DEFAULT_COLUMN_VISIBILITY)
   const [rowSelection, setRowSelection] = React.useState({})
   const [selectedActivity, setSelectedActivity] = React.useState<Activity | null>(null)
   const [sheetOpen, setSheetOpen] = React.useState(false)
+  const [editActivity, setEditActivity] = React.useState<ActivityRaw | null>(null)
+
+  // Reset a la primera página cuando cambian los filtros compartidos con el Board.
+  React.useEffect(() => {
+    setQuery((q) => ({ ...q, page: 1 }))
+  }, [search, status, flowId, opportunityId])
 
   React.useEffect(() => {
     let cancelled = false
@@ -446,33 +413,63 @@ export function ActivitiesTable() {
     const timer = setTimeout(() => {
       activityService
         .list({
-          page: query.page,
-          take: query.pageSize,
-          filter: query.search || undefined,
-          is_completed: query.isCompleted !== null ? query.isCompleted : undefined,
+          page:          query.page,
+          take:          query.pageSize,
+          filter:        search || undefined,
+          status:        status ?? undefined,
+          flowId:        flowId ?? undefined,
+          opportunityId: opportunityId ?? undefined,
         })
         .then((res) => {
           if (cancelled) return
-          setData(res.data.map(mapActivity))
+          setRawItems(res.data)
+          setData(res.data.map((a) => mapActivity(a, timezone)))
           setTotal(res.total)
+          onTotalChange(res.total)
           setLoading(false)
         })
         .catch(() => {
           if (!cancelled) setLoading(false)
         })
-    }, query.search ? 400 : 0)
+    }, search ? 400 : 0)
     return () => {
       cancelled = true
       clearTimeout(timer)
     }
-  }, [query])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, search, status, flowId, opportunityId, refreshKey, localRefreshKey, timezone])
+
+  const handleEdit = React.useCallback((activity: Activity) => {
+    const raw = rawItems.find((r) => r.id === activity.id) ?? null
+    setEditActivity(raw)
+  }, [rawItems])
+
+  const handleDelete = React.useCallback(async (activity: Activity) => {
+    const confirmed = await orgConfirm.delete(activity.title)
+    if (!confirmed) return
+
+    setData((prev) => prev.filter((r) => r.id !== activity.id))
+    setRawItems((prev) => prev.filter((r) => r.id !== activity.id))
+    setTotal((t) => t - 1)
+
+    activityService.delete(activity.id)
+      .then(() => {
+        notify.success({ title: "Actividad eliminada", description: `"${activity.title}" fue eliminada.` })
+      })
+      .catch(() => {
+        setLocalRefreshKey((k) => k + 1)
+        notify.error({ title: "Algo salió mal", description: "No se pudo eliminar la actividad." })
+      })
+  }, [])
 
   const columns = React.useMemo(
     () => getColumns(
       (activity) => { setSelectedActivity(activity); setSheetOpen(true) },
-      (activity) => router.push(`/crm/activities/${activity.id}`)
+      (activity) => router.push(`/crm/activities/${activity.id}?from=list`),
+      handleEdit,
+      handleDelete,
     ),
-    [router]
+    [router, handleEdit, handleDelete]
   )
 
   const table = useReactTable({
@@ -483,7 +480,7 @@ export function ActivitiesTable() {
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    onColumnVisibilityChange: setColumnVisibility,
+    onColumnVisibilityChange: onColumnVisibilityChange,
     onRowSelectionChange: setRowSelection,
     state: {
       sorting,
@@ -502,78 +499,10 @@ export function ActivitiesTable() {
 
   const skeletonRows = Array.from({ length: query.pageSize })
 
-  const statusFilterValue =
-    query.isCompleted === true ? "true" : query.isCompleted === false ? "false" : null
-
-  const hasFilters = !!query.search || query.isCompleted !== null
-
   return (
-    <div className="w-full p-4">
-      {/* Toolbar */}
-      <div className="flex items-center gap-2 pb-4">
-        <Input
-          className="max-w-sm h-8"
-          placeholder="Buscar actividades..."
-          value={query.search}
-          onChange={(e) => setQuery((q) => ({ ...q, search: e.target.value, page: 1 }))}
-        />
-        <SimpleFilter
-          label="Estado"
-          value={statusFilterValue}
-          options={[
-            { label: "Pendiente",  value: "false" },
-            { label: "Completada", value: "true"  },
-          ]}
-          onChange={(v) =>
-            setQuery((q) => ({
-              ...q,
-              page: 1,
-              isCompleted: v === "true" ? true : v === "false" ? false : null,
-            }))
-          }
-        />
-        {hasFilters && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8"
-            onClick={() => setQuery((q) => ({ ...q, search: "", isCompleted: null, page: 1 }))}
-          >
-            Reset <XIcon className="ml-1 size-4" />
-          </Button>
-        )}
-        <div className="ml-auto flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">
-            {loading ? "…" : `${total} actividades`}
-          </span>
-          <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="outline" />}>
-              Columnas <ChevronDown className="ml-2 size-4" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {table
-                .getAllColumns()
-                .filter((col) => col.getCanHide())
-                .map((col) => (
-                  <DropdownMenuCheckboxItem
-                    key={col.id}
-                    className="capitalize"
-                    checked={col.getIsVisible()}
-                    onCheckedChange={(v) => col.toggleVisibility(!!v)}
-                  >
-                    {columnLabels[col.id] ?? col.id}
-                  </DropdownMenuCheckboxItem>
-                ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button>
-            <PlusIcon className="size-4" /> Crear Actividad
-          </Button>
-        </div>
-      </div>
-
+    <div className="flex-1 min-h-0 overflow-y-auto">
       {/* Table */}
-      <div className="rounded-md border">
+      <div className="mx-4 mt-3 rounded-md border">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((hg) => (
@@ -618,7 +547,7 @@ export function ActivitiesTable() {
         </Table>
       </div>
 
-      <div className="py-4">
+      <div className="px-4 py-3">
         <DataTablePagination table={table} />
       </div>
 
@@ -626,7 +555,29 @@ export function ActivitiesTable() {
         activity={selectedActivity}
         open={sheetOpen}
         onOpenChange={setSheetOpen}
+        onEdit={selectedActivity ? () => { setSheetOpen(false); handleEdit(selectedActivity) } : undefined}
+        onDelete={selectedActivity ? () => { setSheetOpen(false); handleDelete(selectedActivity) } : undefined}
       />
+
+      {editActivity !== null && (
+        <CreateActivitySheet
+          open
+          onOpenChange={(v) => { if (!v) setEditActivity(null) }}
+          opportunityId={editActivity.opportunity?.id}
+          opportunityName={editActivity.opportunity?.name}
+          flowName={editActivity.opportunity?.flow?.name ?? null}
+          activity={editActivity}
+          onSuccess={(updated) => {
+            setEditActivity(null)
+            if (updated) {
+              setRawItems((prev) => prev.map((r) => r.id === updated.id ? updated : r))
+              setData((prev) => prev.map((r) => r.id === updated.id ? mapActivity(updated, timezone) : r))
+            } else {
+              setLocalRefreshKey((k) => k + 1)
+            }
+          }}
+        />
+      )}
     </div>
   )
 }

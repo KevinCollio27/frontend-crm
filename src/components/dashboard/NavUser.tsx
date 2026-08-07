@@ -1,5 +1,6 @@
 "use client"
 
+import { useRouter } from "next/navigation"
 import {
   Avatar,
   AvatarFallback,
@@ -20,19 +21,45 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { ChevronsUpDownIcon, SparklesIcon, BadgeCheckIcon, CreditCardIcon, BellIcon, LogOutIcon } from "lucide-react"
+import { ChevronsUpDownIcon, UserCircleIcon, CreditCardIcon, LogOutIcon } from "lucide-react"
 import { authService } from "@/services/auth.service"
+import { authConfirm } from "@/lib/confirm"
 
 export function NavUser({
   user,
+  isLoading = false,
 }: {
   user: {
     name: string
     email: string
     avatar: string
   }
+  isLoading?: boolean
 }) {
   const { isMobile } = useSidebar()
+  const router = useRouter()
+
+  async function handleLogout() {
+    const confirmed = await authConfirm.logout()
+    if (confirmed) authService.logout()
+  }
+
+  if (isLoading) {
+    return (
+      <SidebarMenu>
+        <SidebarMenuItem>
+          <SidebarMenuButton size="lg" disabled>
+            <div className="size-8 shrink-0 rounded-full bg-muted animate-pulse" />
+            <div className="grid flex-1 gap-1">
+              <div className="h-3 w-20 rounded bg-muted animate-pulse" />
+              <div className="h-2.5 w-28 rounded bg-muted animate-pulse" />
+            </div>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      </SidebarMenu>
+    )
+  }
+
   return (
     <SidebarMenu>
       <SidebarMenuItem>
@@ -44,7 +71,7 @@ export function NavUser({
           >
             <div className="relative">
               <Avatar>
-                <AvatarImage src="/images/avatar-contact.svg" alt={user.name} />
+                <AvatarImage src={user.avatar} alt={user.name} />
                 <AvatarFallback>{user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)}</AvatarFallback>
               </Avatar>
               <div className="absolute right-0 bottom-0 size-2 rounded-full bg-green-500 ring-2 ring-background" />
@@ -66,7 +93,7 @@ export function NavUser({
                 <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                   <div className="relative">
                     <Avatar>
-                      <AvatarImage src="/images/avatar-contact.svg" alt={user.name} />
+                      <AvatarImage src={user.avatar} alt={user.name} />
                       <AvatarFallback>{user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)}</AvatarFallback>
                     </Avatar>
                     <div className="absolute right-0 bottom-0 size-2 rounded-full bg-green-500 ring-2 ring-background" />
@@ -80,34 +107,19 @@ export function NavUser({
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>
-                <SparklesIcon
-                />
-                Upgrade to Pro
+              <DropdownMenuItem onClick={() => router.push("/settings/profile")}>
+                <UserCircleIcon />
+                Mi Perfil
               </DropdownMenuItem>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuItem>
-                <BadgeCheckIcon
-                />
-                Account
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <CreditCardIcon
-                />
+              <DropdownMenuItem onClick={() => router.push("/settings/billing")}>
+                <CreditCardIcon />
                 Billing
               </DropdownMenuItem>
-              <DropdownMenuItem>
-                <BellIcon
-                />
-                Notifications
-              </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => authService.logout()}>
+            <DropdownMenuItem onClick={handleLogout}>
               <LogOutIcon />
-              Log out
+              Cerrar sesión
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

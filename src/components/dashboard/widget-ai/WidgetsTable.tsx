@@ -10,14 +10,16 @@ import {
   type VisibilityState,
 } from "@tanstack/react-table"
 import {
-  BotIcon,
+  CheckCircle2Icon,
   ChevronDown,
   CopyIcon,
+  EyeIcon,
   GlobeIcon,
+  ListIcon,
   MessageSquareTextIcon,
   MoreHorizontal,
   PencilIcon,
-  PlusIcon,
+  SearchIcon,
   SmartphoneIcon,
   Trash2Icon,
   XIcon,
@@ -25,6 +27,7 @@ import {
 import * as React from "react"
 
 import { Button } from "@/components/ui/button"
+import { EntityAccentBar } from "@/components/ui/entity-accent-bar"
 import { Checkbox } from "@/components/ui/checkbox"
 import { DataTablePagination } from "@/components/ui/data-table-pagination"
 import {
@@ -38,6 +41,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
+import { SingleSelectFilter, type SingleSelectOption } from "@/components/ui/single-select-filter"
 import {
   Table,
   TableBody,
@@ -46,10 +50,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { confirmDialog } from "@/lib/confirm"
+import { notify } from "@/lib/notify"
 import { getSortIcon } from "@/lib/table-utils"
 import { cn } from "@/lib/utils"
 import { widgetAIService } from "@/services/widget-ai.service"
 import type { WidgetAIRaw } from "@/types/widget-ai"
+import { CreateWidgetSheet } from "./CreateWidgetSheet"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -122,47 +129,19 @@ type QueryState = {
   isWhatsappAgent: boolean | null
 }
 
-// ─── SimpleFilter ─────────────────────────────────────────────────────────────
+// ─── Filtros ──────────────────────────────────────────────────────────────────
 
-function SimpleFilter({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string
-  value: string | null
-  options: { label: string; value: string }[]
-  onChange: (v: string | null) => void
-}) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger render={
-        <Button variant="outline" size="sm" className={cn("h-8 gap-1", value && "border-primary/50 bg-primary/5")} />
-      }>
-        {label}
-        {value && <span className="ml-1 text-primary">·</span>}
-        <ChevronDown className="size-3.5" />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="min-w-32">
-        {value && (
-          <DropdownMenuItem onClick={() => onChange(null)}>
-            <XIcon className="size-3.5" /> Todos
-          </DropdownMenuItem>
-        )}
-        {options.map((opt) => (
-          <DropdownMenuItem
-            key={opt.value}
-            onClick={() => onChange(opt.value === value ? null : opt.value)}
-            className={opt.value === value ? "font-medium" : ""}
-          >
-            {opt.label}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
-}
+const STATUS_OPTIONS: SingleSelectOption[] = [
+  { value: "all",   label: "Todos"    },
+  { value: "true",  label: "Activo"   },
+  { value: "false", label: "Inactivo" },
+]
+
+const TYPE_OPTIONS: SingleSelectOption[] = [
+  { value: "all",   label: "Todos"      },
+  { value: "false", label: "Widget Web" },
+  { value: "true",  label: "WhatsApp"   },
+]
 
 // ─── Skeleton ────────────────────────────────────────────────────────────────
 
@@ -195,7 +174,11 @@ const skeletonCell: Record<string, React.ReactNode> = {
 
 // ─── Columns ─────────────────────────────────────────────────────────────────
 
-const columns: ColumnDef<WidgetAI>[] = [
+function getColumns(
+  onEdit: (widget: WidgetAI) => void,
+  onToggleActive: (widget: WidgetAI) => void
+): ColumnDef<WidgetAI>[] {
+  return [
   {
     id: "select",
     header: ({ table }) => (
@@ -235,20 +218,13 @@ const columns: ColumnDef<WidgetAI>[] = [
       </Button>
     ),
     cell: ({ row }) => {
-      const { name, description, brandColor } = row.original
+      const { id, name, description } = row.original
       return (
-        <div className="flex items-center gap-2.5 max-w-xs">
-          <div
-            className="flex size-7 shrink-0 items-center justify-center rounded-md"
-            style={{ backgroundColor: `${brandColor}25` }}
-          >
-            <BotIcon className="size-3.5" style={{ color: brandColor }} />
-          </div>
+        <div className="flex items-stretch gap-2.5 max-w-xs">
+          <EntityAccentBar seed={id} />
           <div className="leading-tight overflow-hidden">
             <div className="text-sm font-medium truncate">{name}</div>
-            {description && (
-              <div className="text-xs text-muted-foreground truncate">{description}</div>
-            )}
+            <div className="text-xs text-muted-foreground truncate">{description || "—"}</div>
           </div>
         </div>
       )
@@ -370,7 +346,7 @@ const columns: ColumnDef<WidgetAI>[] = [
     id: "actions",
     enableHiding: false,
     cell: ({ row }) => {
-      const apiKey = row.original.apiKey
+      const widget = row.original
       return (
         <DropdownMenu>
           <DropdownMenuTrigger render={<Button className="h-8 w-8 p-0" variant="ghost" />}>
@@ -380,23 +356,31 @@ const columns: ColumnDef<WidgetAI>[] = [
           <DropdownMenuContent align="end" className="min-w-48">
             <DropdownMenuGroup>
               <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => window.open(`/widget/test/${widget.apiKey}`, "_blank")}>
+                <EyeIcon /> Ver Widget
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onEdit(widget)}>
                 <PencilIcon /> Editar
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigator.clipboard.writeText(apiKey)}>
+              <DropdownMenuItem onClick={() => navigator.clipboard.writeText(widget.apiKey)}>
                 <CopyIcon /> Copiar API Key
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive focus:text-destructive">
-              <Trash2Icon /> Eliminar
+            <DropdownMenuItem
+              className={widget.isActive ? "text-destructive focus:text-destructive" : "text-emerald-600 focus:text-emerald-600"}
+              onClick={() => onToggleActive(widget)}
+            >
+              {widget.isActive ? <Trash2Icon /> : <CheckCircle2Icon />}
+              {widget.isActive ? "Desactivar" : "Activar"}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       )
     },
   },
-]
+  ]
+}
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -414,6 +398,41 @@ export function WidgetsTable() {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>(DEFAULT_COLUMN_VISIBILITY)
   const [rowSelection, setRowSelection] = React.useState({})
+  const [createOpen, setCreateOpen] = React.useState(false)
+  const [editId, setEditId] = React.useState<number | null>(null)
+  const [refreshKey, setRefreshKey] = React.useState(0)
+
+  const columns = React.useMemo(
+    () =>
+      getColumns(
+        (widget) => setEditId(widget.id),
+        async (widget) => {
+          const activating = !widget.isActive
+          const ok = await confirmDialog({
+            title: activating ? "¿Activar widget?" : "¿Desactivar widget?",
+            description: activating
+              ? `"${widget.name}" volverá a responder a los visitantes.`
+              : `"${widget.name}" dejará de responder. Podrás reactivarlo desde este mismo menú.`,
+            confirmText: activating ? "Activar" : "Desactivar",
+            cancelText: "Cancelar",
+            tone: activating ? "info" : "warning",
+          })
+          if (!ok) return
+          setData((prev) => prev.map((w) => (w.id === widget.id ? { ...w, isActive: activating } : w)))
+          try {
+            await widgetAIService.update(widget.id, { is_active: activating })
+            notify.success({
+              title: activating ? "Widget activado" : "Widget desactivado",
+              description: activating ? "El widget ya está respondiendo." : "El widget dejó de responder.",
+            })
+          } catch {
+            notify.error({ title: `No se pudo ${activating ? "activar" : "desactivar"} el widget`, description: "Intenta de nuevo." })
+            setData((prev) => prev.map((w) => (w.id === widget.id ? { ...w, isActive: widget.isActive } : w)))
+          }
+        }
+      ),
+    []
+  )
 
   React.useEffect(() => {
     let cancelled = false
@@ -441,7 +460,7 @@ export function WidgetsTable() {
       cancelled = true
       clearTimeout(timer)
     }
-  }, [query])
+  }, [query, refreshKey])
 
   const table = useReactTable({
     data,
@@ -472,27 +491,43 @@ export function WidgetsTable() {
   const hasFilters = !!query.search || query.isActive !== null || query.isWhatsappAgent !== null
 
   const activeFilterValue =
-    query.isActive === true ? "true" : query.isActive === false ? "false" : null
+    query.isActive === true ? "true" : query.isActive === false ? "false" : "all"
   const typeFilterValue =
-    query.isWhatsappAgent === true ? "true" : query.isWhatsappAgent === false ? "false" : null
+    query.isWhatsappAgent === true ? "true" : query.isWhatsappAgent === false ? "false" : "all"
+
+  function resetFilters() {
+    setQuery((q) => ({ ...q, search: "", isActive: null, isWhatsappAgent: null, page: 1 }))
+  }
 
   return (
     <div className="w-full">
-      {/* Toolbar */}
-      <div className="flex items-center gap-2 py-4">
-        <Input
-          className="max-w-sm h-8"
-          placeholder="Buscar widgets..."
-          value={query.search}
-          onChange={(e) => setQuery((q) => ({ ...q, search: e.target.value, page: 1 }))}
-        />
-        <SimpleFilter
-          label="Estado"
-          value={activeFilterValue}
-          options={[
-            { label: "Activo",   value: "true"  },
-            { label: "Inactivo", value: "false" },
-          ]}
+      {/* Row 1 — view toggle + create */}
+      <div className="flex items-center justify-between border-b px-4 py-2">
+        <div className="flex items-center gap-0.5 rounded-lg border bg-muted/40 p-0.5">
+          <span className="flex items-center gap-1.5 rounded-md bg-background px-2.5 py-1 text-xs font-medium shadow-sm">
+            <ListIcon className="size-3.5" />
+            Lista
+          </span>
+        </div>
+        <Button size="sm" onClick={() => setCreateOpen(true)}>+ Crear Widget</Button>
+      </div>
+
+      {/* Row 2 — filters */}
+      <div className="flex items-center gap-2 border-b px-4 py-2">
+        <div className="relative w-44 shrink-0">
+          <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Buscar widgets..."
+            className="h-8 pl-8 text-xs"
+            value={query.search}
+            onChange={(e) => setQuery((q) => ({ ...q, search: e.target.value, page: 1 }))}
+          />
+        </div>
+
+        <SingleSelectFilter
+          title="Estado"
+          options={STATUS_OPTIONS}
+          selected={activeFilterValue}
           onChange={(v) =>
             setQuery((q) => ({
               ...q,
@@ -501,13 +536,11 @@ export function WidgetsTable() {
             }))
           }
         />
-        <SimpleFilter
-          label="Tipo"
-          value={typeFilterValue}
-          options={[
-            { label: "Widget Web", value: "false" },
-            { label: "WhatsApp",   value: "true"  },
-          ]}
+
+        <SingleSelectFilter
+          title="Tipo"
+          options={TYPE_OPTIONS}
+          selected={typeFilterValue}
           onChange={(v) =>
             setQuery((q) => ({
               ...q,
@@ -516,23 +549,21 @@ export function WidgetsTable() {
             }))
           }
         />
+
         {hasFilters && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8"
-            onClick={() => setQuery((q) => ({ ...q, search: "", isActive: null, isWhatsappAgent: null, page: 1 }))}
-          >
-            Reset <XIcon className="ml-1 size-4" />
+          <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={resetFilters}>
+            <XIcon className="size-3.5" />
+            Restablecer
           </Button>
         )}
+
         <div className="ml-auto flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">
+          <span className="text-xs text-muted-foreground">
             {loading ? "…" : `${total} widgets`}
           </span>
           <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="outline" />}>
-              Columnas <ChevronDown className="ml-2 size-4" />
+            <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8" />}>
+              Columnas <ChevronDown className="ml-1.5 size-3.5" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               {table
@@ -550,14 +581,11 @@ export function WidgetsTable() {
                 ))}
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button>
-            <PlusIcon className="size-4" /> Crear Widget
-          </Button>
         </div>
       </div>
 
       {/* Table */}
-      <div className="rounded-md border">
+      <div className="mx-4 mt-3 rounded-md border">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((hg) => (
@@ -602,9 +630,25 @@ export function WidgetsTable() {
         </Table>
       </div>
 
-      <div className="py-4">
+      <div className="px-4 py-3">
         <DataTablePagination table={table} />
       </div>
+
+      {createOpen && (
+        <CreateWidgetSheet
+          open
+          onOpenChange={setCreateOpen}
+          onSuccess={() => setRefreshKey((k) => k + 1)}
+        />
+      )}
+      {editId !== null && (
+        <CreateWidgetSheet
+          open
+          onOpenChange={(v) => { if (!v) setEditId(null) }}
+          widgetId={editId}
+          onSuccess={() => setRefreshKey((k) => k + 1)}
+        />
+      )}
     </div>
   )
 }

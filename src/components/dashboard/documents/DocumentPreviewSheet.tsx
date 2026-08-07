@@ -14,6 +14,7 @@ import {
   ImageIcon,
   InfoIcon,
   Link2,
+  PencilIcon,
   TargetIcon,
   Trash2,
   UserIcon,
@@ -101,15 +102,27 @@ interface Props {
   document: Document | null
   open: boolean
   onOpenChange: (open: boolean) => void
+  onDownload?: () => void
+  onEdit?: () => void
+  onDelete?: () => void
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function DocumentPreviewSheet({ document: doc, open, onOpenChange }: Props) {
+export function DocumentPreviewSheet({ document: doc, open, onOpenChange, onDownload, onEdit, onDelete }: Props) {
   if (!doc) return null
 
+  const isLink = doc.fileType === "link"
   const config = fileConfig[doc.fileType] ?? { icon: FileIcon, iconClass: "text-muted-foreground", bgClass: "bg-muted" }
   const FileTypeIcon = config.icon
+
+  function handleOpen() {
+    if (isLink) {
+      window.open(doc.filePath, "_blank")
+    } else {
+      onDownload?.()
+    }
+  }
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -215,15 +228,33 @@ export function DocumentPreviewSheet({ document: doc, open, onOpenChange }: Prop
 
         {/* Footer */}
         <SheetFooter className="flex-col gap-2 border-t px-4 py-3 shrink-0">
-          <Button variant="outline" className="w-full justify-start text-xs h-8 gap-1.5">
-            <ExternalLinkIcon className="size-3.5" /> Ver archivo
+          <Button
+            variant="outline"
+            className="w-full justify-start text-xs h-8 gap-1.5"
+            onClick={handleOpen}
+          >
+            <ExternalLinkIcon className="size-3.5" />
+            {isLink ? "Abrir enlace" : "Ver archivo"}
           </Button>
-          <Button className="w-full justify-start text-xs h-8 gap-1.5 bg-[#534AB7] hover:bg-[#4840A0]">
-            <DownloadIcon className="size-3.5" /> Descargar
+          {!isLink && (
+            <Button
+              className="w-full justify-start text-xs h-8 gap-1.5 bg-[#534AB7] hover:bg-[#4840A0]"
+              onClick={onDownload}
+            >
+              <DownloadIcon className="size-3.5" /> Descargar
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            className="w-full justify-start text-xs h-8 gap-1.5"
+            onClick={onEdit}
+          >
+            <PencilIcon className="size-3.5" /> Editar
           </Button>
           <Button
             variant="outline"
             className="w-full justify-start text-xs h-8 gap-1.5 border-red-200 text-red-500 hover:bg-red-50 hover:text-red-600"
+            onClick={onDelete}
           >
             <Trash2 className="size-3.5" /> Eliminar
           </Button>

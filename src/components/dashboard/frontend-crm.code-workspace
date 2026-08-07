@@ -8,6 +8,9 @@
 		},
 		{
 			"path": "../../../../goxt-frontend-crm"
+		},
+		{
+			"path": "../../../../goxt-website-principal"
 		}
 	]
 }

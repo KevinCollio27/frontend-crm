@@ -6,8 +6,9 @@ import { z } from "zod";
 import { useState, useEffect, useRef } from "react";
 import { getCountry, getAllCountries } from "countries-and-timezones";
 import { Building2, Camera } from "lucide-react";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { authService } from "@/services/auth.service";
+import { workspaceService } from "@/services/workspace.service";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -59,8 +60,21 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve((reader.result as string).split(",")[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 interface Props {
-  onSuccess: () => void;
+  // Si se subió un logo, onSuccess recibe la promesa de esa subida — el padre
+  // debe esperarla antes de hacer la navegación dura a /chat (window.location.href),
+  // porque esa recarga completa es la única forma en que el sidebar toma el logo
+  // fresco; si navega antes de que el logo termine, se pierde el resultado.
+  onSuccess: (logoUploadPromise?: Promise<unknown>) => void;
 }
 
 export const CreateWorkspaceForm = ({ onSuccess }: Props) => {
@@ -69,13 +83,14 @@ export const CreateWorkspaceForm = ({ onSuccess }: Props) => {
     .map((c) => ({ value: c.id, label: c.name, flag: c.id }));
 
   const [timezones, setTimezones] = useState<{ value: string; label: string }[]>([]);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: { name: "", country: "", timezone: "", currency: "" },
+    defaultValues: { name: "", country: "CL", timezone: "", currency: "" },
   });
 
   const selectedCountry  = watch("country");
@@ -103,6 +118,7 @@ export const CreateWorkspaceForm = ({ onSuccess }: Props) => {
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setLogoFile(file);
     setLogoPreview(URL.createObjectURL(file));
   };
 
@@ -112,6 +128,7 @@ export const CreateWorkspaceForm = ({ onSuccess }: Props) => {
     if (!countryData || !currencyData) return;
 
     setIsLoading(true);
+    const t0 = performance.now();
     try {
       await authService.createWorkspace({
         name:     values.name,
@@ -119,10 +136,28 @@ export const CreateWorkspaceForm = ({ onSuccess }: Props) => {
         timezone: { id: values.timezone, name: values.timezone },
         currency: { id: currencyData.id, name: currencyData.name },
       });
-      onSuccess();
+      console.log(`⏱️ [CreateWorkspace] createWorkspace: ${Math.round(performance.now() - t0)}ms`);
+
+      // No bloqueamos el paso 2 por el logo — se sube en segundo plano, pero
+      // el padre debe esperar esta promesa antes de navegar a /chat.
+      let logoUploadPromise: Promise<unknown> | undefined;
+      if (logoFile) {
+        const file = logoFile;
+        const tLogo0 = performance.now();
+        logoUploadPromise = fileToBase64(file)
+          .then((base64) => workspaceService.uploadLogo(file.name, base64))
+          .then(() => {
+            console.log(`⏱️ [CreateWorkspace] uploadLogo (background): ${Math.round(performance.now() - tLogo0)}ms`);
+          })
+          .catch(() => {
+            notify.error({ title: "No se pudo subir el logo", description: "El workspace se creó igual, puedes subirlo después en Ajustes." });
+          });
+      }
+
+      onSuccess(logoUploadPromise);
     } catch (err: unknown) {
       const msg = (err as { message?: string }).message ?? "Error inesperado";
-      toast.error("Error al crear workspace", { description: msg });
+      notify.error({ title: "Error al crear workspace", description: msg });
     } finally {
       setIsLoading(false);
     }

@@ -23,6 +23,7 @@
   },
   "registries": {
     "@commercn": "https://commercn.com/r/{name}.json",
-    "@blocks-so": "https://blocks.so/r/{name}.json"
+    "@blocks-so": "https://blocks.so/r/{name}.json",
+    "@shadcndesign": "https://shadcndesign-free.vercel.app/r/{name}.json"
   }
 }

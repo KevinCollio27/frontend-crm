@@ -2,33 +2,38 @@
 
 import * as React from "react"
 import {
-  CheckCircle2Icon,
+  HandIcon,
+  Loader2Icon,
+  MessageSquareTextIcon,
   MessagesSquareIcon,
   MicIcon,
-  MoreHorizontalIcon,
   PlusIcon,
   SendIcon,
   SmileIcon,
+  SparklesIcon,
   UserPlusIcon,
-  UsersIcon,
   ZapIcon,
   UserIcon,
 } from "lucide-react"
+import { SiFacebook, SiInstagram } from "react-icons/si"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Separator } from "@/components/ui/separator"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
-  type Conversation,
-  AVATAR_COLOR_CLASSES,
-  STATUS_CONFIG,
-} from "./data"
+import { Avatar, AvatarBadge, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { MarkdownContent } from "@/components/dashboard/MarkdownContent"
+import { notify } from "@/lib/notify"
+import { whatsappService } from "@/services/whatsapp.service"
+import { instagramService } from "@/services/instagram.service"
+import { facebookService } from "@/services/facebook.service"
+import { type Conversation, type ConversationMessage } from "./data"
 import { ContactSheet } from "./ContactSheet"
+
+// Servicio a usar para enviar/tomar-control según el canal — WhatsApp, Instagram y Facebook
+// comparten el mismo contrato (sendMessageToConversation/takeoverConversation/releaseConversation).
+const DIRECT_CHANNEL_SERVICE = {
+  whatsapp: whatsappService,
+  instagram: instagramService,
+  facebook: facebookService,
+} as const
 
 // ─── Bubble components ────────────────────────────────────────────────────────
 
@@ -45,37 +50,25 @@ function DateChip({ label }: { label: string }) {
 
 function IncomingBubble({
   initials,
-  avatarColor,
+  avatarUrl,
   content,
   time,
-  isBot,
 }: {
   initials: string
-  avatarColor: Conversation["visitorAvatarColor"]
+  avatarUrl?: string
   content: string
   time: string
-  isBot?: boolean
 }) {
   return (
     <div className="flex flex-col items-start gap-0.5">
       <div className="flex items-end gap-2">
-        <div className={cn(
-          "flex size-6 shrink-0 items-center justify-center rounded-full text-[9px] font-semibold",
-          isBot ? "bg-violet-100 text-violet-700" : AVATAR_COLOR_CLASSES[avatarColor]
-        )}>
-          {isBot ? "IA" : initials}
-        </div>
-        <div className={cn(
-          "max-w-[72%] rounded-2xl rounded-bl-sm px-3 py-2 text-[12px] leading-relaxed",
-          isBot
-            ? "border border-violet-200 bg-violet-50 text-violet-900 dark:bg-violet-950/30 dark:text-violet-200"
-            : "border bg-background text-foreground"
-        )}>
-          {isBot && (
-            <p className="mb-1 flex items-center gap-1 text-[10px] font-semibold text-violet-600">
-              <ZapIcon className="size-2.5" /> Asistente IA
-            </p>
-          )}
+        <Avatar size="sm" className="shrink-0">
+          <AvatarImage src={avatarUrl || "https://github.com/shadcn.png"} alt="" />
+          <AvatarFallback className="text-[9px] font-semibold">
+            {initials}
+          </AvatarFallback>
+        </Avatar>
+        <div className="max-w-[72%] rounded-2xl rounded-bl-sm border bg-background px-3 py-2 text-[12px] leading-relaxed text-foreground">
           {content}
         </div>
       </div>
@@ -88,26 +81,51 @@ function OutgoingBubble({
   content,
   time,
   channel,
+  isBot,
 }: {
   content: string
   time: string
   channel: Conversation["channel"]
+  isBot?: boolean
 }) {
   const isWsp = channel === "whatsapp"
+  const isIg = channel === "instagram"
+  const isFb = channel === "facebook"
   return (
     <div className="flex flex-col items-end gap-0.5">
       <div className="flex items-end justify-end gap-2">
         <div className={cn(
           "max-w-[72%] rounded-2xl rounded-br-sm px-3 py-2 text-[12px] leading-relaxed",
-          isWsp ? "bg-[#DCF8C6] text-[#1a3a1a]" : "bg-violet-600 text-white"
+          isBot
+            ? "border border-violet-200 bg-violet-50 text-violet-900 dark:border-violet-800 dark:bg-violet-950/30 dark:text-violet-200"
+            : isWsp
+            ? "bg-emerald-100 text-emerald-950 dark:bg-emerald-900/40 dark:text-emerald-50"
+            : isIg
+            ? "bg-pink-100 text-pink-950 dark:bg-pink-950/40 dark:text-pink-50"
+            : isFb
+            ? "bg-blue-100 text-blue-950 dark:bg-blue-950/40 dark:text-blue-50"
+            : "bg-violet-600 text-white"
         )}>
-          {content}
+          {isBot && (
+            <p className="mb-1 flex items-center gap-1 text-[10px] font-semibold text-violet-600 dark:text-violet-400">
+              <SparklesIcon className="size-2.5" /> Asistente IA
+            </p>
+          )}
+          {isBot ? <MarkdownContent content={content} /> : content}
         </div>
-        <img src="/images/avatar-contact.svg" alt="Agente" className="size-6 shrink-0 rounded-full" />
+        {isBot ? (
+          <Avatar size="sm" className="shrink-0">
+            <AvatarFallback className="bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-300">
+              <SparklesIcon className="size-3" />
+            </AvatarFallback>
+          </Avatar>
+        ) : (
+          <img src="/images/avatar-contact.svg" alt="Agente" className="size-6 shrink-0 rounded-full" />
+        )}
       </div>
       <div className="mr-8 flex items-center justify-end gap-1 text-[10px] text-muted-foreground">
         {time}
-        {isWsp && <span className="text-blue-500">✓✓</span>}
+        {isWsp && !isBot && <span className="text-blue-500">✓✓</span>}
       </div>
     </div>
   )
@@ -117,16 +135,20 @@ function OutgoingBubble({
 
 interface ConversationViewProps {
   conversation: Conversation | undefined
+  loadingMessages?: boolean
+  onConversationChange?: (updated: Conversation) => void
 }
 
-export function ConversationView({ conversation }: ConversationViewProps) {
+export function ConversationView({ conversation, loadingMessages = false, onConversationChange }: ConversationViewProps) {
   const [message, setMessage]       = React.useState("")
   const [contactOpen, setContactOpen] = React.useState(false)
+  const [sending, setSending]       = React.useState(false)
+  const [takeoverLoading, setTakeoverLoading] = React.useState(false)
   const messagesEndRef               = React.useRef<HTMLDivElement>(null)
 
   React.useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [conversation?.id])
+  }, [conversation?.id, conversation?.messages.length])
 
   if (!conversation) {
     return (
@@ -137,14 +159,78 @@ export function ConversationView({ conversation }: ConversationViewProps) {
     )
   }
 
-  const displayName  = conversation.visitorName ?? `Visitante · ${conversation.widgetName ?? "Widget"}`
-  const statusCfg    = STATUS_CONFIG[conversation.status]
   const isWsp        = conversation.channel === "whatsapp"
+  const isIg         = conversation.channel === "instagram"
+  const isFb         = conversation.channel === "facebook"
+  const channelLabel = isWsp ? "WhatsApp" : isIg ? "Instagram" : isFb ? "Messenger" : conversation.widgetName ?? "Widget web"
+  const displayName  = conversation.visitorName ?? `Visitante · ${channelLabel}`
+  const isDirect     = isWsp || isIg || isFb
+  const windowClosed = isDirect && conversation.windowOpen === false
+
+  async function handleSend() {
+    const text = message.trim()
+    if (!text || !conversation) return
+
+    if (!isDirect) {
+      // Envío real de Widget todavía no implementado en el backend de conversaciones.
+      setMessage("")
+      return
+    }
+    if (conversation.windowOpen === false) return
+
+    const service = DIRECT_CHANNEL_SERVICE[conversation.channel as "whatsapp" | "instagram" | "facebook"]
+    setSending(true)
+    try {
+      await service.sendMessageToConversation(Number(conversation.id), text)
+      const sentMessage: ConversationMessage = {
+        id: `local-${Date.now()}`,
+        role: "agent",
+        content: text,
+        createdAt: "ahora",
+      }
+      onConversationChange?.({
+        ...conversation,
+        messages: [...conversation.messages, sentMessage],
+        lastMessage: text,
+      })
+      setMessage("")
+    } catch (error) {
+      notify.error({
+        title: "No se pudo enviar",
+        description: (error as { message?: string })?.message ?? "Intenta de nuevo.",
+      })
+    } finally {
+      setSending(false)
+    }
+  }
+
+  async function handleToggleTakeover() {
+    if (!conversation || !isDirect) return
+    const service = DIRECT_CHANNEL_SERVICE[conversation.channel as "whatsapp" | "instagram" | "facebook"]
+    setTakeoverLoading(true)
+    try {
+      if (conversation.isAiActive) {
+        await service.takeoverConversation(Number(conversation.id))
+        notify.info({ title: "Tomaste el control", description: "La IA dejó de responder en esta conversación." })
+      } else {
+        await service.releaseConversation(Number(conversation.id))
+        notify.info({ title: "Se lo devolviste a la IA", description: "El agente IA volvió a responder en esta conversación." })
+      }
+      onConversationChange?.({ ...conversation, isAiActive: !conversation.isAiActive })
+    } catch (error) {
+      notify.error({
+        title: "No se pudo actualizar la conversación",
+        description: (error as { message?: string })?.message ?? "Intenta de nuevo.",
+      })
+    } finally {
+      setTakeoverLoading(false)
+    }
+  }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
-      setMessage("")
+      handleSend()
     }
   }
 
@@ -154,31 +240,39 @@ export function ConversationView({ conversation }: ConversationViewProps) {
       {/* Header */}
       <div className="flex shrink-0 items-center gap-3 border-b px-4 py-2.5">
         {/* Avatar */}
-        <div className="relative shrink-0">
-          <div className={cn(
-            "flex size-8 items-center justify-center rounded-full text-[12px] font-semibold",
-            AVATAR_COLOR_CLASSES[conversation.visitorAvatarColor]
-          )}>
+        <Avatar className="shrink-0">
+          <AvatarImage src={conversation.visitorAvatarUrl || "https://github.com/shadcn.png"} alt="" />
+          <AvatarFallback className="text-[12px] font-semibold">
             {conversation.visitorInitials}
-          </div>
-          <span className={cn(
-            "absolute -bottom-0.5 -right-0.5 flex size-3.5 items-center justify-center rounded-full border-[1.5px] border-background",
-            isWsp ? "bg-[#25D366]" : "bg-violet-600"
-          )}>
-            <img
-              src={isWsp ? "/images/WhatsApp.svg" : "/images/Asistente AI.svg"}
-              alt={isWsp ? "WhatsApp" : "Widget"}
-              className="size-2"
-            />
-          </span>
-        </div>
+          </AvatarFallback>
+          {isWsp ? (
+            <AvatarBadge className="bg-[#25D366]">
+              <img src="/images/WhatsApp.svg" alt="WhatsApp" className="size-2" />
+            </AvatarBadge>
+          ) : isIg ? (
+            <AvatarBadge className="bg-[#E4405F] size-3.5! [&>svg]:size-2.5!">
+              <SiInstagram className="text-white" />
+            </AvatarBadge>
+          ) : isFb ? (
+            <AvatarBadge className="bg-[#1877F2] size-3.5! [&>svg]:size-2.5!">
+              <SiFacebook className="text-white" />
+            </AvatarBadge>
+          ) : (
+            <AvatarBadge className="bg-blue-600">
+              <MessageSquareTextIcon />
+            </AvatarBadge>
+          )}
+        </Avatar>
 
         {/* Info */}
         <div className="flex-1 min-w-0">
           <p className="truncate text-sm font-semibold">{displayName}</p>
           <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-            <span className={cn("size-1.5 rounded-full", isWsp ? "bg-[#25D366]" : "bg-violet-600")} />
-            {isWsp ? "WhatsApp" : conversation.widgetName ?? "Widget web"}
+            <span className={cn("size-1.5 rounded-full", isWsp ? "bg-[#25D366]" : isIg ? "bg-pink-500" : isFb ? "bg-[#1877F2]" : "bg-blue-600")} />
+            {channelLabel}
+            {isIg && conversation.visitorUsername && (
+              <><span>·</span><span className="truncate">@{conversation.visitorUsername}</span></>
+            )}
             {conversation.companyName && (
               <><span>·</span><span className="truncate">{conversation.companyName}</span></>
             )}
@@ -200,53 +294,45 @@ export function ConversationView({ conversation }: ConversationViewProps) {
               <UserPlusIcon className="size-3.5" />
             )}
           </Button>
-          <Button variant="ghost" size="icon" className="size-7" title="Asignar">
-            <UsersIcon className="size-3.5" />
-          </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="size-7" />}>
-              <MoreHorizontalIcon className="size-3.5" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-40">
-              <DropdownMenuItem>Silenciar</DropdownMenuItem>
-              <DropdownMenuItem>Bloquear</DropdownMenuItem>
-              <DropdownMenuItem className="text-destructive focus:text-destructive">
-                Eliminar conversación
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Separator orientation="vertical" className="mx-1 data-[orientation=vertical]:h-4" />
-          <Button
-            size="sm"
-            className="h-7 gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
-          >
-            <CheckCircle2Icon className="size-3" />
-            Resolver
-          </Button>
+          {isDirect && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7"
+              title={conversation.isAiActive ? "Tomar control" : "Devolver a IA"}
+              disabled={takeoverLoading}
+              onClick={handleToggleTakeover}
+            >
+              {conversation.isAiActive ? (
+                <HandIcon className="size-3.5" />
+              ) : (
+                <SparklesIcon className="size-3.5 text-violet-500" />
+              )}
+            </Button>
+          )}
+          {/* Asignar / "..." / Resolver: ocultos hasta que exista asignación y estado reales en el backend */}
         </div>
-      </div>
-
-      {/* Assign bar */}
-      <div className="flex shrink-0 items-center gap-2 border-b bg-muted/40 px-4 py-1.5 text-[11px] text-muted-foreground">
-        <UsersIcon className="size-3 shrink-0" />
-        Asignado a:
-        <div className="flex size-4 items-center justify-center rounded-full bg-violet-100 text-[8px] font-semibold text-violet-700">
-          KC
-        </div>
-        <span className="font-medium text-foreground">Kevin Collio</span>
-        <span className="text-border">·</span>
-        <span className={cn(
-          "rounded-full px-1.5 py-0.5 text-[10px] font-medium",
-          statusCfg.className
-        )}>
-          {statusCfg.label}
-        </span>
-        <span className="text-border">·</span>
-        <span>{conversation.lastMessageAt}</span>
       </div>
 
       {/* Messages */}
       <div className="flex flex-1 flex-col gap-3 overflow-y-auto bg-muted/20 px-4 py-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {loadingMessages ? (
+          Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={i}
+              className={cn("flex items-end gap-2 animate-pulse", i % 2 === 0 ? "" : "flex-row-reverse")}
+            >
+              <div className="size-6 shrink-0 rounded-full bg-muted" />
+              <div
+                className={cn(
+                  "h-8 rounded-2xl bg-muted",
+                  i % 2 === 0 ? "w-48 rounded-bl-sm" : "w-36 rounded-br-sm"
+                )}
+              />
+            </div>
+          ))
+        ) : (
+        <>
         <DateChip label="Hoy, 28 abr. 2026" />
 
         {conversation.messages.map((msg) => {
@@ -255,7 +341,7 @@ export function ConversationView({ conversation }: ConversationViewProps) {
               <IncomingBubble
                 key={msg.id}
                 initials={conversation.visitorInitials}
-                avatarColor={conversation.visitorAvatarColor}
+                avatarUrl={conversation.visitorAvatarUrl}
                 content={msg.content}
                 time={msg.createdAt}
               />
@@ -263,12 +349,11 @@ export function ConversationView({ conversation }: ConversationViewProps) {
           }
           if (msg.role === "bot") {
             return (
-              <IncomingBubble
+              <OutgoingBubble
                 key={msg.id}
-                initials="IA"
-                avatarColor="purple"
                 content={msg.content}
                 time={msg.createdAt}
+                channel={conversation.channel}
                 isBot
               />
             )
@@ -287,6 +372,8 @@ export function ConversationView({ conversation }: ConversationViewProps) {
         })}
 
         <div ref={messagesEndRef} />
+        </>
+        )}
       </div>
 
       {/* Input */}
@@ -299,15 +386,23 @@ export function ConversationView({ conversation }: ConversationViewProps) {
               "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors",
               isWsp
                 ? "border-[#25D366] bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30"
-                : "border-violet-400 bg-violet-50 text-violet-700 dark:bg-violet-950/30"
+                : isIg
+                ? "border-pink-400 bg-pink-50 text-pink-700 dark:bg-pink-950/30"
+                : isFb
+                ? "border-blue-400 bg-blue-50 text-blue-700 dark:bg-blue-950/30"
+                : "border-blue-400 bg-blue-50 text-blue-700 dark:bg-blue-950/30"
             )}
           >
-            <img
-              src={isWsp ? "/images/WhatsApp.svg" : "/images/Asistente AI.svg"}
-              alt=""
-              className="size-3"
-            />
-            {isWsp ? "WhatsApp" : "Widget"}
+            {isWsp ? (
+              <img src="/images/WhatsApp.svg" alt="" className="size-3" />
+            ) : isIg ? (
+              <SiInstagram className="size-3" />
+            ) : isFb ? (
+              <SiFacebook className="size-3" />
+            ) : (
+              <MessageSquareTextIcon className="size-3" />
+            )}
+            {channelLabel}
           </button>
         </div>
 
@@ -317,9 +412,16 @@ export function ConversationView({ conversation }: ConversationViewProps) {
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={`Escribe un mensaje por ${isWsp ? "WhatsApp" : "Widget"}...`}
+            disabled={windowClosed || sending}
+            placeholder={
+              sending
+                ? "Enviando..."
+                : windowClosed
+                ? "Ventana de 24h cerrada — solo puedes reabrir con un template"
+                : `Escribe un mensaje por ${channelLabel}...`
+            }
             rows={2}
-            className="w-full resize-none bg-transparent text-[12px] leading-relaxed text-foreground placeholder:text-muted-foreground/60 focus:outline-none"
+            className="w-full resize-none bg-transparent text-[12px] leading-relaxed text-foreground placeholder:text-muted-foreground/60 focus:outline-none disabled:cursor-not-allowed"
           />
         </div>
 
@@ -345,13 +447,21 @@ export function ConversationView({ conversation }: ConversationViewProps) {
               "h-7 gap-1.5 text-xs text-white",
               isWsp
                 ? "bg-[#25D366] hover:bg-[#1aab52]"
+                : isIg
+                ? "bg-linear-to-br from-purple-500 to-pink-500 hover:opacity-90"
+                : isFb
+                ? "bg-[#1877F2] hover:bg-[#1565d8]"
                 : "bg-violet-600 hover:bg-violet-700"
             )}
-            disabled={!message.trim()}
-            onClick={() => setMessage("")}
+            disabled={!message.trim() || sending || windowClosed}
+            onClick={handleSend}
           >
-            <SendIcon className="size-3" />
-            Enviar
+            {sending ? (
+              <Loader2Icon className="size-3 animate-spin" />
+            ) : (
+              <SendIcon className="size-3" />
+            )}
+            {sending ? "Enviando..." : "Enviar"}
           </Button>
         </div>
       </div>

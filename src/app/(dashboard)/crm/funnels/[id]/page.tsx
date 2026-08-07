@@ -1,6 +1,5 @@
-import { redirect } from "next/navigation"
-import { DEAL_DETAILS } from "@/components/dashboard/funnels/data"
-import { FunnelDetail } from "@/components/dashboard/funnels/FunnelDetail"
+import { Suspense } from "react"
+import { OpportunityDetail } from "@/components/dashboard/funnels/OpportunityDetail"
 
 export default async function FunnelDetailPage({
   params,
@@ -8,7 +7,9 @@ export default async function FunnelDetailPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const detail = DEAL_DETAILS[id]
-  if (!detail) redirect("/crm/funnels")
-  return <FunnelDetail deal={detail} />
+  return (
+    <Suspense>
+      <OpportunityDetail id={Number(id)} />
+    </Suspense>
+  )
 }

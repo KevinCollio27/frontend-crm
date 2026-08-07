@@ -1,7 +1,7 @@
 "use client"
 
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Tabs as TabsPrimitive } from "@base-ui/react/tabs"
-import type { OrganizationDetail } from "../data"
 import { ActividadesTab } from "./tabs/ActividadesTab"
 import { ContactosTab } from "./tabs/ContactosTab"
 import { DesafiosTab } from "./tabs/DesafiosTab"
@@ -17,17 +17,35 @@ const TABS = [
   { value: "desafios",      label: "Desafíos"      },
   { value: "notas",         label: "Notas"         },
 ]
+const VALID_TABS = new Set(TABS.map((t) => t.value))
 
 interface Props {
-  organization: OrganizationDetail
+  orgId:   number
+  orgName: string
 }
 
-export function Col2Tabs({ organization }: Props) {
+export function Col2Tabs({ orgId, orgName }: Props) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
+  // La pestaña activa vive en la URL (?tab=notas), no en un defaultValue interno del
+  // Tabs — así un F5 (o compartir el link) te deja en la misma pestaña en vez de
+  // resetear siempre a "Historial".
+  const tabParam = searchParams.get("tab")
+  const activeTab = tabParam && VALID_TABS.has(tabParam) ? tabParam : "historial"
+
+  function handleTabChange(value: string) {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set("tab", value)
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+  }
+
   return (
     <div className="flex h-full flex-col overflow-hidden">
 
-      <TabsPrimitive.Root defaultValue="historial" className="flex min-h-0 flex-1 flex-col">
-        <TabsPrimitive.List className="flex shrink-0 items-end border-b px-2">
+      <TabsPrimitive.Root value={activeTab} onValueChange={handleTabChange} className="flex min-h-0 flex-1 flex-col">
+        <TabsPrimitive.List className="flex shrink-0 items-end border-b px-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {TABS.map(({ value, label }) => (
             <TabsPrimitive.Tab
               key={value}
@@ -40,12 +58,12 @@ export function Col2Tabs({ organization }: Props) {
         </TabsPrimitive.List>
 
         <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <TabsPrimitive.Panel value="historial"     className="outline-none"><HistorialTab     organization={organization} /></TabsPrimitive.Panel>
-          <TabsPrimitive.Panel value="contactos"     className="outline-none"><ContactosTab     organization={organization} /></TabsPrimitive.Panel>
-          <TabsPrimitive.Panel value="oportunidades" className="outline-none"><OportunidadesTab organization={organization} /></TabsPrimitive.Panel>
-          <TabsPrimitive.Panel value="actividades"   className="outline-none"><ActividadesTab   organization={organization} /></TabsPrimitive.Panel>
-          <TabsPrimitive.Panel value="desafios"      className="outline-none"><DesafiosTab      organization={organization} /></TabsPrimitive.Panel>
-          <TabsPrimitive.Panel value="notas"         className="outline-none"><NotasTab         organization={organization} /></TabsPrimitive.Panel>
+          <TabsPrimitive.Panel value="historial"     className="outline-none"><HistorialTab     orgId={orgId} /></TabsPrimitive.Panel>
+          <TabsPrimitive.Panel value="contactos"     className="outline-none"><ContactosTab     orgId={orgId} orgName={orgName} /></TabsPrimitive.Panel>
+          <TabsPrimitive.Panel value="oportunidades" className="outline-none"><OportunidadesTab orgId={orgId} /></TabsPrimitive.Panel>
+          <TabsPrimitive.Panel value="actividades"   className="outline-none"><ActividadesTab   orgId={orgId} /></TabsPrimitive.Panel>
+          <TabsPrimitive.Panel value="desafios"      className="outline-none"><DesafiosTab      orgId={orgId} /></TabsPrimitive.Panel>
+          <TabsPrimitive.Panel value="notas"         className="outline-none"><NotasTab         orgId={orgId} /></TabsPrimitive.Panel>
         </div>
       </TabsPrimitive.Root>
 

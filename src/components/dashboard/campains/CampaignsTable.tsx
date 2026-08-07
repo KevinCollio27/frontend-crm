@@ -11,17 +11,20 @@ import {
 } from "@tanstack/react-table"
 import {
   ChevronDown,
-  CopyIcon,
   EyeIcon,
-  MailIcon,
+  ListIcon,
   MoreHorizontal,
-  PlusIcon,
+  RefreshCwIcon,
+  SearchIcon,
   Trash2Icon,
+  XIcon,
 } from "lucide-react"
 import * as React from "react"
 
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
+import { confirmDialog } from "@/lib/confirm"
+import { notify } from "@/lib/notify"
 import { DataTablePagination } from "@/components/ui/data-table-pagination"
 import {
   DropdownMenu,
@@ -33,6 +36,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Input } from "@/components/ui/input"
+import { SingleSelectFilter, type SingleSelectOption } from "@/components/ui/single-select-filter"
 import {
   Table,
   TableBody,
@@ -43,8 +48,12 @@ import {
 } from "@/components/ui/table"
 import { getSortIcon } from "@/lib/table-utils"
 import { cn } from "@/lib/utils"
+import { EntityAccentBar } from "@/components/ui/entity-accent-bar"
 import { campaignService } from "@/services/campaign.service"
 import type { CampaignRaw } from "@/types/campaign"
+import type { CampaignFormState } from "./shared/form-state"
+import { CreateCampaignSheet } from "./CreateCampaignSheet"
+import { CampaignPreviewSheet } from "./CampaignPreviewSheet"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -97,6 +106,17 @@ const audienceConfig: Record<string, { label: string; badge: string }> = {
   organization: { label: "Organización", badge: "bg-orange-50 text-orange-600 dark:bg-orange-950 dark:text-orange-400" },
   custom_list:  { label: "Lista custom", badge: "bg-pink-50 text-pink-600 dark:bg-pink-950 dark:text-pink-400"         },
 }
+
+// "any" en vez de "all" como sentinel de "sin filtro" — "all" ya es un valor
+// real de audience_filter (audiencia "General").
+const AUDIENCE_OPTIONS: SingleSelectOption[] = [
+  { value: "any",          label: "Todas"        },
+  { value: "all",          label: "General"      },
+  { value: "recent",       label: "Recientes"    },
+  { value: "specific",     label: "Específica"   },
+  { value: "organization", label: "Organización" },
+  { value: "custom_list",  label: "Lista custom" },
+]
 
 const columnLabels: Record<string, string> = {
   id:             "ID",
@@ -196,16 +216,14 @@ const columns: ColumnDef<Campaign>[] = [
       </Button>
     ),
     cell: ({ row }) => {
+      const campaign = row.original
       const name: string = row.getValue("name")
-      const subject = row.original.subject
       return (
-        <div className="flex items-center gap-2.5">
-          <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/10">
-            <MailIcon className="size-3.5 text-primary" />
-          </div>
+        <div className="flex items-stretch gap-2.5">
+          <EntityAccentBar seed={campaign.id} />
           <div className="leading-tight">
             <div className="text-sm font-medium">{name}</div>
-            <div className="text-xs text-muted-foreground">{subject}</div>
+            <div className="text-xs text-muted-foreground">{campaign.subject}</div>
           </div>
         </div>
       )
@@ -307,10 +325,17 @@ const columns: ColumnDef<Campaign>[] = [
       <div className="text-sm text-muted-foreground">{row.getValue("createdBy")}</div>
     ),
   },
-  {
+]
+
+function makeActionsColumn(
+  onPreview: (id: number) => void,
+  onResend: (id: number) => void,
+  onDelete: (id: number) => void,
+): ColumnDef<Campaign> {
+  return {
     id: "actions",
     enableHiding: false,
-    cell: () => (
+    cell: ({ row }) => (
       <DropdownMenu>
         <DropdownMenuTrigger render={<Button className="h-8 w-8 p-0" variant="ghost" />}>
           <span className="sr-only">Abrir menú</span>
@@ -319,33 +344,109 @@ const columns: ColumnDef<Campaign>[] = [
         <DropdownMenuContent align="end" className="min-w-48">
           <DropdownMenuGroup>
             <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onPreview(row.original.id)}>
               <EyeIcon /> Ver campaña
             </DropdownMenuItem>
-            <DropdownMenuItem>
-              <CopyIcon /> Duplicar
+            <DropdownMenuItem onClick={() => onResend(row.original.id)}>
+              <RefreshCwIcon /> Reenviar
             </DropdownMenuItem>
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
-          <DropdownMenuItem className="text-destructive focus:text-destructive">
+          <DropdownMenuItem
+            className="text-destructive focus:text-destructive"
+            onClick={() => onDelete(row.original.id)}
+          >
             <Trash2Icon /> Eliminar
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     ),
-  },
-]
+  }
+}
+
+// ─── Resend mapping ──────────────────────────────────────────────────────────
+
+function audienceFilterToForm(c: CampaignRaw): Partial<CampaignFormState> {
+  const hasBlocks = Array.isArray(c.blocks_json) && c.blocks_json.length > 0
+  const base: Partial<CampaignFormState> = {
+    name: c.name,
+    subject: c.subject,
+    contentMode: hasBlocks ? "blocks" : "html",
+    blocks: hasBlocks ? (c.blocks_json as unknown as CampaignFormState["blocks"]) : [],
+    htmlContent: hasBlocks ? "" : (c.content ?? ""),
+  }
+
+  switch (c.audience_filter) {
+    case "all":
+    case "recent":
+      return { ...base, audienceMode: "crm", crmFilter: c.audience_filter as "all" | "recent" }
+    case "custom_list":
+      return {
+        ...base,
+        audienceMode: "custom",
+        customRecipients: (c.custom_recipients ?? []).map((r, i) => ({ id: `resend-${i}`, name: r.name, email: r.email })),
+      }
+    case "organization":
+    case "specific":
+    default:
+      // No se puede reconstruir la selección exacta — el usuario debe reseleccionar.
+      return { ...base, audienceMode: "crm", crmFilter: "all" }
+  }
+}
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function CampaignsTable() {
   const [data, setData] = React.useState<Campaign[]>([])
   const [total, setTotal] = React.useState(0)
+  const [dailyUsage, setDailyUsage] = React.useState<{ used: number; limit: number } | null>(null)
   const [loading, setLoading] = React.useState(true)
+  const [search, setSearch] = React.useState("")
+  const [audienceFilter, setAudienceFilter] = React.useState("any")
   const [query, setQuery] = React.useState<QueryState>({ page: 1, pageSize: 10 })
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>(DEFAULT_COLUMN_VISIBILITY)
   const [rowSelection, setRowSelection] = React.useState({})
+  const [createOpen, setCreateOpen] = React.useState(false)
+  const [resendForm, setResendForm] = React.useState<Partial<CampaignFormState> | null>(null)
+  const [previewId, setPreviewId] = React.useState<number | null>(null)
+  const [previewOpen, setPreviewOpen] = React.useState(false)
+
+  const handlePreview = React.useCallback((id: number) => {
+    setPreviewId(id)
+    setPreviewOpen(true)
+  }, [])
+
+  const handleResend = React.useCallback(async (id: number) => {
+    const campaign = await campaignService.getById(id)
+    setResendForm(audienceFilterToForm(campaign))
+    setCreateOpen(true)
+  }, [])
+
+  const handleDelete = React.useCallback(async (id: number) => {
+    const ok = await confirmDialog({
+      title: "¿Eliminar campaña?",
+      description: "Esta acción es irreversible. Los datos de seguimiento también se eliminarán.",
+      confirmText: "Sí, eliminar",
+      cancelText: "Cancelar",
+      tone: "danger",
+    })
+    if (!ok) return
+    try {
+      setData((prev) => prev.filter((c) => c.id !== id))
+      setTotal((prev) => prev - 1)
+      await campaignService.delete(id)
+      notify.success({ title: "Campaña eliminada", description: "La campaña fue eliminada correctamente." })
+    } catch {
+      notify.error({ title: "Error al eliminar", description: "No se pudo eliminar la campaña." })
+      setQuery((q) => ({ ...q }))
+    }
+  }, [])
+
+  const tableColumns = React.useMemo(
+    () => [...columns, makeActionsColumn(handlePreview, handleResend, handleDelete)],
+    [handlePreview, handleResend, handleDelete],
+  )
 
   React.useEffect(() => {
     let cancelled = false
@@ -356,6 +457,7 @@ export function CampaignsTable() {
         if (cancelled) return
         setData(res.data.map(mapCampaign))
         setTotal(res.total)
+        setDailyUsage(res.dailyUsage)
         setLoading(false)
       })
       .catch(() => {
@@ -364,9 +466,22 @@ export function CampaignsTable() {
     return () => { cancelled = true }
   }, [query])
 
+  // Client-side sobre la página cargada — el backend todavía no tiene params
+  // de búsqueda ni de audiencia (solo page/limit).
+  const visibleData = React.useMemo(() => {
+    return data.filter((c) => {
+      if (audienceFilter !== "any" && c.audienceFilter !== audienceFilter) return false
+      if (search) {
+        const q = search.toLowerCase()
+        return c.name.toLowerCase().includes(q) || c.subject.toLowerCase().includes(q)
+      }
+      return true
+    })
+  }, [data, search, audienceFilter])
+
   const table = useReactTable({
-    data,
-    columns,
+    data: visibleData,
+    columns: tableColumns,
     rowCount: total,
     manualPagination: true,
     onSortingChange: setSorting,
@@ -391,17 +506,71 @@ export function CampaignsTable() {
 
   const skeletonRows = Array.from({ length: query.pageSize })
 
+  const hasActiveFilters = !!search || audienceFilter !== "any"
+
+  function resetFilters() {
+    setSearch("")
+    setAudienceFilter("any")
+  }
+
   return (
     <div className="w-full">
-      {/* Toolbar */}
-      <div className="flex items-center gap-2 py-4">
+      {/* Row 1 — view toggle + create */}
+      <div className="flex items-center justify-between border-b px-4 py-2">
+        <div className="flex items-center gap-0.5 rounded-lg border bg-muted/40 p-0.5">
+          <span className="flex items-center gap-1.5 rounded-md bg-background px-2.5 py-1 text-xs font-medium shadow-sm">
+            <ListIcon className="size-3.5" />
+            Lista
+          </span>
+        </div>
+        <Button size="sm" onClick={() => setCreateOpen(true)}>+ Crear Campaña</Button>
+      </div>
+
+      {/* Row 2 — filters */}
+      <div className="flex items-center gap-2 border-b px-4 py-2">
+        <div className="relative w-44 shrink-0">
+          <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Buscar campaña..."
+            className="h-8 pl-8 text-xs"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+
+        <SingleSelectFilter
+          title="Audiencia"
+          options={AUDIENCE_OPTIONS}
+          selected={audienceFilter}
+          onChange={setAudienceFilter}
+        />
+
+        {hasActiveFilters && (
+          <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={resetFilters}>
+            <XIcon className="size-3.5" />
+            Restablecer
+          </Button>
+        )}
+
         <div className="ml-auto flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">
+          {dailyUsage && (
+            <span className={cn(
+              "text-xs tabular-nums px-2 py-1 rounded-md border",
+              dailyUsage.used >= dailyUsage.limit
+                ? "border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400"
+                : dailyUsage.used >= dailyUsage.limit * 0.8
+                ? "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                : "border-border bg-muted/50 text-muted-foreground"
+            )}>
+              {dailyUsage.used.toLocaleString()} / {dailyUsage.limit.toLocaleString()} hoy
+            </span>
+          )}
+          <span className="text-xs text-muted-foreground">
             {loading ? "…" : `${total} campañas`}
           </span>
           <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="outline" />}>
-              Columnas <ChevronDown className="ml-2 size-4" />
+            <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8" />}>
+              Columnas <ChevronDown className="ml-1.5 size-3.5" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               {table
@@ -419,14 +588,29 @@ export function CampaignsTable() {
                 ))}
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button>
-            <PlusIcon className="size-4" /> Crear Campaña
-          </Button>
         </div>
       </div>
 
+      <CreateCampaignSheet
+        open={createOpen}
+        onOpenChange={(v) => { setCreateOpen(v); if (!v) setResendForm(null) }}
+        onSuccess={() => setQuery((q) => ({ ...q, page: 1 }))}
+        initialForm={resendForm ?? undefined}
+      />
+
+      <CampaignPreviewSheet
+        campaignId={previewId}
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
+        onResend={async (c) => {
+          setPreviewOpen(false)
+          setResendForm(audienceFilterToForm(c))
+          setCreateOpen(true)
+        }}
+      />
+
       {/* Table */}
-      <div className="rounded-md border">
+      <div className="mx-4 mt-3 rounded-md border">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((hg) => (
@@ -471,7 +655,7 @@ export function CampaignsTable() {
         </Table>
       </div>
 
-      <div className="py-4">
+      <div className="px-4 py-3">
         <DataTablePagination table={table} />
       </div>
     </div>

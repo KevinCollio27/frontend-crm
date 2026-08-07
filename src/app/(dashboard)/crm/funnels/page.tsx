@@ -1,3 +1,4 @@
+import { Suspense } from "react"
 import { TrendingUpIcon } from "lucide-react"
 import { PageHeader } from "@/components/dashboard/PageHeader"
 import { FunnelKanban } from "@/components/dashboard/funnels/FunnelKanban"
@@ -11,7 +12,9 @@ export default function FunnelsPage() {
         description="Gestiona las oportunidades de tu pipeline"
       />
       <div className="flex flex-1 min-h-0 overflow-hidden">
-        <FunnelKanban />
+        <Suspense>
+          <FunnelKanban />
+        </Suspense>
       </div>
     </>
   )

@@ -2,7 +2,28 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { ExternalLinkIcon, HomeIcon, LifeBuoyIcon, MegaphoneIcon, Plug, SettingsIcon, Sparkle, TruckIcon, UsersIcon } from "lucide-react"
+import {
+  ActivityIcon,
+  BookOpenIcon,
+  BotIcon,
+  BuildingIcon,
+  CalendarHeart,
+  ClipboardListIcon,
+  CloudUpload,
+  ExternalLinkIcon,
+  FileTextIcon,
+  LifeBuoyIcon,
+  MailIcon,
+  MegaphoneIcon,
+  MessagesSquareIcon,
+  Plug,
+  SendIcon,
+  SettingsIcon,
+  Sparkle,
+  TrendingUpIcon,
+  TruckIcon,
+  UsersIcon,
+} from "lucide-react"
 import { NavMain } from "@/components/dashboard/NavMain"
 import { NavUser } from "@/components/dashboard/NavUser"
 import { TeamSwitcher } from "@/components/dashboard/TeamSwitcher"
@@ -25,11 +46,12 @@ const navMain = [
     url: "#",
     icon: <UsersIcon />,
     items: [
-      { title: "Funnels", url: "/crm/funnels" },
-      { title: "Contactos", url: "/crm/contacts" },
-      { title: "Organizaciones", url: "/crm/organizations" },
-      { title: "Actividades", url: "/crm/activities" },
-      { title: "Documentos", url: "/crm/documents" },
+      { title: "Funnels", url: "/crm/funnels", icon: <TrendingUpIcon /> },
+      { title: "Contactos", url: "/crm/contacts", icon: <UsersIcon /> },
+      { title: "Organizaciones", url: "/crm/organizations", icon: <BuildingIcon /> },
+      { title: "Actividades", url: "/crm/activities", icon: <ActivityIcon /> },
+      { title: "Cotizaciones", url: "/crm/quotations", icon: <FileTextIcon /> },
+      { title: "Documentos", url: "/crm/documents", icon: <CloudUpload /> },
     ],
   },
   {
@@ -37,9 +59,9 @@ const navMain = [
     url: "#",
     icon: <Plug />,
     items: [
-      { title: "Mensajeria", url: "/crm/messaging" },
-      { title: "Correo", url: "/crm/mail" },
-      { title: "Calendario", url: "/crm/calendaries" },
+      { title: "Mensajeria", url: "/crm/messaging", icon: <MessagesSquareIcon /> },
+      { title: "Correo", url: "/crm/mail", icon: <MailIcon /> },
+      { title: "Calendario", url: "/crm/calendaries", icon: <CalendarHeart /> },
     ],
   },
   {
@@ -47,21 +69,22 @@ const navMain = [
     url: "#",
     icon: <MegaphoneIcon />,
     items: [
-      { title: "Campañas", url: "/marketing/campaigns" },
-      { title: "Formularios", url: "/marketing/forms" },
-      { title: "Widgets AI", url: "/marketing/widget-ai" },
-      { title: "Blog", url: "/marketing/blogs" },
+      { title: "Campañas", url: "/marketing/campaigns", icon: <SendIcon /> },
+      { title: "Formularios", url: "/marketing/forms", icon: <ClipboardListIcon /> },
+      { title: "Widgets AI", url: "/marketing/widget-ai", icon: <BotIcon /> },
+      { title: "Blog", url: "/marketing/blogs", icon: <BookOpenIcon /> },
     ],
   },
 ]
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const user = useSessionStore((s) => s.user)
+  const isLoading = useSessionStore((s) => s.isLoading)
 
   const currentUser = {
     name: user?.name ?? "",
     email: user?.email ?? "",
-    avatar: "",
+    avatar: "https://github.com/shadcn.png",
   }
 
   return (
@@ -76,10 +99,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               <SidebarMenuButton render={<Link href="/chat" />} tooltip="Chat IA">
                 <Sparkle />
                 <span>Chat</span>
-              </SidebarMenuButton>
-              <SidebarMenuButton render={<Link href="/home" />} tooltip="Home">
-                <HomeIcon />
-                <span>Home</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
@@ -101,7 +120,18 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <SidebarMenuItem>
               <SidebarMenuButton
                 size="sm"
-                render={<a href="https://ti.goxt.io/" target="_blank" rel="noreferrer" />}
+                render={<a href="https://docs.goxt.io/docs/crm" target="_blank" rel="noreferrer" />}
+                tooltip="Documentación"
+              >
+                <BookOpenIcon />
+                <span>Documentación</span>
+                <ExternalLinkIcon className="ml-auto size-3 opacity-60" />
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                size="sm"
+                render={<a href={`${process.env.NEXT_PUBLIC_WIDGET_BASE_URL}/widget/form/formulario-de-soporte`} target="_blank" rel="noreferrer" />}
                 tooltip="Soporte / Ayuda"
               >
                 <LifeBuoyIcon />
@@ -123,7 +153,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={currentUser} />
+        <NavUser user={currentUser} isLoading={isLoading} />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

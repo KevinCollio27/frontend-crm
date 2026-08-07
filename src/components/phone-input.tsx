@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { CURATED_COUNTRIES } from "@/lib/curated-countries";
 
 type PhoneInputProps = Omit<
   React.ComponentProps<"input">,
@@ -44,6 +45,7 @@ const PhoneInput: React.ForwardRefExoticComponent<PhoneInputProps> =
           inputComponent={InputComponent}
           smartCaret={false}
           defaultCountry={defaultCountry}
+          countries={[...CURATED_COUNTRIES]}
           value={value || undefined}
           onCountryChange={(c) => { if (c) lastCountry.current = c; }}
           onChange={(newValue) => {
@@ -137,11 +139,11 @@ const CountrySelect = ({
                 }
               }, 0);
             }}
-            placeholder="Search country..."
+            placeholder="Buscar país..."
           />
           <CommandList>
             <ScrollArea ref={scrollAreaRef} className="h-72">
-              <CommandEmpty>No country found.</CommandEmpty>
+              <CommandEmpty>País no encontrado.</CommandEmpty>
               <CommandGroup>
                 {countryList.map(({ value, label }) =>
                   value ? (

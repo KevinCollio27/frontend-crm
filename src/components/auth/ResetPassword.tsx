@@ -1,51 +1,41 @@
 import Link from "next/link";
+import { AuthHeroPanel } from "@/components/auth/AuthHeroPanel";
 import { ResetPasswordForm } from "@/components/auth/ResetPasswordForm";
-import { Testimonials } from "@/components/auth/Testimonials";
 
 interface ResetPasswordProps {
   token: string;
 }
 
 const ResetPassword = ({ token }: ResetPasswordProps) => (
-  <div className="grid grid-cols-1 lg:grid-cols-2 lg:divide-x">
-    <div className="flex h-screen items-center justify-center">
-      <div className="mx-auto w-full max-w-md px-10 py-14 sm:rounded-2xl sm:border sm:bg-card sm:shadow-2xl/5">
-        <img src="/images/goxt-negro.png" alt="GOXT CRM" className="mx-auto h-10 w-auto" />
-        <h1 className="mt-3 text-center font-medium text-2xl">
-          Crea tu Nueva Contraseña
-        </h1>
-        <p className="text-center text-muted-foreground text-sm mt-1">
-          Ingresa tu nueva contraseña
-        </p>
+  <div className="flex min-h-svh flex-col items-center justify-center gap-3 bg-muted p-4 md:p-6">
+    <div className="grid w-full max-w-4xl overflow-hidden rounded-2xl border bg-card shadow-2xl/5 lg:grid-cols-2">
+      <div className="flex flex-col gap-5 p-6 md:p-8">
+        <div className="flex flex-col items-center gap-2 text-center">
+          <h1 className="text-2xl font-bold">Crea tu nueva contraseña</h1>
+          <p className="text-balance text-muted-foreground">
+            Ingresa tu nueva contraseña
+          </p>
+        </div>
 
         {token ? (
-          <div className="mt-2">
-            <ResetPasswordForm token={token} />
-          </div>
+          <ResetPasswordForm token={token} />
         ) : (
-          <p className="mt-6 text-center text-sm text-destructive">
+          <p className="text-center text-sm text-destructive">
             Enlace inválido.{" "}
-            <Link className="text-blue-600 hover:text-blue-700" href="/recovery-password">
+            <Link className="underline-offset-2 hover:underline" href="/recovery-password">
               Solicitar nuevo código
             </Link>
           </p>
         )}
 
-        <p className="mt-6 text-center text-sm">
+        <p className="text-center text-sm">
           ¿Recordaste tu contraseña?{" "}
-          <Link className="text-blue-600 hover:text-blue-700" href="/login">
+          <Link className="underline-offset-2 hover:underline" href="/login">
             Iniciar sesión
           </Link>
         </p>
       </div>
-    </div>
-    <div className="relative flex h-full w-full flex-col overflow-hidden bg-muted/50 dark:bg-muted/30">
-      <img
-        alt="Login"
-        className="absolute inset-0 size-full object-cover"
-        src="/images/login-hero2.jpg"
-      />
-      <Testimonials />
+      <AuthHeroPanel />
     </div>
   </div>
 );

@@ -18,6 +18,7 @@ export interface ActivityRaw {
   date_from: string | null
   date_to: string | null
   is_completed: boolean
+  status: string
   created_at: string
   ubication: string | null
   user: { id: number; name: string } | null
@@ -26,8 +27,11 @@ export interface ActivityRaw {
     name: string
     flow: { id: number; name: string } | null
     flow_stage: { id: number; name: string } | null
+    person?: { id: number; name: string } | null
+    organization?: { id: number; name: string } | null
   } | null
   opportunity_activity_detail: ActivityDetailRaw[]
+  activity_calendar_events?: { google_event_id: string }[]
 }
 
 export interface ActivityPage {

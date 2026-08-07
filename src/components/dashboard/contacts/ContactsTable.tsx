@@ -7,29 +7,35 @@ import {
   getCoreRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
-  getSortedRowModel,
   type SortingState,
   useReactTable,
   type VisibilityState,
   type PaginationState,
 } from "@tanstack/react-table"
 import {
+  ArrowDownUpIcon,
   ChevronDown,
   ExternalLinkIcon,
+  GitMergeIcon,
+  ListIcon,
   MailIcon,
   MoreHorizontal,
   PencilIcon,
   PhoneIcon,
   PlusCircleIcon,
-  PlusIcon,
+  SearchIcon,
   Trash2Icon,
   UserIcon,
   XIcon,
 } from "lucide-react"
 import * as React from "react"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
+import { FcGoogle } from "react-icons/fc"
+import { useEntityRealtime } from "@/hooks/useEntityRealtime"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { EntityAccentBar } from "@/components/ui/entity-accent-bar"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -55,8 +61,15 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { ContactPreviewSheet } from "./ContactPreviewSheet"
+import { CreateContactSheet } from "./CreateContactSheet"
+import { ImportGoogleContactsSheet } from "./ImportGoogleContactsSheet"
+import { DuplicateContactsSheet } from "./DuplicateContactsSheet"
+import { ContactsImportExportSheet } from "./ContactsImportExportSheet"
 import { contactService, type CountryCount } from "@/services/contact.service"
 import { organizationService, type OrganizationOption } from "@/services/organization.service"
+import { contactConfirm } from "@/lib/confirm"
+import { notify } from "@/lib/notify"
+import { useIntegrations } from "@/hooks/useIntegrations"
 import type { Person } from "@/types/contact"
 import { getFlag, getSortIcon, getInitials } from "@/lib/table-utils"
 
@@ -124,7 +137,9 @@ const DEFAULT_COLUMN_VISIBILITY: VisibilityState = {
 
 function getColumns(
   onPreview: (contact: Contact) => void,
-  onDetail: (contact: Contact) => void
+  onDetail: (contact: Contact) => void,
+  onEdit: (contact: Contact) => void,
+  onDelete: (contact: Contact) => void
 ): ColumnDef<Contact>[] {
   return [
     {
@@ -193,7 +208,15 @@ function getColumns(
           Organización {getSortIcon(column.getIsSorted())}
         </Button>
       ),
-      cell: ({ row }) => <div className="text-sm">{row.getValue("org")}</div>,
+      cell: ({ row }) => {
+        const c = row.original
+        return (
+          <div className="flex items-stretch gap-2.5">
+            {c.orgId !== null && <EntityAccentBar seed={c.orgId} />}
+            <span className="text-sm self-center">{c.org}</span>
+          </div>
+        )
+      },
     },
     {
       accessorKey: "internalPosition",
@@ -210,11 +233,8 @@ function getColumns(
     },
     {
       accessorKey: "phone",
-      header: ({ column }) => (
-        <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
-          Teléfono {getSortIcon(column.getIsSorted())}
-        </Button>
-      ),
+      enableSorting: false,
+      header: "Teléfono",
       cell: ({ row }) => (
         <div className="text-sm text-muted-foreground">
           {(row.getValue("phone") as string) || "—"}
@@ -282,29 +302,50 @@ function getColumns(
                   <UserIcon />
                   Vista Previa
                 </DropdownMenuItem>
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onEdit(contact)}>
                   <PencilIcon />
                   Editar
                 </DropdownMenuItem>
               </DropdownMenuGroup>
+              {(contact.email || contact.phone) && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuGroup>
+                    <DropdownMenuLabel>Acceso rápido</DropdownMenuLabel>
+                    {contact.email && (
+                      <DropdownMenuItem
+                        onClick={() => {
+                          navigator.clipboard.writeText(contact.email)
+                          toast.success("Correo copiado", {
+                            description: "Has copiado el correo con éxito.",
+                          })
+                        }}
+                      >
+                        <MailIcon />
+                        Copiar email
+                      </DropdownMenuItem>
+                    )}
+                    {contact.phone && (
+                      <DropdownMenuItem
+                        onClick={() => {
+                          navigator.clipboard.writeText(contact.phone)
+                          toast.success("Teléfono copiado", {
+                            description: "Has copiado el teléfono con éxito.",
+                          })
+                        }}
+                      >
+                        <PhoneIcon />
+                        Copiar teléfono
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuGroup>
+                </>
+              )}
               <DropdownMenuSeparator />
-              <DropdownMenuGroup>
-                <DropdownMenuLabel>Acceso rápido</DropdownMenuLabel>
-                <DropdownMenuItem
-                  onClick={() => navigator.clipboard.writeText(contact.email)}
-                >
-                  <MailIcon />
-                  Copiar email
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => navigator.clipboard.writeText(contact.phone)}
-                >
-                  <PhoneIcon />
-                  Copiar teléfono
-                </DropdownMenuItem>
-              </DropdownMenuGroup>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive focus:text-destructive">
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onClick={() => onDelete(contact)}
+              >
                 <Trash2Icon />
                 Eliminar
               </DropdownMenuItem>
@@ -360,13 +401,13 @@ function OrgFilter({
       <DropdownMenuTrigger
         render={<Button variant="outline" size="sm" className="h-8 border-dashed" />}
       >
-        <PlusCircleIcon className="size-4" />
+        <PlusCircleIcon className="size-3.5" />
         Organización
         {selected !== null && (
           <>
             <Separator
               orientation="vertical"
-              className="mx-1 data-vertical:h-4 data-vertical:self-auto"
+              className="mx-1 data-[orientation=vertical]:h-4 data-[orientation=vertical]:self-auto"
             />
             <span className="inline-block max-w-35 truncate align-middle rounded bg-muted px-1.5 py-0.5 text-xs font-medium">
               {selectedOrg?.name ?? "…"}
@@ -406,6 +447,8 @@ interface QueryState {
   search: string
   orgId: number | null
   countries: string[]
+  sortBy: string | undefined
+  sortOrder: "asc" | "desc" | undefined
 }
 
 export function ContactsTable() {
@@ -421,6 +464,8 @@ export function ContactsTable() {
     search: "",
     orgId: null,
     countries: [],
+    sortBy: undefined,
+    sortOrder: undefined,
   })
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
@@ -428,11 +473,28 @@ export function ContactsTable() {
   const [rowSelection, setRowSelection] = React.useState({})
   const [selectedContact, setSelectedContact] = React.useState<Contact | null>(null)
   const [sheetOpen, setSheetOpen] = React.useState(false)
+  const [createOpen, setCreateOpen] = React.useState(false)
+  const [editContactId, setEditContactId] = React.useState<number | null>(null)
+  const [editOpen, setEditOpen] = React.useState(false)
+  const [refreshKey, setRefreshKey] = React.useState(0)
+  const [importOpen, setImportOpen] = React.useState(false)
+  const [mergeOpen, setMergeOpen] = React.useState(false)
+  const [importExportOpen, setImportExportOpen] = React.useState(false)
+  const { connections: integrationConnections } = useIntegrations()
+  const googleContactsIntegration = integrationConnections.find((c) => c.provider_key === "google-contacts")
   const [countryCounts, setCountryCounts] = React.useState<CountryCount[]>([])
+
+  // Tiempo real: si otra sesión crea/edita/elimina un contacto en este
+  // workspace, refresca la tabla sin esperar a un F5 manual. El evento real
+  // que emite el backend es "contact" (person.controller.ts), no "person".
+  useEntityRealtime("contact", () => setRefreshKey((k) => k + 1))
 
   React.useEffect(() => {
     const t = setTimeout(
-      () => setQuery((q) => ({ ...q, page: 1, search: searchInput })),
+      () => setQuery((q) => {
+        if (q.search === searchInput) return q
+        return { ...q, page: 1, search: searchInput }
+      }),
       400
     )
     return () => clearTimeout(t)
@@ -449,6 +511,7 @@ export function ContactsTable() {
   React.useEffect(() => {
     let cancelled = false
     setLoading(true)
+    const t0 = performance.now()
     contactService
       .list({
         page: query.page,
@@ -456,12 +519,15 @@ export function ContactsTable() {
         filter: query.search || undefined,
         organization_id: query.orgId ?? undefined,
         country: query.countries.length > 0 ? query.countries : undefined,
+        sortBy: query.sortBy,
+        sortOrder: query.sortOrder,
       })
       .then((res) => {
         if (cancelled) return
         setContacts(res.data.map(mapPerson))
         setTotal(res.total)
         setLoading(false)
+        console.log(`[ContactsTable] fetch+render page=${query.page} total=${res.total} → ${(performance.now() - t0).toFixed(1)}ms`)
       })
       .catch(() => {
         if (!cancelled) setLoading(false)
@@ -469,7 +535,7 @@ export function ContactsTable() {
     return () => {
       cancelled = true
     }
-  }, [query])
+  }, [query, refreshKey])
 
   React.useEffect(() => {
     organizationService.allNoPaginate().then(setOrgs).catch(() => {})
@@ -522,6 +588,23 @@ export function ContactsTable() {
     setColumnFilters([])
   }
 
+  async function handleDeleteClick(contact: Contact) {
+    const { canDelete, opportunityCount } = await contactService.checkCanDelete(contact.id)
+    if (!canDelete) {
+      await contactConfirm.blockedByOpportunity(contact.name, opportunityCount)
+      return
+    }
+    const confirmed = await contactConfirm.delete(contact.name)
+    if (!confirmed) return
+    try {
+      await contactService.delete(contact.id)
+      notify.success({ title: "Contacto eliminado", description: `"${contact.name}" fue eliminado correctamente.` })
+      setRefreshKey((k) => k + 1)
+    } catch {
+      notify.error({ title: "Algo salió mal", description: "No se pudo eliminar el contacto." })
+    }
+  }
+
   const columns = React.useMemo(
     () =>
       getColumns(
@@ -529,22 +612,40 @@ export function ContactsTable() {
           setSelectedContact(contact)
           setSheetOpen(true)
         },
-        (contact) => router.push(`/crm/contacts/${contact.id}`)
+        (contact) => router.push(`/crm/contacts/${contact.id}`),
+        (contact) => {
+          setEditContactId(contact.id)
+          setEditOpen(true)
+        },
+        handleDeleteClick,
       ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [router]
   )
+
+  const handleSorting = (updater: SortingState | ((prev: SortingState) => SortingState)) => {
+    const next = typeof updater === "function" ? updater(sorting) : updater
+    setSorting(next)
+    const col = next[0]
+    setQuery((q) => ({
+      ...q,
+      page: 1,
+      sortBy: col?.id,
+      sortOrder: col ? (col.desc ? "desc" : "asc") : undefined,
+    }))
+  }
 
   const table = useReactTable({
     data: contacts,
     columns,
     manualPagination: true,
+    manualSorting: true,
     rowCount: total,
     onPaginationChange: handlePagination,
-    onSortingChange: setSorting,
+    onSortingChange: handleSorting,
     onColumnFiltersChange: setColumnFilters,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
-    getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
@@ -553,31 +654,52 @@ export function ContactsTable() {
 
   return (
     <div className="w-full">
-      <div className="flex items-center gap-2 py-4">
-        <Input
-          className="max-w-sm"
-          placeholder="Buscar contacto..."
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-        />
+      {/* Row 1 — view toggle + create */}
+      <div className="flex items-center justify-between border-b px-4 py-2">
+        <div className="flex items-center gap-0.5 rounded-lg border bg-muted/40 p-0.5">
+          <span className="flex items-center gap-1.5 rounded-md bg-background px-2.5 py-1 text-xs font-medium shadow-sm">
+            <ListIcon className="size-3.5" />
+            Lista
+          </span>
+        </div>
+        <Button size="sm" onClick={() => setCreateOpen(true)}>+ Crear Contacto</Button>
+      </div>
+
+      {/* Row 2 — filters */}
+      <div className="flex items-center gap-2 border-b px-4 py-2">
+        <div className="relative w-44 shrink-0">
+          <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Buscar contacto..."
+            className="h-8 pl-8 text-xs"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+          />
+        </div>
+
         <OrgFilter orgs={orgs} selected={query.orgId} onChange={handleOrgFilter} />
+
+        <Separator orientation="vertical" className="mx-0.5 data-[orientation=vertical]:h-5 data-[orientation=vertical]:self-auto" />
+
         <DataTableFacetedFilter
           column={table.getColumn("country")!}
           title="País"
           options={countryOptions}
           counts={countryCountsMap}
         />
+
         {hasActiveFilters && (
-          <Button variant="ghost" size="sm" className="h-8" onClick={resetFilters}>
-            Reset
-            <XIcon className="ml-1 size-4" />
+          <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={resetFilters}>
+            <XIcon className="size-3.5" />
+            Restablecer
           </Button>
         )}
+
         <div className="ml-auto flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">{total} contactos</span>
+          <span className="text-xs text-muted-foreground">{total} contactos</span>
           <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="outline" />}>
-              Columnas <ChevronDown className="ml-2 size-4" />
+            <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8" />}>
+              Columnas <ChevronDown className="ml-1.5 size-3.5" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               {table
@@ -595,14 +717,24 @@ export function ContactsTable() {
                 ))}
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button>
-            <PlusIcon className="size-4" />
-            Crear Contacto
+          {googleContactsIntegration && (
+            <Button variant="outline" size="sm" className="h-8" onClick={() => setImportOpen(true)}>
+              <FcGoogle className="size-3.5" />
+              Importar con Google
+            </Button>
+          )}
+          <Button variant="outline" size="sm" className="h-8" onClick={() => setMergeOpen(true)}>
+            <GitMergeIcon className="size-3.5" />
+            Fusionar duplicados
+          </Button>
+          <Button variant="outline" size="sm" className="h-8" onClick={() => setImportExportOpen(true)}>
+            <ArrowDownUpIcon className="size-3.5" />
+            Importar / Exportar
           </Button>
         </div>
       </div>
 
-      <div className="rounded-md border">
+      <div className="mx-4 mt-3 rounded-md border">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -649,7 +781,7 @@ export function ContactsTable() {
         </Table>
       </div>
 
-      <div className="py-4">
+      <div className="px-4 py-3">
         <DataTablePagination table={table} />
       </div>
 
@@ -657,7 +789,49 @@ export function ContactsTable() {
         contact={selectedContact}
         open={sheetOpen}
         onOpenChange={setSheetOpen}
+        onViewDetails={selectedContact ? () => router.push(`/crm/contacts/${selectedContact.id}`) : undefined}
       />
+
+      <CreateContactSheet
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onSuccess={() => setRefreshKey((k) => k + 1)}
+      />
+
+      {editOpen && (
+        <CreateContactSheet
+          open
+          onOpenChange={(v) => { if (!v) setEditOpen(false) }}
+          contactId={editContactId ?? undefined}
+          onSuccess={() => { setEditOpen(false); setRefreshKey((k) => k + 1) }}
+        />
+      )}
+
+      {googleContactsIntegration && (
+        <ImportGoogleContactsSheet
+          open={importOpen}
+          onOpenChange={setImportOpen}
+          integrationId={googleContactsIntegration.id}
+          onSuccess={() => setRefreshKey((k) => k + 1)}
+        />
+      )}
+
+      {mergeOpen && (
+        <DuplicateContactsSheet
+          open
+          onOpenChange={(o) => { if (!o) setMergeOpen(false) }}
+          onMerged={() => setRefreshKey((k) => k + 1)}
+        />
+      )}
+
+      {importExportOpen && (
+        <ContactsImportExportSheet
+          open
+          onOpenChange={(o) => { if (!o) setImportExportOpen(false) }}
+          totalContacts={total}
+          onImported={() => setRefreshKey((k) => k + 1)}
+        />
+      )}
     </div>
   )
 }

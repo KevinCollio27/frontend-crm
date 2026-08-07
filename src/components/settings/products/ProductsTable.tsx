@@ -1,34 +1,33 @@
 "use client"
 
+import * as React from "react"
 import {
   type ColumnDef,
-  type ColumnFiltersState,
   flexRender,
   getCoreRowModel,
-  getFilteredRowModel,
-  getPaginationRowModel,
   getSortedRowModel,
   type SortingState,
   useReactTable,
+  type VisibilityState,
 } from "@tanstack/react-table"
 import {
-  ArrowDownIcon,
-  ArrowUpDown,
-  ArrowUpIcon,
   CopyIcon,
-  MoreHorizontal,
+  MoreHorizontalIcon,
   PencilIcon,
   PlusIcon,
+  Settings2Icon,
   Trash2Icon,
 } from "lucide-react"
-import * as React from "react"
-
-import { cn } from "@/lib/utils"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { getSortIcon } from "@/lib/table-utils"
+import { useIsWorkspaceAdmin } from "@/hooks/useIsWorkspaceAdmin"
+import { productConfirm } from "@/lib/confirm"
+import { productNotify } from "@/lib/notify"
 import { Button } from "@/components/ui/button"
+import { EntityAccentBar } from "@/components/ui/entity-accent-bar"
 import { DataTablePagination } from "@/components/ui/data-table-pagination"
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
@@ -45,151 +44,173 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { productService } from "@/services/product.service"
+import type { ProductRaw } from "@/types/product"
+import { ChipList } from "@/components/ui/chip-list"
+import { CreateProductSheet } from "./CreateProductSheet"
+import type { ProductFormState, ProductLabelType } from "./shared/form-state"
 
-interface Product {
+// ─── Entity ──────────────────────────────────────────────────────────────────
+
+export interface Product {
   id: number
   name: string
   labels: string[]
+  createdAt: string
+  raw: ProductRaw
 }
 
-const data: Product[] = [
-  {
-    id: 1,
-    name: "Merpel",
-    labels: ["Naves", "Lugar de Servicio", "Tipo Merpel", "Fecha Tentativa"],
-  },
-  {
-    id: 2,
-    name: "Combustible",
-    labels: ["Naves", "Lugar de Servicio", "Lts", "Fecha Tentativa"],
-  },
-  {
-    id: 3,
-    name: "Peróxido",
-    labels: ["Naves", "Lugar de Servicio", "Isotanques", "Fecha Tentativa"],
-  },
-  {
-    id: 4,
-    name: "Redes",
-    labels: ["Naves", "Lugar de Servicio", "Contenedores", "Tipo Redes", "Requiere Virador", "Uso extra winche", "Fecha Tentativa"],
-  },
-  {
-    id: 5,
-    name: "Cabotaje",
-    labels: ["Naves", "Lugar de Servicio", "Tons", "Contenedores", "Fecha Tentativa"],
-  },
-  {
-    id: 6,
-    name: "Alimento",
-    labels: ["Naves", "Lugar de Servicio", "Tons", "Fecha Tentativa", "Destino"],
-  },
-]
+// ─── Map ─────────────────────────────────────────────────────────────────────
 
-const badgeColors = [
-  "bg-blue-100 text-blue-700",
-  "bg-green-100 text-green-700",
-  "bg-purple-100 text-purple-700",
-  "bg-amber-100 text-amber-700",
-  "bg-rose-100 text-rose-700",
-  "bg-cyan-100 text-cyan-700",
-  "bg-orange-100 text-orange-700",
-  "bg-teal-100 text-teal-700",
-  "bg-indigo-100 text-indigo-700",
-  "bg-fuchsia-100 text-fuchsia-700",
-]
-
-function getBadgeColor(text: string) {
-  let hash = 0
-  for (let i = 0; i < text.length; i++) {
-    hash = text.charCodeAt(i) + ((hash << 5) - hash)
+function mapProduct(r: ProductRaw): Product {
+  return {
+    id: r.id,
+    name: r.name,
+    labels: r.product_label?.map((l) => l.name) ?? [],
+    createdAt: new Date(r.created_at).toLocaleDateString("es-CL", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    }),
+    raw: r,
   }
-  return badgeColors[Math.abs(hash) % badgeColors.length]
 }
 
-const getInitials = (name: string) =>
-  name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2)
-
-const getSortIcon = (sorted: false | "asc" | "desc") => {
-  if (sorted === "asc") return <ArrowUpIcon className="ml-2 size-3.5" />
-  if (sorted === "desc") return <ArrowDownIcon className="ml-2 size-3.5" />
-  return <ArrowUpDown className="ml-2 size-3.5" />
+function productToFormValues(product: Product): ProductFormState {
+  return {
+    id: product.raw.id,
+    name: product.raw.name,
+    labels: (product.raw.product_label ?? [])
+      .slice()
+      .sort((a, b) => (a.order_number ?? 0) - (b.order_number ?? 0))
+      .map((l) => ({
+        id: String(l.id),
+        name: l.name,
+        type: l.type as ProductLabelType,
+        options: (l.product_label_option ?? [])
+          .slice()
+          .sort((a, b) => (a.order_number ?? 0) - (b.order_number ?? 0))
+          .map((o) => ({
+            id: String(o.id),
+            value: o.value,
+          })),
+      })),
+  }
 }
 
-const columns: ColumnDef<Product>[] = [
+// ─── Config ───────────────────────────────────────────────────────────────────
+
+const COLUMN_LABELS: Record<string, string> = {
+  id:        "ID",
+  name:      "Nombre",
+  labels:    "Etiquetas",
+  createdAt: "Creado el",
+}
+
+const DEFAULT_COLUMN_VISIBILITY: VisibilityState = {}
+
+// ─── Skeleton ─────────────────────────────────────────────────────────────────
+
+const skeletonCell: Record<string, React.ReactNode> = {
+  id: <div className="h-3 w-8 animate-pulse rounded bg-muted" />,
+  name: (
+    <div className="flex items-center gap-2.5">
+      <div className="size-7 animate-pulse rounded-full bg-muted" />
+      <div className="h-4 w-32 animate-pulse rounded bg-muted" />
+    </div>
+  ),
+  labels: (
+    <div className="flex gap-1.5">
+      <div className="h-5 w-16 animate-pulse rounded-md bg-muted" />
+      <div className="h-5 w-20 animate-pulse rounded-md bg-muted" />
+      <div className="h-5 w-14 animate-pulse rounded-md bg-muted" />
+    </div>
+  ),
+  createdAt: <div className="h-4 w-20 animate-pulse rounded bg-muted" />,
+  actions:   <div className="ml-auto size-8 animate-pulse rounded bg-muted" />,
+}
+
+// ─── Columns ──────────────────────────────────────────────────────────────────
+
+function getColumns(
+  onEdit: (product: Product) => void,
+  onDelete: (product: Product) => void,
+  onDuplicate: (product: Product) => void,
+  isAdmin: boolean
+): ColumnDef<Product>[] {
+  return [
+  {
+    accessorKey: "id",
+    header: ({ column }) => (
+      <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
+        ID {getSortIcon(column.getIsSorted())}
+      </Button>
+    ),
+    cell: ({ row }) => (
+      <span className="text-xs text-muted-foreground tabular-nums">{row.getValue("id")}</span>
+    ),
+  },
   {
     accessorKey: "name",
     header: ({ column }) => (
       <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
-        Nombre
-        {getSortIcon(column.getIsSorted())}
+        Nombre {getSortIcon(column.getIsSorted())}
       </Button>
     ),
     cell: ({ row }) => {
       const name: string = row.getValue("name")
       return (
-        <div className="flex items-center gap-2.5">
-          <Avatar size="sm">
-            <AvatarFallback>{getInitials(name)}</AvatarFallback>
-          </Avatar>
-          <span className="text-sm font-medium">{name}</span>
+        <div className="flex items-stretch gap-2.5">
+          <EntityAccentBar seed={row.original.id} />
+          <span className="text-sm font-medium self-center">{name}</span>
         </div>
       )
     },
-    filterFn: (row, _id, value: string) =>
-      (row.getValue("name") as string).toLowerCase().includes(value.toLowerCase()),
   },
   {
     accessorKey: "labels",
     header: "Etiquetas",
-    cell: ({ row }) => {
-      const labels: string[] = row.getValue("labels")
-      return (
-        <div className="flex flex-wrap gap-1.5">
-          {labels.map((label) => (
-            <span
-              key={label}
-              className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium", getBadgeColor(label))}
-            >
-              {label}
-            </span>
-          ))}
-        </div>
-      )
-    },
     enableSorting: false,
+    cell: ({ row }) => <ChipList items={row.getValue("labels")} />,
+  },
+  {
+    accessorKey: "createdAt",
+    header: ({ column }) => (
+      <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
+        Creado el {getSortIcon(column.getIsSorted())}
+      </Button>
+    ),
+    cell: ({ row }) => (
+      <span className="text-sm text-muted-foreground">{row.getValue("createdAt")}</span>
+    ),
   },
   {
     id: "actions",
-    header: () => <div className="text-right">Acciones</div>,
     enableHiding: false,
     cell: ({ row }) => {
+      if (!isAdmin) return null
       const product = row.original
       return (
         <div className="flex justify-end">
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button className="h-8 w-8 p-0" variant="ghost" />}>
               <span className="sr-only">Abrir menú</span>
-              <MoreHorizontal className="size-4" />
+              <MoreHorizontalIcon className="size-4" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-48">
               <DropdownMenuGroup>
                 <DropdownMenuLabel>{product.name}</DropdownMenuLabel>
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onEdit(product)}>
                   <PencilIcon />
                   Editar producto
                 </DropdownMenuItem>
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onDuplicate(product)}>
                   <CopyIcon />
-                  Duplicar
+                  Duplicar producto
                 </DropdownMenuItem>
               </DropdownMenuGroup>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive focus:text-destructive">
+              <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => onDelete(product)}>
                 <Trash2Icon />
                 Eliminar producto
               </DropdownMenuItem>
@@ -199,61 +220,201 @@ const columns: ColumnDef<Product>[] = [
       )
     },
   },
-]
+  ]
+}
+
+// ─── QueryState ───────────────────────────────────────────────────────────────
+
+interface QueryState {
+  page:     number
+  pageSize: number
+  search:   string
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export function ProductsTable() {
+  const isAdmin = useIsWorkspaceAdmin()
+  const [data, setData]       = React.useState<Product[]>([])
+  const [total, setTotal]     = React.useState(0)
+  const [loading, setLoading] = React.useState(true)
+  const [search, setSearch]   = React.useState("")
   const [sorting, setSorting] = React.useState<SortingState>([])
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
+  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>(DEFAULT_COLUMN_VISIBILITY)
+  const [query, setQuery]     = React.useState<QueryState>({ page: 1, pageSize: 10, search: "" })
+  const [refreshKey, setRefreshKey] = React.useState(0)
+  const [createOpen, setCreateOpen] = React.useState(false)
+  const [editingProduct, setEditingProduct] = React.useState<ProductFormState | undefined>(undefined)
+
+  async function handleDelete(product: Product) {
+    let t0 = Date.now()
+    console.log(`[product] checkCanDelete start id=${product.id}`)
+    const { canDelete, message } = await productService.checkCanDelete(product.id)
+    console.log(`[product] checkCanDelete OK → ${Date.now() - t0}ms`)
+    if (!canDelete) {
+      await productConfirm.blockedByOpportunity(message)
+      return
+    }
+    const confirmed = await productConfirm.delete(product.name)
+    if (!confirmed) return
+    try {
+      t0 = Date.now()
+      console.log(`[product] delete start id=${product.id}`)
+      await productService.delete(product.id)
+      console.log(`[product] delete OK → ${Date.now() - t0}ms`)
+      productNotify.deleted(product.name)
+      setRefreshKey((k) => k + 1)
+    } catch (error) {
+      productNotify.error((error as { message?: string })?.message ?? "No se pudo eliminar el producto.")
+    }
+  }
+
+  async function handleDuplicate(product: Product) {
+    const t0 = Date.now()
+    console.log(`[product] duplicate start id=${product.id}`)
+    try {
+      const duplicated = await productService.duplicate(product.id)
+      console.log(`[product] duplicate OK → ${Date.now() - t0}ms`)
+      productNotify.created(duplicated.name)
+      setRefreshKey((k) => k + 1)
+    } catch (error) {
+      productNotify.error((error as { message?: string })?.message ?? "No se pudo duplicar el producto.")
+    }
+  }
+
+  const columns = React.useMemo(
+    () =>
+      getColumns(
+        (product) => {
+          setEditingProduct(productToFormValues(product))
+          setCreateOpen(true)
+        },
+        (product) => handleDelete(product),
+        (product) => handleDuplicate(product),
+        isAdmin
+      ),
+    [isAdmin]
+  )
+
+  React.useEffect(() => {
+    const t = setTimeout(() => setQuery((q) => ({ ...q, page: 1, search })), 400)
+    return () => clearTimeout(t)
+  }, [search])
+
+  React.useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+
+    productService
+      .list({ page: query.page, take: query.pageSize, filter: query.search || undefined })
+      .then((page) => {
+        if (cancelled) return
+        setData(page.data.map(mapProduct))
+        setTotal(page.total)
+      })
+      .catch(() => {
+        if (!cancelled) { setData([]); setTotal(0) }
+      })
+      .finally(() => { if (!cancelled) setLoading(false) })
+
+    return () => { cancelled = true }
+  }, [query, refreshKey])
 
   const table = useReactTable({
     data,
     columns,
+    manualPagination: true,
+    rowCount: total,
+    state: {
+      sorting,
+      columnVisibility,
+      pagination: { pageIndex: query.page - 1, pageSize: query.pageSize },
+    },
     onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
+    onColumnVisibilityChange: setColumnVisibility,
+    onPaginationChange: (updater) => {
+      const next =
+        typeof updater === "function"
+          ? updater({ pageIndex: query.page - 1, pageSize: query.pageSize })
+          : updater
+      setQuery((q) => ({ ...q, page: next.pageIndex + 1, pageSize: next.pageSize }))
+    },
     getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    state: { sorting, columnFilters },
   })
 
   return (
-    <div className="w-full">
-      <div className="flex flex-wrap items-center gap-2 py-4">
+    <div className="w-full space-y-4">
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center gap-2">
         <Input
           className="w-full sm:max-w-xs"
           placeholder="Filtrar por nombre..."
-          value={(table.getColumn("name")?.getFilterValue() as string) ?? ""}
-          onChange={(e) => table.getColumn("name")?.setFilterValue(e.target.value)}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
         />
         <div className="ml-auto flex items-center gap-2">
           <span className="hidden sm:block text-sm text-muted-foreground">
-            {table.getFilteredRowModel().rows.length} productos
+            {total} producto{total !== 1 ? "s" : ""}
           </span>
-          <Button size="sm">
-            <PlusIcon className="size-4" />
-            <span className="hidden sm:inline">Crear Producto</span>
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button variant="outline" size="sm" />}>
+              <Settings2Icon className="size-4" />
+              Visualización
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-40">
+              {table.getAllColumns().filter((col) => col.getCanHide()).map((col) => (
+                <DropdownMenuCheckboxItem
+                  key={col.id}
+                  checked={col.getIsVisible()}
+                  onCheckedChange={(v) => col.toggleVisibility(!!v)}
+                >
+                  {COLUMN_LABELS[col.id] ?? col.id}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          {isAdmin && (
+            <Button
+              size="sm"
+              onClick={() => {
+                setEditingProduct(undefined)
+                setCreateOpen(true)
+              }}
+            >
+              <PlusIcon className="size-4" />
+              <span className="hidden sm:inline">Crear Producto</span>
+            </Button>
+          )}
         </div>
       </div>
 
+      {/* Table */}
       <div className="overflow-x-auto rounded-md border">
         <Table>
           <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id}>
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(header.column.columnDef.header, header.getContext())}
+            {table.getHeaderGroups().map((hg) => (
+              <TableRow key={hg.id}>
+                {hg.headers.map((h) => (
+                  <TableHead key={h.id}>
+                    {h.isPlaceholder ? null : flexRender(h.column.columnDef.header, h.getContext())}
                   </TableHead>
                 ))}
               </TableRow>
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows?.length ? (
+            {loading ? (
+              Array.from({ length: query.pageSize }).map((_, i) => (
+                <TableRow key={i}>
+                  {table.getVisibleLeafColumns().map((col) => (
+                    <TableCell key={col.id}>
+                      {skeletonCell[col.id] ?? <div className="h-4 w-3/4 animate-pulse rounded bg-muted" />}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : table.getRowModel().rows.length ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow key={row.id}>
                   {row.getVisibleCells().map((cell) => (
@@ -274,9 +435,15 @@ export function ProductsTable() {
         </Table>
       </div>
 
-      <div className="py-4">
-        <DataTablePagination table={table} />
-      </div>
+      {/* Pagination */}
+      <DataTablePagination table={table} />
+
+      <CreateProductSheet
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        product={editingProduct}
+        onSuccess={() => setRefreshKey((k) => k + 1)}
+      />
     </div>
   )
 }

@@ -3,12 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
-import { Separator } from "@/components/ui/separator";
+import { FieldSeparator } from "@/components/ui/field";
+import { AuthHeroPanel } from "@/components/auth/AuthHeroPanel";
 import { GoogleButton } from "@/components/auth/GoogleButton";
 import { SignUpForm } from "@/components/auth/SignupForm";
 import { VerifyOTP } from "@/components/auth/VerifyOTP";
-import { Testimonials } from "@/components/auth/Testimonials";
+import { notify } from "@/lib/notify";
 import { authService } from "@/services/auth.service";
 
 const SignUp = () => {
@@ -42,66 +42,78 @@ const SignUp = () => {
   const handleResend = async () => {
     try {
       await authService.resendVerificationEmail(email);
-      toast.success("Código reenviado", { description: `Revisa tu correo ${email}` });
+      notify.success({ title: "Código reenviado", description: `Revisa tu correo ${email}` });
     } catch (err: unknown) {
       const msg = (err as { message?: string }).message ?? "Error inesperado";
-      toast.error(msg);
+      notify.error({ title: "Error inesperado", description: msg });
     }
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 lg:divide-x">
-      <div className="flex h-screen items-center justify-center">
-        <div className="mx-auto w-full max-w-md px-10 py-14 sm:rounded-2xl sm:border sm:bg-card sm:shadow-2xl/5">
-          <img src="/images/goxt-negro.png" alt="GOXT CRM" className="mx-auto h-10 w-auto" />
-
+    <div className="flex min-h-svh flex-col items-center justify-center gap-3 bg-muted p-4 md:p-6">
+      <div className="grid w-full max-w-5xl overflow-hidden rounded-2xl border bg-card shadow-2xl/5 lg:grid-cols-2">
+        <div className="p-6 md:p-8">
           {step === 1 && (
-            <>
-              <h1 className="mt-3 text-center font-medium text-2xl">¡Crea tu cuenta!</h1>
-              <p className="text-center text-muted-foreground text-sm mt-1">
-                Impulsa tus ventas con la plataforma
-              </p>
-              <div className="mt-2">
-                <GoogleButton />
-                <div className="my-4 flex items-center justify-center gap-2 overflow-hidden">
-                  <Separator />
-                  <span className="text-muted-foreground text-sm">O</span>
-                  <Separator />
-                </div>
-                <SignUpForm onSuccess={handleRegistered} />
+            <div className="flex flex-col gap-5">
+              <div className="flex flex-col items-center gap-2 text-center">
+                <h1 className="text-2xl font-bold">Crea tu cuenta</h1>
+                <p className="text-balance text-muted-foreground">
+                  Completa el formulario para crear tu cuenta
+                </p>
               </div>
-              <p className="mt-6 text-center text-sm">
+
+              <SignUpForm onSuccess={handleRegistered} />
+
+              <FieldSeparator className="*:data-[slot=field-separator-content]:bg-card">
+                O continúa con
+              </FieldSeparator>
+
+              <GoogleButton />
+
+              <p className="text-center text-sm">
                 ¿Ya tienes una cuenta?{" "}
-                <Link className="text-blue-600 hover:text-blue-700" href="/login">
-                  Inicia sesión
+                <Link className="underline-offset-2 hover:underline" href="/login">
+                  Iniciar sesión
                 </Link>
               </p>
-            </>
+            </div>
           )}
 
           {step === 2 && (
-            <div className="mt-8">
-              <VerifyOTP
-                email={email}
-                onVerify={handleVerified}
-                onResend={handleResend}
-                onBack={() => setStep(1)}
-                isLoading={isVerifying}
-                error={verifyError}
-              />
-            </div>
+            <VerifyOTP
+              email={email}
+              onVerify={handleVerified}
+              onResend={handleResend}
+              onBack={() => setStep(1)}
+              isLoading={isVerifying}
+              error={verifyError}
+            />
           )}
         </div>
+        <AuthHeroPanel />
       </div>
 
-      <div className="relative flex h-full w-full flex-col overflow-hidden bg-muted/50 dark:bg-muted/30">
-        <img
-          alt="Sign up"
-          className="absolute inset-0 size-full object-cover"
-          src="/images/login-hero2.jpg"
-        />
-        <Testimonials />
-      </div>
+      <p className="max-w-5xl text-center text-sm text-muted-foreground">
+        Al continuar, aceptas los{" "}
+        <Link
+          href="https://goxt.io/terminos"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-foreground underline-offset-2 hover:underline"
+        >
+          Términos de Servicio
+        </Link>{" "}
+        y la{" "}
+        <Link
+          href="https://goxt.io/privacidad"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-foreground underline-offset-2 hover:underline"
+        >
+          Política de Privacidad
+        </Link>
+        .
+      </p>
     </div>
   );
 };

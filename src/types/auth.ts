@@ -15,6 +15,7 @@ export interface User {
   id: number;
   name: string;
   email: string;
+  phone?: string | null;
   is_email_verified: boolean;
   is_active: boolean;
   user_workspace?: UserWorkspace[];
@@ -27,6 +28,7 @@ export interface ApiResponse<T = Record<string, unknown>> {
   user?: User;
   token?: string;
   resetToken?: string;
-  workspace?: { id: number; name: string };
+  workspace?: { id: number; name: string; logo?: string | null };
+  expireAt?: string;
   data?: T;
 }

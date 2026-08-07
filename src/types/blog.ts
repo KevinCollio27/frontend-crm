@@ -2,6 +2,7 @@ export interface BlogRaw {
   id: number
   workspace_id: number
   name: string
+  api_key: string
   brand_color: string | null
   logo_url: string | null
   allowed_domains: string | null
@@ -41,10 +42,6 @@ export interface BlogPostRaw {
   author: BlogAuthor | null
 }
 
-export interface BlogPostPage {
-  data: BlogPostRaw[]
-  total: number
-  totalPages: number
-  page: number
-  pageSize: number
+export interface BlogPostDetailRaw extends BlogPostRaw {
+  content: string
 }

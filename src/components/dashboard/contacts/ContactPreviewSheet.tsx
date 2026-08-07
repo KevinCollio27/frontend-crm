@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetFooter } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
 import {
+  BadgeCheck,
   BriefcaseIcon,
   Building2Icon,
   CalendarIcon,
@@ -74,16 +75,19 @@ interface Props {
   contact: Contact | null
   open: boolean
   onOpenChange: (open: boolean) => void
+  onViewDetails?: () => void
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function ContactPreviewSheet({ contact, open, onOpenChange }: Props) {
+export function ContactPreviewSheet({ contact, open, onOpenChange, onViewDetails }: Props) {
   const [copied, setCopied] = useState<"email" | "phone" | null>(null)
 
   if (!contact) return null
 
-  const hasOrg = contact.org !== "No Aplica"
+  const hasOrg    = contact.org !== "No Aplica"
+  const hasEmail  = Boolean(contact.email)
+  const hasPhone  = Boolean(contact.phone)
 
   const copy = (text: string, type: "email" | "phone") => {
     navigator.clipboard.writeText(text)
@@ -91,7 +95,7 @@ export function ContactPreviewSheet({ contact, open, onOpenChange }: Props) {
     setTimeout(() => setCopied(null), 1500)
   }
 
-  const whatsappUrl = `https://wa.me/${contact.phone.replace(/\D/g, "")}`
+  const whatsappUrl = hasPhone ? `https://wa.me/${contact.phone.replace(/\D/g, "")}` : null
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -100,7 +104,7 @@ export function ContactPreviewSheet({ contact, open, onOpenChange }: Props) {
         {/* Identity */}
         <div className="flex shrink-0 items-center gap-4 border-b px-5 py-4">
           <Avatar className="size-16 shrink-0">
-            <AvatarImage src="/images/avatar-contact.svg" alt={contact.name} />
+            <AvatarImage src="https://github.com/shadcn.png" alt={contact.name} />
             <AvatarFallback className="text-base font-medium">
               {contact.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)}
             </AvatarFallback>
@@ -108,21 +112,6 @@ export function ContactPreviewSheet({ contact, open, onOpenChange }: Props) {
           <div className="flex min-w-0 flex-col gap-1">
             <span className="truncate text-sm font-medium">{contact.name}</span>
             <span className="truncate text-xs text-muted-foreground">{contact.email}</span>
-            <div className="flex gap-1.5 flex-wrap mt-0.5">
-              {hasOrg && (
-                <span className="w-fit rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                  {contact.org}
-                </span>
-              )}
-              <span className={cn(
-                "w-fit rounded-full px-2 py-0.5 text-xs font-medium",
-                contact.source === "CRM"
-                  ? "bg-blue-50 text-blue-600"
-                  : "bg-emerald-50 text-emerald-600"
-              )}>
-                {contact.source}
-              </span>
-            </div>
           </div>
         </div>
 
@@ -150,27 +139,35 @@ export function ContactPreviewSheet({ contact, open, onOpenChange }: Props) {
           <div className="flex flex-col gap-1.5 px-4 py-3">
             <div className="flex items-center justify-between px-3 py-2 bg-muted/50 rounded-lg">
               <span className="text-xs text-muted-foreground">Email</span>
-              <div className="flex items-center gap-1.5">
-                <span className="text-sm">{contact.email}</span>
-                <button onClick={() => copy(contact.email, "email")} className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors" title="Copiar email">
-                  <CopyIcon className={cn("size-3.5", copied === "email" && "text-emerald-500")} />
-                </button>
-                <a href={`mailto:${contact.email}`} className="text-muted-foreground hover:text-blue-600 transition-colors" title="Abrir correo">
-                  <MailIcon className="size-3.5" />
-                </a>
-              </div>
+              {hasEmail ? (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm">{contact.email}</span>
+                  <button onClick={() => copy(contact.email, "email")} className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors" title="Copiar email">
+                    <CopyIcon className={cn("size-3.5", copied === "email" && "text-emerald-500")} />
+                  </button>
+                  <a href={`mailto:${contact.email}`} className="text-muted-foreground hover:text-blue-600 transition-colors" title="Abrir correo">
+                    <MailIcon className="size-3.5" />
+                  </a>
+                </div>
+              ) : (
+                <span className="text-sm text-muted-foreground">No Aplica</span>
+              )}
             </div>
             <div className="flex items-center justify-between px-3 py-2 bg-muted/50 rounded-lg">
               <span className="text-xs text-muted-foreground">Teléfono</span>
-              <div className="flex items-center gap-1.5">
-                <span className="text-sm">{contact.phone}</span>
-                <button onClick={() => copy(contact.phone, "phone")} className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors" title="Copiar teléfono">
-                  <CopyIcon className={cn("size-3.5", copied === "phone" && "text-emerald-500")} />
-                </button>
-                <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-emerald-600 transition-colors" title="Abrir WhatsApp">
-                  <MessageCircleIcon className="size-3.5" />
-                </a>
-              </div>
+              {hasPhone ? (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm">{contact.phone}</span>
+                  <button onClick={() => copy(contact.phone, "phone")} className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors" title="Copiar teléfono">
+                    <CopyIcon className={cn("size-3.5", copied === "phone" && "text-emerald-500")} />
+                  </button>
+                  <a href={whatsappUrl!} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-emerald-600 transition-colors" title="Abrir WhatsApp">
+                    <MessageCircleIcon className="size-3.5" />
+                  </a>
+                </div>
+              ) : (
+                <span className="text-sm text-muted-foreground">No Aplica</span>
+              )}
             </div>
             <InfoRow label="País">
               {getFlag(contact.country)}{" "}
@@ -192,11 +189,12 @@ export function ContactPreviewSheet({ contact, open, onOpenChange }: Props) {
             {hasOrg ? (
               <div className="flex items-center gap-2.5 px-3 py-2 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition-colors">
                 <Avatar className="size-7 shrink-0 rounded-md">
-                  <AvatarImage src="/images/avatar-contact.svg" alt={contact.org} />
+                  <AvatarImage src="https://github.com/shadcn.png" alt={contact.org} />
                   <AvatarFallback className="rounded-md text-[10px] font-medium">
                     {contact.org.slice(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
+                <BadgeCheck className="absolute -right-1 -bottom-1 size-4.5 rounded-full fill-blue-500 text-white" />
                 <div className="flex flex-col min-w-0">
                   <p className="text-xs font-medium">{contact.org}</p>
                   {orgDetails[contact.org] && (
@@ -219,8 +217,8 @@ export function ContactPreviewSheet({ contact, open, onOpenChange }: Props) {
 
         {/* Footer */}
         <SheetFooter className="flex-col gap-2 border-t px-4 py-3 shrink-0">
-          <Button variant="outline" className="w-full justify-start text-xs h-8">
-            <Eye className="size-3.5" /> Ver Registro
+          <Button variant="outline" className="w-full justify-start text-xs h-8" onClick={onViewDetails}>
+            <Eye className="size-3.5" /> Ver Detalles
           </Button>
           <Button
             variant="outline"

@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# notas internas / docs de trabajo — no se suben
+/Puntos/
