@@ -450,7 +450,7 @@ export function PostEditor({ value, onChange, placeholder }: PostEditorProps) {
     e.preventDefault()
     e.stopPropagation()
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    editor.insertFragment(parsePlainText(text) as any)
+    editor.tf.insertFragment(parsePlainText(text) as any)
   }
 
   return (

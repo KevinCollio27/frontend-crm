@@ -18,7 +18,7 @@ interface Step4ReviewProps {
 export function Step4Review({ form }: Step4ReviewProps) {
   const audienceSummary =
     form.audienceMode === "crm"
-      ? form.crmFilter === "specific" || form.selectedContactIds.length > 0
+      ? form.selectedContactIds.length > 0
         ? `${form.selectedContactIds.length} contacto(s) seleccionados`
         : form.crmFilter === "organization"
           ? `Organización: ${form.crmFilterOrganization || "—"}`

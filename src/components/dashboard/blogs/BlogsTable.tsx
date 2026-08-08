@@ -61,6 +61,7 @@ import { CreateBlogSheet, blogRawToFormValues, type BlogFormValues } from "./Cre
 export interface Blog {
   id: number
   name: string
+  apiKey: string
   postCount: number
   isActive: boolean
   brandColor: string | null
@@ -73,6 +74,7 @@ function mapBlog(d: BlogRaw): Blog {
   return {
     id: d.id,
     name: d.name,
+    apiKey: d.api_key,
     postCount: d._count.blog_post,
     isActive: d.is_active,
     brandColor: d.brand_color,
@@ -355,6 +357,7 @@ export function BlogsTable() {
           setEditingBlog(blogRawToFormValues({
             id: blog.id,
             name: blog.name,
+            api_key: blog.apiKey,
             brand_color: blog.brandColor,
             is_active: blog.isActive,
             logo_url: blog.logoUrl,

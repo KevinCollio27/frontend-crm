@@ -1,10 +1,11 @@
 "use client"
 
+import { Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { CircleHelpIcon } from "lucide-react"
 import { ContactWidgetForm } from "./_components/ContactWidgetForm"
 
-export default function WidgetPage() {
+function WidgetPageContent() {
   const searchParams = useSearchParams()
   const token = searchParams.get("token")
   const flow = searchParams.get("flow")
@@ -26,4 +27,12 @@ export default function WidgetPage() {
   }
 
   return <ContactWidgetForm token={token} flowId={Number(flow)} />
+}
+
+export default function WidgetPage() {
+  return (
+    <Suspense fallback={null}>
+      <WidgetPageContent />
+    </Suspense>
+  )
 }

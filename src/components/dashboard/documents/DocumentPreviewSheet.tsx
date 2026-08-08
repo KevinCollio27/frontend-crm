@@ -118,7 +118,7 @@ export function DocumentPreviewSheet({ document: doc, open, onOpenChange, onDown
 
   function handleOpen() {
     if (isLink) {
-      window.open(doc.filePath, "_blank")
+      window.open(doc!.filePath, "_blank")
     } else {
       onDownload?.()
     }
