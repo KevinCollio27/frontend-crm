@@ -46,6 +46,11 @@ export const formService = {
     return res
   },
 
+  async hasVacantes(): Promise<boolean> {
+    const res = await api.get<never, { hasVacantes: boolean }>("widget-forms/has-vacantes")
+    return res.hasVacantes
+  },
+
   async listVacantes(): Promise<VacanteSummary[]> {
     const res = await api.get<never, { vacantes: VacanteSummary[] }>("widget-forms/vacantes")
     return res.vacantes

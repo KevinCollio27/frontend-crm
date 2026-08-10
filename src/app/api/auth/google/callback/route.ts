@@ -2,6 +2,10 @@ import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
 const API = process.env.API_URL!;
+// Detrás del proxy de Railway, req.url resuelve al origen interno del contenedor
+// (localhost:PORT), no al dominio público — por eso las redirects usan esta base
+// en vez de req.url.
+const APP_URL = process.env.NEXT_PUBLIC_WIDGET_BASE_URL!;
 
 const COOKIE_BASE = {
   httpOnly: true,
@@ -20,7 +24,7 @@ export async function GET(req: NextRequest) {
 
   if (errorParam || !token) {
     const msg = searchParams.get("message") ?? "google_auth_failed";
-    return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(msg)}`, req.url));
+    return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(msg)}`, APP_URL));
   }
 
   try {
@@ -30,13 +34,13 @@ export async function GET(req: NextRequest) {
     });
 
     if (!res.ok) {
-      return NextResponse.redirect(new URL("/login?error=auth_failed", req.url));
+      return NextResponse.redirect(new URL("/login?error=auth_failed", APP_URL));
     }
 
     const data = await res.json();
 
     if (!data.success || !data.user) {
-      return NextResponse.redirect(new URL("/login?error=invalid_user", req.url));
+      return NextResponse.redirect(new URL("/login?error=invalid_user", APP_URL));
     }
 
     const jar = await cookies();
@@ -49,11 +53,11 @@ export async function GET(req: NextRequest) {
 
     if (workspaceId && !isNewUser) {
       jar.set("workspace_id", String(workspaceId), { ...COOKIE_BASE, maxAge: MAX_AGE });
-      return NextResponse.redirect(new URL("/chat?welcome=google", req.url));
+      return NextResponse.redirect(new URL("/chat?welcome=google", APP_URL));
     }
 
-    return NextResponse.redirect(new URL("/create-workspace", req.url));
+    return NextResponse.redirect(new URL("/create-workspace", APP_URL));
   } catch {
-    return NextResponse.redirect(new URL("/login?error=auth_failed", req.url));
+    return NextResponse.redirect(new URL("/login?error=auth_failed", APP_URL));
   }
 }

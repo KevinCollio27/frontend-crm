@@ -7,10 +7,11 @@ import { cn } from "@/lib/utils"
 import { FormsTable } from "./FormsTable"
 import { FormAnswersBoard } from "./FormAnswersBoard"
 import { VacantesBoard } from "./VacantesBoard"
+import { formService } from "@/services/form.service"
 
 type View = "lista" | "respuestas" | "vacantes"
 
-function ViewToggle({ view, onChange }: { view: View; onChange: (v: View) => void }) {
+function ViewToggle({ view, onChange, showVacantes }: { view: View; onChange: (v: View) => void; showVacantes: boolean | null }) {
   return (
     <div className="flex shrink-0 items-center gap-0.5 rounded-lg border bg-muted/40 p-0.5">
       <button
@@ -39,19 +40,21 @@ function ViewToggle({ view, onChange }: { view: View; onChange: (v: View) => voi
         <InboxIcon className="size-3.5" />
         Respuestas
       </button>
-      <button
-        type="button"
-        onClick={() => onChange("vacantes")}
-        className={cn(
-          "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium whitespace-nowrap transition-colors",
-          view === "vacantes"
-            ? "bg-background shadow-sm"
-            : "text-muted-foreground hover:text-foreground",
-        )}
-      >
-        <BriefcaseIcon className="size-3.5" />
-        Vacantes
-      </button>
+      {showVacantes && (
+        <button
+          type="button"
+          onClick={() => onChange("vacantes")}
+          className={cn(
+            "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium whitespace-nowrap transition-colors",
+            view === "vacantes"
+              ? "bg-background shadow-sm"
+              : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          <BriefcaseIcon className="size-3.5" />
+          Vacantes
+        </button>
+      )}
     </div>
   )
 }
@@ -64,6 +67,21 @@ export function FormsView() {
   const [view, setView] = React.useState<View>(
     () => (searchParams.get("view") as View) ?? "lista"
   )
+  // null = todavía no se sabe (evita ocultar/redirigir de más mientras carga)
+  const [showVacantes, setShowVacantes] = React.useState<boolean | null>(null)
+
+  React.useEffect(() => {
+    formService.hasVacantes()
+      .then(setShowVacantes)
+      .catch(() => setShowVacantes(false))
+  }, [])
+
+  // Si alguien llega con ?view=vacantes (link viejo, etc.) pero el workspace no
+  // tiene evidencia de uso del módulo, cae a "lista" en vez de mostrar un tab fantasma.
+  React.useEffect(() => {
+    if (view === "vacantes" && showVacantes === false) changeView("lista")
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showVacantes])
 
   function changeView(v: View) {
     setView(v)
@@ -72,7 +90,7 @@ export function FormsView() {
     router.replace(`${pathname}?${params.toString()}`, { scroll: false })
   }
 
-  const toggle = <ViewToggle view={view} onChange={changeView} />
+  const toggle = <ViewToggle view={view} onChange={changeView} showVacantes={showVacantes} />
 
   // "Lista" es una tabla normal que crece con el contenido (necesita que la página
   // scrollee) — "Respuestas" es un layout de 2 columnas de altura fija con su propio
