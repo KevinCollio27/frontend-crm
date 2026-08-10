@@ -215,7 +215,10 @@ export function BlogManager({ id }: { id: number }) {
           setLoading(false)
         })
         .catch(() => {
-          if (!cancelled) setLoading(false)
+          // Mismo patrón que OrganizationDetail: si el fetch falla (ej. el blog ya no
+          // pertenece al workspace activo porque el usuario lo cambió mientras estaba
+          // acá adentro), sacarlo a la lista en vez de dejarlo viendo un detalle fantasma.
+          if (!cancelled) router.push("/marketing/blogs")
         })
     }, search ? 400 : 0)
     return () => {

@@ -324,7 +324,7 @@ export function WorkspaceForm() {
                 <img
                   src={logo || "/images/goxt-negro.png"}
                   alt="Logo del workspace"
-                  className={logo ? "size-full object-cover" : "size-10 object-contain"}
+                  className={logo ? "size-full object-contain p-2" : "size-10 object-contain"}
                 />
               </div>
               <div className="flex flex-col gap-1.5">
