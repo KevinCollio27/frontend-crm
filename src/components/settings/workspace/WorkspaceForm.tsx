@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod"
 import { getAllCountries, getCountry } from "countries-and-timezones"
-import { Loader2Icon, PencilIcon, UploadIcon } from "lucide-react"
+import { Loader2Icon, PencilIcon, Trash2Icon, UploadIcon } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 import { Controller, useForm } from "react-hook-form"
 import { z } from "zod"
@@ -33,6 +33,8 @@ import { notify } from "@/lib/notify"
 import { workspaceService } from "@/services/workspace.service"
 import { currencyService } from "@/services/currency.service"
 import { useSessionStore } from "@/store/session.store"
+import { useIsWorkspaceOwner } from "@/hooks/useIsWorkspaceOwner"
+import { DeleteWorkspaceSheet } from "./DeleteWorkspaceSheet"
 import { CURATED_COUNTRIES } from "@/lib/curated-countries"
 import { CURRENCY_FLAG } from "@/lib/currency-utils"
 import { formatTaxId, TAX_ID_META, DEFAULT_TAX_ID } from "@/lib/tax-id-utils"
@@ -87,8 +89,10 @@ export function WorkspaceForm() {
   const user = useSessionStore((s) => s.user)
   const workspaceId = useSessionStore((s) => s.workspaceId)
   const isAdmin = !!user?.user_workspace?.find((uw) => uw.workspace_id === workspaceId && (uw.is_admin || uw.is_owner))
+  const isOwner = useIsWorkspaceOwner()
 
   const [isLoading, setIsLoading] = useState(true)
+  const [deleteSheetOpen, setDeleteSheetOpen] = useState(false)
   const [timezones, setTimezones] = useState<{ value: string; label: string }[]>([])
   const [currencies, setCurrencies] = useState<CurrencyRaw[]>([])
   const [logo, setLogo] = useState<string | null>(null)
@@ -667,6 +671,38 @@ export function WorkspaceForm() {
           </CardFooter>
         </Card>
       </form>
+
+      {/* Zona de peligro — solo el owner puede eliminar el workspace */}
+      {isOwner && (
+        <Card className="border-destructive/30">
+          <CardHeader className="border-b">
+            <CardTitle className="text-destructive">Zona de Peligro</CardTitle>
+            <CardDescription>Eliminar este workspace para siempre</CardDescription>
+          </CardHeader>
+          <CardContent className="pt-5">
+            <div className="flex items-center justify-between gap-4">
+              <p className="text-sm text-muted-foreground">
+                Borra este workspace y todo lo que tiene adentro. Esto no se puede deshacer.
+              </p>
+              <Button
+                type="button"
+                variant="destructive"
+                className="shrink-0 gap-1.5"
+                onClick={() => setDeleteSheetOpen(true)}
+              >
+                <Trash2Icon className="size-3.5" />
+                Eliminar Workspace
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <DeleteWorkspaceSheet
+        open={deleteSheetOpen}
+        onOpenChange={setDeleteSheetOpen}
+        workspaceName={identityForm.watch("name")}
+      />
     </div>
   )
 }

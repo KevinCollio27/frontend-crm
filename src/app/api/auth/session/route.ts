@@ -20,13 +20,19 @@ export async function POST(req: Request) {
   return NextResponse.json({ success: true });
 }
 
-// PATCH — update workspace_id after workspace creation
+// PATCH — update workspace_id after workspace creation (o limpiarlo, cuando no
+// queda ningún workspace disponible — workspaceId: null borra la cookie en vez
+// de guardar el string "null")
 export async function PATCH(req: Request) {
   const { workspaceId } = await req.json();
   const jar = await cookies();
   if (!jar.get("session_token")) return NextResponse.json({ success: false }, { status: 401 });
 
-  jar.set("workspace_id", String(workspaceId), { ...BASE, maxAge: 30 * 24 * 60 * 60 });
+  if (workspaceId) {
+    jar.set("workspace_id", String(workspaceId), { ...BASE, maxAge: 30 * 24 * 60 * 60 });
+  } else {
+    jar.delete("workspace_id");
+  }
   return NextResponse.json({ success: true });
 }
 

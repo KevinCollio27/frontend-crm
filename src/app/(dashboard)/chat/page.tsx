@@ -41,7 +41,19 @@ export default function ChatPage() {
   const [sending, setSending]             = React.useState(false)
 
   React.useEffect(() => {
-    if (searchParams.get("welcome") !== "1") return
+    const welcome = searchParams.get("welcome")
+
+    if (welcome === "workspace-deleted") {
+      const name = searchParams.get("name")
+      notify.success({
+        title: "Workspace eliminado con éxito",
+        description: name ? `Te dimos la bienvenida a "${name}".` : "Te cambiamos a otro de tus workspaces.",
+      })
+      router.replace("/chat")
+      return
+    }
+
+    if (welcome !== "1") return
     notify.success({
       title: "¡Tu workspace está listo!",
       description: "Ya puedes empezar a gestionar tus ventas.",

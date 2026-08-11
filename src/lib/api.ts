@@ -20,6 +20,14 @@ api.interceptors.response.use(
       window.location.replace("/login");
     }
 
+    // El workspace que tenías activo fue eliminado (por su owner) mientras lo usabas —
+    // te deja igual que una sesión vencida: sacarte de inmediato en vez de dejarte
+    // viendo errores sueltos en cada pantalla que intente cargar algo.
+    if (status === 403 && error.response?.data?.message === "Workspace is not active" && typeof window !== "undefined") {
+      useSessionStore.getState().clear();
+      window.location.replace("/login");
+    }
+
     return Promise.reject(
       error.response?.data ?? { success: false, message: "Error de red" }
     );

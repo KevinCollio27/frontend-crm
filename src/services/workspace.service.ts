@@ -58,4 +58,8 @@ export const workspaceService = {
     )
     return res.data.logo_url
   },
+
+  async deactivate(): Promise<void> {
+    await api.delete("workspace/deactivate")
+  },
 }

@@ -1,12 +1,14 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import { ArrowLeftIcon, Building2, Users, ChevronRight } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { ArrowLeftIcon, Building2, LogOutIcon, Users, ChevronRight } from "lucide-react";
 import { AuthHeroPanel } from "@/components/auth/AuthHeroPanel";
 import { CreateWorkspaceForm } from "@/components/onboarding/CreateWorkspaceForm";
 import { InviteTeamForm } from "@/components/onboarding/InviteTeamForm";
 import { useSessionStore } from "@/store/session.store";
+import { authService } from "@/services/auth.service";
+import { notify } from "@/lib/notify";
 import { cn } from "@/lib/utils";
 
 const STEPS = [
@@ -17,8 +19,20 @@ const STEPS = [
 const CreateWorkspace = () => {
   const [step, setStep] = useState(1);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const hasActiveWorkspace = useSessionStore((s) => s.workspaceId !== null);
   const logoUploadRef = useRef<Promise<unknown> | undefined>(undefined);
+
+  // Llegaste acá porque eliminaste tu único workspace — no es un error, es lo
+  // esperable, pero igual conviene explicar por qué terminaste en esta pantalla.
+  useEffect(() => {
+    if (searchParams.get("notice") !== "workspace-deleted") return
+    notify.success({
+      title: "Workspace eliminado",
+      description: "No tienes otro workspace disponible — crea uno nuevo para continuar.",
+    })
+    router.replace("/create-workspace")
+  }, [searchParams, router]);
 
   const handleWorkspaceSuccess = (logoUploadPromise?: Promise<unknown>) => {
     logoUploadRef.current = logoUploadPromise;
@@ -50,6 +64,19 @@ const CreateWorkspace = () => {
             >
               <ArrowLeftIcon className="size-3.5" />
               Volver
+            </button>
+          )}
+
+          {/* Sin workspace activo: no hay "Volver" a ningún lado (recién llegaste sin
+              ninguno, o te quedaste sin ninguno). Necesitas una salida además de crear uno. */}
+          {!hasActiveWorkspace && step === 1 && (
+            <button
+              type="button"
+              onClick={() => authService.logout()}
+              className="flex w-fit items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <LogOutIcon className="size-3.5" />
+              Cerrar sesión
             </button>
           )}
 

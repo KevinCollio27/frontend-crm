@@ -1,5 +1,10 @@
+import { Suspense } from "react";
 import CreateWorkspace from "@/components/onboarding/CreateWorkspace";
 
 export default function CreateWorkspacePage() {
-  return <CreateWorkspace />;
+  return (
+    <Suspense>
+      <CreateWorkspace />
+    </Suspense>
+  );
 }
