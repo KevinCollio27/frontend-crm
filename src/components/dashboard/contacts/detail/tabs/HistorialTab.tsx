@@ -266,7 +266,8 @@ export function HistorialTab({ contactId }: Props) {
               const message   = isSystem
                 ? log.message.replace(/El usuario\s+""\s*/i, "El widget ")
                 : log.message
-              const role      = isSystem ? null : roleOf(log.userId ? teamById.get(log.userId) : undefined)
+              const member    = log.userId ? teamById.get(log.userId) : undefined
+              const role      = isSystem ? null : roleOf(member)
 
               return (
                 <div key={log.id} className="relative pb-6 pl-7 last:pb-0">
@@ -280,7 +281,7 @@ export function HistorialTab({ contactId }: Props) {
                         </div>
                       ) : (
                         <Avatar size="sm">
-                          <AvatarImage src="https://github.com/shadcn.png" />
+                          <AvatarImage src={member?.user?.avatar_url ?? "https://github.com/shadcn.png"} />
                           <AvatarFallback className="text-base" />
                         </Avatar>
                       )}

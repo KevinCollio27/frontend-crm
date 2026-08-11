@@ -115,7 +115,7 @@ export interface OpportunityDetailData {
   planned_clousure_date: string | null
   created_at: string
   owner: { id: number; name: string } | null
-  responsibles: { id: number; name: string; is_main: boolean }[]
+  responsibles: { id: number; name: string; is_main: boolean; avatarUrl: string | null }[]
   netCost: number
   currency: string
   person: { id: number; name: string } | null

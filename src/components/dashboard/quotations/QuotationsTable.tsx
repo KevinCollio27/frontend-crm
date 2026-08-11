@@ -87,7 +87,7 @@ interface Quotation {
   currency:        string
   validUntil:      string | null
   createdAt:       string
-  responsible:     string | null
+  responsible:     { name: string; avatarUrl: string | null } | null
   opportunityId:   number | null
   opportunityName: string | null
   isSentToCargo:   boolean
@@ -113,7 +113,7 @@ function mapQuotation(q: QuotationRaw): Quotation {
     createdAt:       new Date(q.created_at).toLocaleDateString("es-CL", {
       day: "numeric", month: "short", year: "numeric",
     }),
-    responsible:     q.created_user?.name ?? null,
+    responsible:     q.created_user ? { name: q.created_user.name, avatarUrl: q.created_user.avatar_url } : null,
     opportunityId:   q.opportunity?.id ?? null,
     opportunityName: q.opportunity?.name ?? null,
     isSentToCargo:   q.is_sent_to_cargo ?? false,
@@ -352,22 +352,22 @@ function getColumns(
     },
     {
       id: "responsible",
-      accessorFn: (row) => row.responsible,
+      accessorFn: (row) => row.responsible?.name ?? "",
       header: ({ column }) => (
         <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
           Responsable {getSortIcon(column.getIsSorted())}
         </Button>
       ),
       cell: ({ row }) => {
-        const name = row.original.responsible
-        if (!name) return <span className="text-sm text-muted-foreground">—</span>
+        const responsible = row.original.responsible
+        if (!responsible) return <span className="text-sm text-muted-foreground">—</span>
         return (
           <div className="flex items-center gap-2">
             <Avatar className="size-6 shrink-0">
-              <AvatarImage src="https://github.com/shadcn.png" alt={name} />
-              <AvatarFallback className="text-[9px] font-semibold">{getInitials(name)}</AvatarFallback>
+              <AvatarImage src={responsible.avatarUrl ?? "https://github.com/shadcn.png"} alt={responsible.name} />
+              <AvatarFallback className="text-[9px] font-semibold">{getInitials(responsible.name)}</AvatarFallback>
             </Avatar>
-            <span className="text-sm">{name}</span>
+            <span className="text-sm">{responsible.name}</span>
           </div>
         )
       },
@@ -630,16 +630,17 @@ export function QuotationsTable() {
   const responsibleOptions = React.useMemo(() => {
     const seen = new Set<string>()
     return data.filter((q) => {
-      if (!q.responsible || seen.has(q.responsible)) return false
-      seen.add(q.responsible)
+      const name = q.responsible?.name
+      if (!name || seen.has(name)) return false
+      seen.add(name)
       return true
-    }).map((q) => ({ value: q.responsible as string, label: q.responsible as string }))
+    }).map((q) => ({ value: q.responsible!.name, label: q.responsible!.name }))
   }, [data])
 
   const visibleData = React.useMemo(() => {
     return data.filter((q) => {
       if (typeFilter !== "all" && q.type !== typeFilter) return false
-      if (responsibleFilter.length > 0 && !responsibleFilter.includes(q.responsible ?? "")) return false
+      if (responsibleFilter.length > 0 && !responsibleFilter.includes(q.responsible?.name ?? "")) return false
       return true
     })
   }, [data, typeFilter, responsibleFilter])

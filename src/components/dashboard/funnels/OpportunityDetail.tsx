@@ -113,9 +113,10 @@ export function OpportunityDetail({ id }: { id: number }) {
           created_at:            raw.created_at,
           owner:                 mainResp?.users ?? null,
           responsibles:          raw.opportunity_responsible.map((r) => ({
-            id:      r.id,
-            is_main: r.is_main,
-            name:    r.users?.name ?? "Sin nombre",
+            id:        r.id,
+            is_main:   r.is_main,
+            name:      r.users?.name ?? "Sin nombre",
+            avatarUrl: r.users?.avatar_url ?? null,
           })),
           netCost:         netCostItem?.value ?? 0,
           currency:        netCostItem?.currency?.symbol ?? "CLP",

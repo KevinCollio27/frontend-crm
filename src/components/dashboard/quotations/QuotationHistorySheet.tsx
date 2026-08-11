@@ -139,7 +139,7 @@ function HistoryItem({ item }: { item: QuotationHistoryRaw }) {
             {item.user ? (
               <>
                 <Avatar className="size-5 shrink-0">
-                  <AvatarImage src="https://github.com/shadcn.png" alt={item.user.name} />
+                  <AvatarImage src={item.user.avatar_url ?? "https://github.com/shadcn.png"} alt={item.user.name} />
                   <AvatarFallback className="text-[8px] font-semibold">{getInitials(item.user.name)}</AvatarFallback>
                 </Avatar>
                 <span className="text-sm font-medium leading-none">{item.user.name}</span>

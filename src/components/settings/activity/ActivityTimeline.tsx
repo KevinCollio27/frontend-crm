@@ -123,11 +123,11 @@ export function ActivityTimeline() {
 
   const [userFilter, setUserFilter] = React.useState<number | "">("")
   const [entityFilter, setEntityFilter] = React.useState("")
-  const [members, setMembers] = React.useState<{ userId: number; name: string }[]>([])
+  const [members, setMembers] = React.useState<{ userId: number; name: string; avatarUrl: string | null }[]>([])
 
   React.useEffect(() => {
     teamService.list({ take: 100 }).then((res) => {
-      setMembers(res.data.map((m) => ({ userId: m.user_id, name: m.user?.name ?? m.user?.email ?? "—" })))
+      setMembers(res.data.map((m) => ({ userId: m.user_id, name: m.user?.name ?? m.user?.email ?? "—", avatarUrl: m.user?.avatar_url ?? null })))
     }).catch(() => {})
   }, [])
 
@@ -256,6 +256,7 @@ export function ActivityTimeline() {
                   const time = format(new Date(log.createdAt), "HH:mm")
                   const userName = log.userName
                   const isSystem = !userName
+                  const member   = log.userId ? members.find((m) => m.userId === log.userId) : undefined
                   const message = isSystem
                     ? log.message.replace(/El usuario\s+""\s*/i, "El widget ")
                     : log.message
@@ -272,7 +273,7 @@ export function ActivityTimeline() {
                             </div>
                           ) : (
                             <Avatar size="sm">
-                              <AvatarImage src="https://github.com/shadcn.png" />
+                              <AvatarImage src={member?.avatarUrl ?? "https://github.com/shadcn.png"} />
                               <AvatarFallback className="text-base">
                               </AvatarFallback>
                             </Avatar>

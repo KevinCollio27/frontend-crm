@@ -79,6 +79,7 @@ export interface TeamMember {
   userId: number
   name: string
   email: string
+  avatarUrl: string | null
   active: boolean
   admin: boolean
   owner: boolean
@@ -93,6 +94,7 @@ function mapMember(r: TeamMemberRaw): TeamMember {
     userId: r.user_id,
     name: r.user?.name ?? "—",
     email: r.user?.email ?? "—",
+    avatarUrl: r.user?.avatar_url ?? null,
     active: r.is_active,
     admin: r.is_admin,
     owner: r.is_owner,
@@ -174,7 +176,7 @@ function getColumns(
       return (
         <div className="flex items-center gap-2.5">
           <Avatar size="default">
-            <AvatarImage src="https://github.com/shadcn.png" alt={name} />
+            <AvatarImage src={row.original.avatarUrl ?? "https://github.com/shadcn.png"} alt={name} />
             <AvatarFallback className="text-base">
               {getInitials(name)}
             </AvatarFallback>

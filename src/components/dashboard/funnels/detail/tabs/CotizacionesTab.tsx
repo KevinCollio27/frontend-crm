@@ -68,7 +68,7 @@ interface TabQuotation {
   currency:    string
   validUntil:  string | null
   createdAt:   string
-  responsible: string | null
+  responsible: { name: string; avatarUrl: string | null } | null
   isSentToCargo: boolean
   pdfTemplateId: number | null
 }
@@ -92,7 +92,7 @@ function mapQuotation(q: QuotationRaw): TabQuotation {
     createdAt:   new Date(q.created_at).toLocaleDateString("es-CL", {
       day: "numeric", month: "short", year: "numeric",
     }),
-    responsible: q.created_user?.name ?? null,
+    responsible: q.created_user ? { name: q.created_user.name, avatarUrl: q.created_user.avatar_url } : null,
     isSentToCargo: q.is_sent_to_cargo ?? false,
     pdfTemplateId: q.pdf_template_id ?? null,
   }
@@ -315,22 +315,22 @@ function getColumns(
     },
     {
       id: "responsible",
-      accessorFn: (row) => row.responsible,
+      accessorFn: (row) => row.responsible?.name ?? "",
       header: ({ column }) => (
         <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
           Responsable {getSortIcon(column.getIsSorted())}
         </Button>
       ),
       cell: ({ row }) => {
-        const name = row.original.responsible
-        if (!name) return <span className="text-sm text-muted-foreground">—</span>
+        const responsible = row.original.responsible
+        if (!responsible) return <span className="text-sm text-muted-foreground">—</span>
         return (
           <div className="flex items-center gap-2">
             <Avatar className="size-6 shrink-0">
-              <AvatarImage src="https://github.com/shadcn.png" alt={name} />
-              <AvatarFallback className="text-[9px] font-semibold">{getInitials(name)}</AvatarFallback>
+              <AvatarImage src={responsible.avatarUrl ?? "https://github.com/shadcn.png"} alt={responsible.name} />
+              <AvatarFallback className="text-[9px] font-semibold">{getInitials(responsible.name)}</AvatarFallback>
             </Avatar>
-            <span className="text-sm">{name}</span>
+            <span className="text-sm">{responsible.name}</span>
           </div>
         )
       },

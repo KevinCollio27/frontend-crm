@@ -192,7 +192,7 @@ export function Col1Info({ data }: Props) {
             data.responsibles.map((r) => (
               <div key={r.id} className="flex items-center gap-3 py-3">
                 <Avatar className="default shrink-0">
-                  <AvatarImage src="https://github.com/shadcn.png" alt={data.name} />
+                  <AvatarImage src={r.avatarUrl ?? "https://github.com/shadcn.png"} alt={r.name} />
                   <AvatarFallback className="text-sm font-semibold"></AvatarFallback>
                 </Avatar>
                 <div className="flex min-w-0 flex-1 flex-col">

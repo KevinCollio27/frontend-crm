@@ -44,7 +44,7 @@ export interface QuotationRaw {
   is_sent_to_cargo:     boolean
   pdf_template_id:      number | null
   currency:             { id: number; name: string; symbol: string } | null
-  created_user:         { id: number; name: string; email: string } | null
+  created_user:         { id: number; name: string; email: string; avatar_url: string | null } | null
   product:              { id: number; name: string; product_label: { key: string; name: string; type: string; order_number: number }[] } | null
   quotation_fields:     QuotationFieldRaw[]
   quotation_additionals: QuotationAdditionalRaw[]
