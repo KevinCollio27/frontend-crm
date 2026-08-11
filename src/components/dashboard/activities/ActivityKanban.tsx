@@ -28,6 +28,7 @@ import {
   EyeIcon,
   KanbanSquareIcon,
   ListIcon,
+  Loader2Icon,
   MoreHorizontalIcon,
   PlusCircleIcon,
   SearchIcon,
@@ -68,6 +69,18 @@ import type { ActivityRaw } from "@/types/activity"
 import type { Flow } from "@/types/flow"
 
 interface OppOption { id: number; name: string }
+
+// Cuántas actividades carga cada columna al abrir el board, y cuántas trae cada
+// "Cargar más" — antes un solo fetch (tope 300) alimentaba las 4 columnas juntas,
+// así que en flows con muchas actividades algunas columnas podían quedar vacías
+// mientras otras se llevaban todo el cupo (mismo problema que tuvo Oportunidades).
+const STAGE_PAGE_SIZE = 30
+
+interface StagePageState {
+  page: number
+  hasMore: boolean
+  loadingMore: boolean
+}
 
 // ─── Board types ─────────────────────────────────────────────────────────────
 
@@ -146,6 +159,12 @@ const TYPE_CONFIG: Record<string, { className: string }> = {
 }
 
 const TODAY = new Date().toISOString().slice(0, 10)
+
+// Mismo criterio visual que Oportunidades: completada ≈ ganada, cancelada ≈ perdida.
+const CARD_BORDER: Record<string, string> = {
+  completada: "border-l-2 border-l-emerald-500",
+  cancelada:  "border-l-2 border-l-red-400",
+}
 
 function isOverdue(activity: BoardActivity) {
   return (
@@ -242,6 +261,7 @@ const ActivityCard = React.memo(function ActivityCard({
         "rounded-lg border bg-card p-3 space-y-2 transition-shadow select-none",
         !isDragging && "hover:shadow-sm cursor-grab active:cursor-grabbing",
         isDragging  && "cursor-grabbing shadow-lg",
+        CARD_BORDER[activity.stageId],
       )}
     >
       <div className="flex items-start gap-1">
@@ -348,10 +368,25 @@ function SortableCard({ activity, onMove, onPreview, onViewDetail }: {
 
 // ─── DroppableColumn ──────────────────────────────────────────────────────────
 
-function DroppableColumn({ stage, activities, statsActivities, onMove, onPreview, onViewDetail }: {
+function DroppableColumn({
+  stage,
+  activities,
+  statsActivities,
+  realCount,
+  hasMore,
+  loadingMore,
+  onLoadMore,
+  onMove,
+  onPreview,
+  onViewDetail,
+}: {
   stage: typeof BOARD_STAGES[number]
   activities: BoardActivity[]
   statsActivities: BoardActivity[]
+  realCount?: number
+  hasMore?: boolean
+  loadingMore?: boolean
+  onLoadMore: (stageId: string) => void
   onMove: (activityId: string, stageId: string) => void
   onPreview: (activity: BoardActivity) => void
   onViewDetail: (activity: BoardActivity) => void
@@ -360,15 +395,12 @@ function DroppableColumn({ stage, activities, statsActivities, onMove, onPreview
   const stageActivities = activities.filter((a) => a.stageId === stage.id)
   const stageIds        = stageActivities.map((a) => a.id)
   const stageStats      = statsActivities.filter((a) => a.stageId === stage.id)
-  const overdueCount    = stageStats.filter(isOverdue).length
 
   return (
     <KanbanColumn
       ref={setNodeRef}
       title={stage.name}
-      count={stageStats.length}
-      subtitle={overdueCount > 0 ? `${overdueCount} atrasada${overdueCount > 1 ? "s" : ""}` : undefined}
-      subtitleClassName="text-amber-600"
+      count={realCount ?? stageStats.length}
       className={cn(isOver && "ring-2 ring-inset ring-primary/30 bg-primary/5")}
     >
       <SortableContext items={stageIds} strategy={verticalListSortingStrategy}>
@@ -382,6 +414,18 @@ function DroppableColumn({ stage, activities, statsActivities, onMove, onPreview
           />
         ))}
       </SortableContext>
+      {hasMore && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="w-full text-xs text-muted-foreground"
+          disabled={loadingMore}
+          onClick={() => onLoadMore(stage.id)}
+        >
+          {loadingMore ? <Loader2Icon className="size-3.5 animate-spin" /> : "Cargar más"}
+        </Button>
+      )}
     </KanbanColumn>
   )
 }
@@ -473,24 +517,94 @@ export function ActivityKanban() {
       .finally(() => setLoadingOpps(false))
   }, [flowId])
 
-  // Load activities when switching to board or when flowId / opportunityId changes
+  // Fetch de actividades del board por columna (paginado) — un fetch independiente
+  // por status, no uno solo para las 4 columnas juntas, así ninguna se queda vacía
+  // esperando que el cupo global "le toque" en el orden del fetch.
+  const [stagePages, setStagePages] = React.useState<Record<string, StagePageState>>({})
+
   React.useEffect(() => {
     if (view !== "board") return
     let cancelled = false
     setLoading(true)
-    activityService.list({
-      take: 300,
-      ...(flowId        !== null ? { flowId }        : {}),
-      ...(opportunityId !== null ? { opportunityId } : {}),
-    })
-      .then((res) => {
-        if (cancelled) return
-        setActivities(res.data.map((a) => mapBoardActivity(a, timezone)))
-      })
-      .catch(() => {})
-      .finally(() => { if (!cancelled) setLoading(false) })
+
+    Promise.all(
+      BOARD_STAGES.map((stage) =>
+        activityService
+          .list({
+            status: stage.id,
+            take: STAGE_PAGE_SIZE,
+            page: 1,
+            ...(flowId        !== null ? { flowId }        : {}),
+            ...(opportunityId !== null ? { opportunityId } : {}),
+          })
+          .then((page) => ({ stageId: stage.id, page }))
+      )
+    ).then((results) => {
+      if (cancelled) return
+      const all: BoardActivity[] = []
+      const pages: Record<string, StagePageState> = {}
+      for (const { stageId, page } of results) {
+        all.push(...page.data.map((a) => mapBoardActivity(a, timezone)))
+        pages[stageId] = { page: 1, hasMore: page.nextPage !== null, loadingMore: false }
+      }
+      setActivities(all)
+      setStagePages(pages)
+    }).catch(() => {
+      if (!cancelled) { setActivities([]); setStagePages({}) }
+    }).finally(() => { if (!cancelled) setLoading(false) })
+
     return () => { cancelled = true }
   }, [view, flowId, opportunityId, timezone, refreshKey])
+
+  function loadMoreForStage(stageId: string) {
+    const current = stagePages[stageId]
+    if (!current || !current.hasMore || current.loadingMore) return
+    const nextPage = current.page + 1
+
+    setStagePages((prev) => ({ ...prev, [stageId]: { ...prev[stageId], loadingMore: true } }))
+
+    activityService
+      .list({
+        status: stageId,
+        take: STAGE_PAGE_SIZE,
+        page: nextPage,
+        ...(flowId        !== null ? { flowId }        : {}),
+        ...(opportunityId !== null ? { opportunityId } : {}),
+      })
+      .then((page) => {
+        setActivities((prev) => {
+          const existingIds = new Set(prev.map((a) => a.id))
+          const fresh = page.data.map((a) => mapBoardActivity(a, timezone)).filter((a) => !existingIds.has(a.id))
+          return [...prev, ...fresh]
+        })
+        setStagePages((prev) => ({
+          ...prev,
+          [stageId]: { page: nextPage, hasMore: page.nextPage !== null, loadingMore: false },
+        }))
+      })
+      .catch(() => {
+        setStagePages((prev) => ({ ...prev, [stageId]: { ...prev[stageId], loadingMore: false } }))
+      })
+  }
+
+  // Conteo real por status (groupBy liviano en el backend) — independiente de lo
+  // cargado, para que el número de cada columna sea correcto aunque no se hayan
+  // traído todavía todas las actividades de esa columna.
+  const [stageCounts, setStageCounts]           = React.useState<Record<string, number>>({})
+  const [realOverdueCount, setRealOverdueCount] = React.useState(0)
+  React.useEffect(() => {
+    if (view !== "board") return
+    let cancelled = false
+    activityService
+      .getStatusCounts(flowId ?? undefined, opportunityId ?? undefined)
+      .then(({ counts, overdue }) => {
+        if (cancelled) return
+        setStageCounts(Object.fromEntries(counts.map((c) => [c.status, c.count])))
+        setRealOverdueCount(overdue)
+      })
+      .catch(() => { if (!cancelled) { setStageCounts({}); setRealOverdueCount(0) } })
+    return () => { cancelled = true }
+  }, [view, flowId, opportunityId, refreshKey])
 
   const handlePreview = React.useCallback((activity: BoardActivity) => {
     setPreviewActivity(activity)
@@ -527,6 +641,12 @@ export function ActivityKanban() {
     })
   }, [activities, search, typeFilter, priorityFilter, responsibleFilter])
 
+  // opportunityId no cuenta acá — ya se lo pasamos al endpoint de conteo real, así
+  // que el número de columna sigue siendo exacto con ese filtro activo. Solo los
+  // filtros que el backend no ve (tipo/prioridad/responsable/búsqueda) invalidan
+  // el conteo real y hacen caer al conteo local (lo cargado hasta el momento).
+  const hasClientOnlyFilters = typeFilter.length > 0 || priorityFilter.length > 0 || responsibleFilter.length > 0 || !!search
+
   // Mirror activities state in a ref so drag handlers always read the latest value
   const activitiesRef   = React.useRef<BoardActivity[]>([])
   React.useEffect(() => { activitiesRef.current = activities }, [activities])
@@ -537,14 +657,28 @@ export function ActivityKanban() {
   const statsActivities    = activeActivity ? predragFilteredRef.current : filtered
   const overdueCount       = filtered.filter(isOverdue).length
 
+  // Mismo criterio que el conteo por columna: el total/atrasadas real del backend
+  // solo vale si no hay filtros que el backend no ve — si no, cae a lo cargado.
+  const realTotalCount = Object.values(stageCounts).reduce((sum, n) => sum + n, 0)
+  const displayTotal   = hasClientOnlyFilters ? filtered.length : realTotalCount
+  const displayOverdue = hasClientOnlyFilters ? overdueCount    : realOverdueCount
+
   const moveActivity = React.useCallback((activityId: string, targetStageId: string) => {
     const activity = activities.find((a) => a.id === activityId)
     if (!activity || activity.stageId === targetStageId) return
 
+    const originalStageId = activity.stageId
     const stageName = BOARD_STAGES.find((s) => s.id === targetStageId)?.name ?? targetStageId
     setActivities((prev) =>
       prev.map((a) => a.id === activityId ? { ...a, stageId: targetStageId } : a)
     )
+    // Contador optimista — si no, queda desactualizado hasta el próximo refresh
+    // (el conteo real del backend no se refresca en cada drag).
+    setStageCounts((prev) => ({
+      ...prev,
+      [originalStageId]: Math.max(0, (prev[originalStageId] ?? 0) - 1),
+      [targetStageId]:   (prev[targetStageId] ?? 0) + 1,
+    }))
     notify.success({ title: `Actividad movida a ${stageName}`, description: "El estado se actualizó correctamente." })
 
     activityService.updateStatus(activity.rawId, targetStageId)
@@ -552,6 +686,11 @@ export function ActivityKanban() {
         setActivities((prev) =>
           prev.map((a) => a.id === activityId ? { ...a, stageId: activity.stageId } : a)
         )
+        setStageCounts((prev) => ({
+          ...prev,
+          [originalStageId]: (prev[originalStageId] ?? 0) + 1,
+          [targetStageId]:   Math.max(0, (prev[targetStageId] ?? 0) - 1),
+        }))
         notify.error({ title: "No se pudo mover la actividad", description: "Intenta de nuevo o recarga la página." })
       })
   }, [activities])
@@ -611,12 +750,22 @@ export function ActivityKanban() {
     // Fire API if card crossed into a different stage
     if (currentStageId && currentStageId !== dragInfo.stageId) {
       const stageName = BOARD_STAGES.find((s) => s.id === currentStageId)?.name ?? currentStageId
+      setStageCounts((prev) => ({
+        ...prev,
+        [dragInfo.stageId]: Math.max(0, (prev[dragInfo.stageId] ?? 0) - 1),
+        [currentStageId]:   (prev[currentStageId] ?? 0) + 1,
+      }))
       notify.success({ title: `Actividad movida a ${stageName}`, description: "El estado se actualizó correctamente." })
       activityService.updateStatus(dragInfo.rawId, currentStageId)
         .catch(() => {
           setActivities((prev) =>
             prev.map((a) => a.id === activeId ? { ...a, stageId: dragInfo.stageId } : a)
           )
+          setStageCounts((prev) => ({
+            ...prev,
+            [dragInfo.stageId]: (prev[dragInfo.stageId] ?? 0) + 1,
+            [currentStageId]:   Math.max(0, (prev[currentStageId] ?? 0) - 1),
+          }))
           notify.error({ title: "No se pudo mover la actividad", description: "Intenta de nuevo o recarga la página." })
         })
     }
@@ -778,10 +927,10 @@ export function ActivityKanban() {
 
         {view === "board" && (
           <span className="ml-auto shrink-0 text-xs text-muted-foreground">
-            {loading ? "Cargando…" : `${filtered.length} actividades`}
-            {!loading && overdueCount > 0 && (
+            {loading ? "Cargando…" : `${displayTotal} actividades`}
+            {!loading && displayOverdue > 0 && (
               <span className="text-amber-600">
-                {" · "}{overdueCount} atrasada{overdueCount > 1 ? "s" : ""}
+                {" · "}{displayOverdue} atrasada{displayOverdue > 1 ? "s" : ""}
               </span>
             )}
           </span>
@@ -806,6 +955,10 @@ export function ActivityKanban() {
                 stage={stage}
                 activities={filtered}
                 statsActivities={statsActivities}
+                realCount={hasClientOnlyFilters ? undefined : stageCounts[stage.id]}
+                hasMore={stagePages[stage.id]?.hasMore}
+                loadingMore={stagePages[stage.id]?.loadingMore}
+                onLoadMore={loadMoreForStage}
                 onMove={moveActivity}
                 onPreview={handlePreview}
                 onViewDetail={handleViewDetail}

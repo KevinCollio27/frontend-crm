@@ -43,6 +43,14 @@ export const activityService = {
     return res.opportunityActivities
   },
 
+  async getStatusCounts(flowId?: number, opportunityId?: number): Promise<{ counts: { status: string; count: number }[]; overdue: number }> {
+    const res = await api.get<never, { counts: { status: string; count: number }[]; overdue: number }>(
+      "opportunity-activity/status-counts",
+      { params: { flowId, opportunityId } }
+    )
+    return { counts: res.counts, overdue: res.overdue }
+  },
+
   async getById(id: number): Promise<ActivityRaw> {
     const res = await api.get<never, { opportunityActivity: ActivityRaw }>(
       `opportunity-activity/${id}`
