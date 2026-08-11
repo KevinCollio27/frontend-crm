@@ -1,13 +1,16 @@
 "use client"
 
 import * as React from "react"
-import { AlertTriangleIcon, PlusIcon, UsersIcon, XIcon } from "lucide-react"
+import { AlertTriangleIcon, PlusIcon, SearchIcon, UsersIcon, XIcon } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet"
 import { contactService } from "@/services/contact.service"
 import type { PersonDuplicateGroup } from "@/types/contact"
 import { MergeContactsSheet } from "./MergeContactsSheet"
+
+const PAGE_SIZE = 30
 
 function Skeleton() {
   return (
@@ -55,6 +58,8 @@ export function DuplicateContactsSheet({ open, onOpenChange, onMerged }: Props) 
   const [loading, setLoading] = React.useState(true)
   const [refreshKey, setRefreshKey] = React.useState(0)
   const [selectedGroup, setSelectedGroup] = React.useState<PersonDuplicateGroup | null>(null)
+  const [search, setSearch] = React.useState("")
+  const [visibleCount, setVisibleCount] = React.useState(PAGE_SIZE)
 
   React.useEffect(() => {
     if (!open) return
@@ -67,6 +72,23 @@ export function DuplicateContactsSheet({ open, onOpenChange, onMerged }: Props) 
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [open, refreshKey])
+
+  // Búsqueda y "cargar más" son 100% client-side — los grupos ya están completos en
+  // memoria (la detección de duplicados necesita escanear todo el workspace de una,
+  // no se puede paginar la búsqueda en sí), pero renderizar los 1000+ grupos de una
+  // sola vez sí era el problema real. Esto solo filtra/recorta lo ya cargado.
+  const filteredGroups = React.useMemo(() => {
+    if (!search.trim()) return groups
+    const q = search.trim().toLowerCase()
+    return groups.filter((g) => g.candidates[0].name.toLowerCase().includes(q))
+  }, [groups, search])
+
+  React.useEffect(() => {
+    setVisibleCount(PAGE_SIZE)
+  }, [search])
+
+  const visibleGroups = filteredGroups.slice(0, visibleCount)
+  const hasMore = visibleCount < filteredGroups.length
 
   function handleMerged() {
     setSelectedGroup(null)
@@ -100,6 +122,20 @@ export function DuplicateContactsSheet({ open, onOpenChange, onMerged }: Props) 
             </Button>
           </div>
 
+          {!loading && groups.length > 0 && (
+            <div className="border-b px-5 py-3">
+              <div className="relative">
+                <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  className="pl-8"
+                  placeholder="Buscar por nombre..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+
           <div className="flex-1 overflow-y-auto">
             {loading ? (
               <Skeleton />
@@ -110,9 +146,13 @@ export function DuplicateContactsSheet({ open, onOpenChange, onMerged }: Props) 
                   Si dos contactos son la misma persona pero con nombres distintos, la detección automática no los junta — puedes fusionarlos a mano.
                 </p>
               </div>
+            ) : filteredGroups.length === 0 ? (
+              <p className="py-12 text-center text-sm text-muted-foreground">
+                Sin resultados para &ldquo;{search}&rdquo;.
+              </p>
             ) : (
               <div className="space-y-3 p-5">
-                {groups.map((group) => (
+                {visibleGroups.map((group) => (
                   <div key={group.key} className="flex items-center justify-between gap-3 rounded-lg border p-4">
                     <div className="flex items-start gap-3 min-w-0">
                       <AlertTriangleIcon className="mt-0.5 size-4 shrink-0 text-amber-500" />
@@ -127,6 +167,13 @@ export function DuplicateContactsSheet({ open, onOpenChange, onMerged }: Props) 
                     </Button>
                   </div>
                 ))}
+                {hasMore && (
+                  <div className="flex justify-center pt-1">
+                    <Button variant="outline" size="sm" onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}>
+                      Cargar más ({filteredGroups.length - visibleGroups.length} restantes)
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
           </div>

@@ -18,6 +18,7 @@ import {
   ExternalLinkIcon,
   GitMergeIcon,
   ListIcon,
+  Loader2Icon,
   MailIcon,
   MoreHorizontal,
   PencilIcon,
@@ -72,6 +73,7 @@ import { notify } from "@/lib/notify"
 import { useIntegrations } from "@/hooks/useIntegrations"
 import type { Person } from "@/types/contact"
 import { getFlag, getSortIcon, getInitials } from "@/lib/table-utils"
+import { cn } from "@/lib/utils"
 
 export interface Contact {
   id: number
@@ -385,21 +387,85 @@ const skeletonCell: Record<string, React.ReactNode> = {
   actions:   <div className="size-8 animate-pulse rounded bg-muted" />,
 }
 
+// Busca con debounce contra el backend (organizationService.list, paginado) en vez
+// de cargar todas las organizaciones del workspace de una — con workspaces grandes
+// (CamionGO y sus cientos de organizaciones) el listado completo tardaba ~10s en
+// cargar y renderizar. El nombre de la seleccionada se guarda aparte porque puede
+// no estar en la página de resultados actual una vez que cambias la búsqueda.
 function OrgFilter({
-  orgs,
   selected,
   onChange,
 }: {
-  orgs: OrganizationOption[]
   selected: number | null
   onChange: (id: number | null) => void
 }) {
-  const selectedOrg = orgs.find((o) => o.id === selected)
+  const [open, setOpen] = React.useState(false)
+  const [search, setSearch] = React.useState("")
+  const [items, setItems] = React.useState<OrganizationOption[]>([])
+  const [searching, setSearching] = React.useState(false)
+  const [selectedName, setSelectedName] = React.useState<string | null>(null)
+  const [dropStyle, setDropStyle] = React.useState<React.CSSProperties>({})
+  const triggerRef = React.useRef<HTMLButtonElement>(null)
+  const containerRef = React.useRef<HTMLDivElement>(null)
+
+  React.useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    setSearching(true)
+    const t = setTimeout(async () => {
+      try {
+        const res = await organizationService.list({ filter: search || undefined, take: 20 })
+        if (!cancelled) setItems(res.data.map((o) => ({ id: o.id, name: o.name })))
+      } catch {
+        if (!cancelled) setItems([])
+      } finally {
+        if (!cancelled) setSearching(false)
+      }
+    }, 300)
+    return () => { cancelled = true; clearTimeout(t) }
+  }, [search, open])
+
+  function handleOpen() {
+    if (!open && triggerRef.current) {
+      const r = triggerRef.current.getBoundingClientRect()
+      setDropStyle({ top: r.bottom + 6, left: r.left, width: Math.max(r.width, 220) })
+    }
+    setOpen((o) => !o)
+  }
+
+  React.useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false)
+        setSearch("")
+      }
+    }
+    document.addEventListener("mousedown", handler)
+    return () => document.removeEventListener("mousedown", handler)
+  }, [])
+
+  function pick(org: OrganizationOption) {
+    const isSame = selected === org.id
+    onChange(isSame ? null : org.id)
+    setSelectedName(isSame ? null : org.name)
+    setOpen(false)
+    setSearch("")
+  }
+
+  function clear() {
+    onChange(null)
+    setSelectedName(null)
+    setOpen(false)
+  }
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={<Button variant="outline" size="sm" className="h-8 border-dashed" />}
+    <div ref={containerRef} className="relative">
+      <Button
+        ref={triggerRef}
+        variant="outline"
+        size="sm"
+        className="h-8 border-dashed"
+        onClick={handleOpen}
       >
         <PlusCircleIcon className="size-3.5" />
         Organización
@@ -409,35 +475,66 @@ function OrgFilter({
               orientation="vertical"
               className="mx-1 data-[orientation=vertical]:h-4 data-[orientation=vertical]:self-auto"
             />
-            <span className="inline-block max-w-35 truncate align-middle rounded bg-muted px-1.5 py-0.5 text-xs font-medium">
-              {selectedOrg?.name ?? "…"}
+            <span className="flex max-w-35 items-center gap-1.5 rounded bg-muted px-1.5 py-0.5 text-xs font-medium">
+              {selected !== null && <EntityAccentBar seed={selected} className="h-3.5" />}
+              <span className="truncate">{selectedName ?? "…"}</span>
             </span>
           </>
         )}
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="max-h-60 min-w-44 overflow-y-auto">
-        {orgs.map((org) => (
-          <DropdownMenuCheckboxItem
-            key={org.id}
-            checked={selected === org.id}
-            onCheckedChange={() => onChange(selected === org.id ? null : org.id)}
-          >
-            {org.name}
-          </DropdownMenuCheckboxItem>
-        ))}
-        {selected !== null && (
-          <>
-            <DropdownMenuSeparator />
-            <button
-              className="w-full px-2 py-1.5 text-center text-xs text-muted-foreground transition-colors hover:text-foreground"
-              onClick={() => onChange(null)}
-            >
-              Limpiar filtro
-            </button>
-          </>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+      </Button>
+
+      {open && (
+        <div
+          className="fixed z-50 rounded-lg border bg-popover text-popover-foreground shadow-md"
+          style={dropStyle}
+        >
+          <div className="border-b p-1.5">
+            <input
+              autoFocus
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar organización..."
+              className="w-full bg-transparent px-2 py-1 text-sm outline-none placeholder:text-muted-foreground"
+            />
+          </div>
+          <div className="max-h-60 min-w-44 overflow-y-auto p-1">
+            {searching ? (
+              <div className="flex justify-center py-4">
+                <Loader2Icon className="size-4 animate-spin text-muted-foreground" />
+              </div>
+            ) : items.length === 0 ? (
+              <p className="py-2 text-center text-sm text-muted-foreground">Sin resultados</p>
+            ) : (
+              items.map((org) => (
+                <button
+                  key={org.id}
+                  type="button"
+                  onClick={() => pick(org)}
+                  className={cn(
+                    "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground",
+                    selected === org.id && "bg-accent/50 font-medium"
+                  )}
+                >
+                  <EntityAccentBar seed={org.id} className="h-4" />
+                  <span className="truncate">{org.name}</span>
+                </button>
+              ))
+            )}
+          </div>
+          {selected !== null && (
+            <>
+              <DropdownMenuSeparator />
+              <button
+                className="w-full px-2 py-1.5 text-center text-xs text-muted-foreground transition-colors hover:text-foreground"
+                onClick={clear}
+              >
+                Limpiar filtro
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -456,7 +553,6 @@ export function ContactsTable() {
   const [contacts, setContacts] = React.useState<Contact[]>([])
   const [total, setTotal] = React.useState(0)
   const [loading, setLoading] = React.useState(true)
-  const [orgs, setOrgs] = React.useState<OrganizationOption[]>([])
   const [searchInput, setSearchInput] = React.useState("")
   const [query, setQuery] = React.useState<QueryState>({
     page: 1,
@@ -536,10 +632,6 @@ export function ContactsTable() {
       cancelled = true
     }
   }, [query, refreshKey])
-
-  React.useEffect(() => {
-    organizationService.allNoPaginate().then(setOrgs).catch(() => {})
-  }, [])
 
   React.useEffect(() => {
     contactService.countryCounts().then(setCountryCounts).catch(() => {})
@@ -677,7 +769,7 @@ export function ContactsTable() {
           />
         </div>
 
-        <OrgFilter orgs={orgs} selected={query.orgId} onChange={handleOrgFilter} />
+        <OrgFilter selected={query.orgId} onChange={handleOrgFilter} />
 
         <Separator orientation="vertical" className="mx-0.5 data-[orientation=vertical]:h-5 data-[orientation=vertical]:self-auto" />
 

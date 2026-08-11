@@ -42,11 +42,11 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { CURATED_COUNTRIES } from "@/lib/curated-countries"
+import { OrgAsyncSelect } from "@/components/shared/OrgAsyncSelect"
 import { activeOptions, catalogService } from "@/services/catalog.service"
 import { contactService, type PersonPayload } from "@/services/contact.service"
 import { notify } from "@/lib/notify"
 import type { CatalogOption } from "@/types/catalog"
-import { organizationService, type OrganizationOption } from "@/services/organization.service"
 import { CreateOrganizationSheet } from "../organizations/CreateOrganizationSheet"
 import { PHONE_CODES, COUNTRY_DIAL_CODE } from "@/lib/phone-utils"
 
@@ -226,7 +226,7 @@ export function CreateContactSheet({ open, onOpenChange, contactId, onSuccess, b
 
   const [name, setName]               = React.useState("")
   const [orgId, setOrgId]             = React.useState<number | null>(null)
-  const [orgs, setOrgs]               = React.useState<OrganizationOption[]>([])
+  const [orgName, setOrgName]         = React.useState<string | null>(null)
   const [isLoading, setIsLoading]     = React.useState(false)
   const [isSubmitting, setIsSubmitting] = React.useState(false)
   const [createOrgOpen, setCreateOrgOpen] = React.useState(false)
@@ -255,12 +255,9 @@ export function CreateContactSheet({ open, onOpenChange, contactId, onSuccess, b
     if (!open) return
     setIsLoading(true)
     Promise.all([
-      organizationService.allNoPaginate(),
       catalogService.getLabelOptions(["email", "phone", "charge"]),
       contactId ? contactService.getById(contactId) : Promise.resolve(null),
-    ]).then(([orgData, labels, contactData]) => {
-      setOrgs(orgData)
-
+    ]).then(([labels, contactData]) => {
       const emailLabel  = labels.find((l) => l.key === "email")
       const phoneLabel  = labels.find((l) => l.key === "phone")
       const chargeLabel = labels.find((l) => l.key === "charge")
@@ -283,6 +280,7 @@ export function CreateContactSheet({ open, onOpenChange, contactId, onSuccess, b
         // ── Edit mode: pre-populate from contact ──────────────────────────
         setName(contactData.name)
         setOrgId(contactData.organization_id)
+        setOrgName(contactData.organization?.name ?? null)
         setCountry(contactData.pais_origen ?? "CL")
         setSource(contactData.contact_source ?? "")
         setInternalRole(contactData.internal_position ?? "")
@@ -390,6 +388,7 @@ export function CreateContactSheet({ open, onOpenChange, contactId, onSuccess, b
     onOpenChange(false)
     setName("")
     setOrgId(null)
+    setOrgName(null)
     setCreateOrgOpen(false)
     setCountry("CL")
     setSource("")
@@ -540,12 +539,10 @@ export function CreateContactSheet({ open, onOpenChange, contactId, onSuccess, b
                       Crear organización
                     </Button>
                   </div>
-                  <SearchableSelect
-                    options={orgs.map((o) => ({ value: String(o.id), label: o.name }))}
-                    value={orgId ? String(orgId) : ""}
-                    onChange={(v) => setOrgId(v ? parseInt(v) : null)}
-                    placeholder={isLoading ? "Cargando..." : "Selecciona una organización"}
-                    searchPlaceholder="Buscar organización..."
+                  <OrgAsyncSelect
+                    value={orgId}
+                    selectedName={orgName}
+                    onChange={(org) => { setOrgId(org?.id ?? null); setOrgName(org?.name ?? null) }}
                     disabled={isLoading}
                   />
                 </div>
@@ -895,8 +892,8 @@ export function CreateContactSheet({ open, onOpenChange, contactId, onSuccess, b
         onOpenChange={(v) => { if (!v) setCreateOrgOpen(false) }}
         breadcrumb="Crear Contacto"
         onSuccess={(org) => {
-          setOrgs((prev) => [...prev, org])
           setOrgId(org.id)
+          setOrgName(org.name)
           setCreateOrgOpen(false)
         }}
       />

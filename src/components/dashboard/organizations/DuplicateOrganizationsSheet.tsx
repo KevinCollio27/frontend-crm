@@ -1,12 +1,15 @@
 "use client"
 
 import * as React from "react"
-import { AlertTriangleIcon, Building2Icon, PlusIcon, XIcon } from "lucide-react"
+import { AlertTriangleIcon, Building2Icon, PlusIcon, SearchIcon, XIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet"
 import { organizationService } from "@/services/organization.service"
 import type { OrganizationDuplicateGroup } from "@/types/organization"
 import { MergeOrganizationsSheet } from "./MergeOrganizationsSheet"
+
+const PAGE_SIZE = 30
 
 function Skeleton() {
   return (
@@ -35,6 +38,8 @@ export function DuplicateOrganizationsSheet({ open, onOpenChange, onMerged }: Pr
   const [loading, setLoading] = React.useState(true)
   const [refreshKey, setRefreshKey] = React.useState(0)
   const [selectedGroup, setSelectedGroup] = React.useState<OrganizationDuplicateGroup | null>(null)
+  const [search, setSearch] = React.useState("")
+  const [visibleCount, setVisibleCount] = React.useState(PAGE_SIZE)
 
   React.useEffect(() => {
     if (!open) return
@@ -47,6 +52,22 @@ export function DuplicateOrganizationsSheet({ open, onOpenChange, onMerged }: Pr
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [open, refreshKey])
+
+  // Búsqueda y "cargar más" son 100% client-side — mismo motivo que en contactos:
+  // los grupos ya están completos en memoria, el problema real era renderizar
+  // 1000+ grupos de una sola vez, no la búsqueda en sí.
+  const filteredGroups = React.useMemo(() => {
+    if (!search.trim()) return groups
+    const q = search.trim().toLowerCase()
+    return groups.filter((g) => g.organizations[0].name.toLowerCase().includes(q))
+  }, [groups, search])
+
+  React.useEffect(() => {
+    setVisibleCount(PAGE_SIZE)
+  }, [search])
+
+  const visibleGroups = filteredGroups.slice(0, visibleCount)
+  const hasMore = visibleCount < filteredGroups.length
 
   function handleMerged() {
     setSelectedGroup(null)
@@ -80,6 +101,20 @@ export function DuplicateOrganizationsSheet({ open, onOpenChange, onMerged }: Pr
             </Button>
           </div>
 
+          {!loading && groups.length > 0 && (
+            <div className="border-b px-5 py-3">
+              <div className="relative">
+                <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  className="pl-8"
+                  placeholder="Buscar por nombre..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+
           <div className="flex-1 overflow-y-auto">
             {loading ? (
               <Skeleton />
@@ -90,9 +125,13 @@ export function DuplicateOrganizationsSheet({ open, onOpenChange, onMerged }: Pr
                   Si dos organizaciones son la misma empresa pero con nombres distintos (ej. con o sin razón social), la detección automática no las junta — puedes fusionarlas a mano.
                 </p>
               </div>
+            ) : filteredGroups.length === 0 ? (
+              <p className="py-12 text-center text-sm text-muted-foreground">
+                Sin resultados para &ldquo;{search}&rdquo;.
+              </p>
             ) : (
               <div className="space-y-3 p-5">
-                {groups.map((group) => (
+                {visibleGroups.map((group) => (
                   <div key={group.key} className="flex items-center justify-between gap-3 rounded-lg border p-4">
                     <div className="flex items-start gap-3 min-w-0">
                       <AlertTriangleIcon className="mt-0.5 size-4 shrink-0 text-amber-500" />
@@ -106,6 +145,13 @@ export function DuplicateOrganizationsSheet({ open, onOpenChange, onMerged }: Pr
                     </Button>
                   </div>
                 ))}
+                {hasMore && (
+                  <div className="flex justify-center pt-1">
+                    <Button variant="outline" size="sm" onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}>
+                      Cargar más ({filteredGroups.length - visibleGroups.length} restantes)
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
           </div>

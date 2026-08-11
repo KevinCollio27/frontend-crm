@@ -7,14 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { OrgAsyncSelect } from "@/components/shared/OrgAsyncSelect"
 import {
   Table,
   TableBody,
@@ -27,7 +20,6 @@ import { getInitials } from "@/lib/table-utils"
 import { cn } from "@/lib/utils"
 import { Section } from "@/components/ui/section"
 import { contactService } from "@/services/contact.service"
-import { organizationService, type OrganizationOption } from "@/services/organization.service"
 import type { Person } from "@/types/contact"
 import type { AudienceMode, CampaignFormState, CrmFilter, CustomRecipient } from "../shared/form-state"
 
@@ -61,7 +53,6 @@ export function Step2Audience({ form, setForm }: Step2AudienceProps) {
   const [loading, setLoading] = React.useState(false)
   const [loadingMore, setLoadingMore] = React.useState(false)
   const [selectingAll, setSelectingAll] = React.useState(false)
-  const [orgs, setOrgs] = React.useState<OrganizationOption[]>([])
   const [search, setSearch] = React.useState("")
   const [debouncedSearch, setDebouncedSearch] = React.useState("")
 
@@ -70,11 +61,6 @@ export function Step2Audience({ form, setForm }: Step2AudienceProps) {
     const t = setTimeout(() => setDebouncedSearch(search), 400)
     return () => clearTimeout(t)
   }, [search])
-
-  // Load orgs once
-  React.useEffect(() => {
-    organizationService.allNoPaginate().then(setOrgs).catch(() => {})
-  }, [])
 
   function buildListParams(pageNum: number, take: number): Parameters<typeof contactService.list>[0] {
     const params: Parameters<typeof contactService.list>[0] = {
@@ -275,30 +261,19 @@ export function Step2Audience({ form, setForm }: Step2AudienceProps) {
               ))}
             </div>
             {form.crmFilter === "organization" && (
-              <Select
-                value={form.crmFilterOrganizationId ? String(form.crmFilterOrganizationId) : ""}
-                onValueChange={(v) => {
-                  const org = orgs.find((o) => String(o.id) === v)
-                  setForm((f) => ({
-                    ...f,
-                    crmFilterOrganizationId: org?.id ?? null,
-                    crmFilterOrganization: org?.name ?? "",
-                  }))
-                }}
-              >
-                <SelectTrigger className="w-48" aria-label="Organización">
-                  <SelectValue placeholder="Selecciona una organización" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {orgs.map((org) => (
-                      <SelectItem key={org.id} value={String(org.id)}>
-                        {org.name}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
+              <div className="w-48">
+                <OrgAsyncSelect
+                  value={form.crmFilterOrganizationId}
+                  selectedName={form.crmFilterOrganization || null}
+                  onChange={(org) =>
+                    setForm((f) => ({
+                      ...f,
+                      crmFilterOrganizationId: org?.id ?? null,
+                      crmFilterOrganization: org?.name ?? "",
+                    }))
+                  }
+                />
+              </div>
             )}
           </div>
 

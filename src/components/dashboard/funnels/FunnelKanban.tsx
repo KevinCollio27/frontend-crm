@@ -30,6 +30,7 @@ import {
   FileTextIcon,
   KanbanSquareIcon,
   ListIcon,
+  Loader2Icon,
   MoreHorizontalIcon,
   PencilIcon,
   SparklesIcon,
@@ -75,7 +76,19 @@ import type { Flow, FlowStage } from "@/types/flow"
 
 // ─── Configs ─────────────────────────────────────────────────────────────────
 
+// Cuántas oportunidades carga cada columna al abrir el board, y cuántas trae cada
+// "Cargar más" — antes un solo fetch de todo el flow (tope 500) alimentaba todas
+// las columnas juntas, así que en flows grandes (Prohabla, 500+) algunas columnas
+// podían quedar vacías mientras otras se llevaban todo el cupo.
+const STAGE_PAGE_SIZE = 30
+
 type OppStatus = "en_progreso" | "ganada" | "perdida" | "reabierta"
+
+interface StagePageState {
+  page: number
+  hasMore: boolean
+  loadingMore: boolean
+}
 
 const STATUS_CONFIG: Record<OppStatus, { label: string; className: string; border: string }> = {
   en_progreso: { label: "En Progreso", className: "bg-blue-50 text-blue-700",       border: ""                                },
@@ -348,6 +361,10 @@ interface DroppableColumnProps {
   stage: FlowStage
   opps: Opportunity[]
   statsOpps: Opportunity[]
+  realCount?: number
+  hasMore?: boolean
+  loadingMore?: boolean
+  onLoadMore: (stageId: number) => void
   stages: FlowStage[]
   onMove: (oppId: number, stageId: number) => void
   onPreview: (opp: Opportunity) => void
@@ -363,6 +380,10 @@ function DroppableColumn({
   stage,
   opps,
   statsOpps,
+  realCount,
+  hasMore,
+  loadingMore,
+  onLoadMore,
   stages,
   onMove,
   onPreview,
@@ -384,7 +405,7 @@ function DroppableColumn({
     <KanbanColumn
       ref={setNodeRef}
       title={stage.name}
-      count={stageStats.length}
+      count={realCount ?? stageStats.length}
       subtitle={stageTotal > 0 ? formatTotal(stageTotal) : undefined}
       className={cn(isOver && "ring-2 ring-inset ring-primary/30 bg-primary/5")}
     >
@@ -405,6 +426,18 @@ function DroppableColumn({
           />
         ))}
       </SortableContext>
+      {hasMore && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="w-full text-xs text-muted-foreground"
+          disabled={loadingMore}
+          onClick={() => onLoadMore(stage.id)}
+        >
+          {loadingMore ? <Loader2Icon className="size-3.5 animate-spin" /> : "Cargar más"}
+        </Button>
+      )}
     </KanbanColumn>
   )
 }
@@ -446,6 +479,7 @@ export function FunnelKanban() {
 
   // ── Board state ─────────────────────────────────────────────────────────────
   const [kanbanOpps, setKanbanOpps]         = React.useState<Opportunity[]>([])
+  const [stagePages, setStagePages]         = React.useState<Record<number, StagePageState>>({})
   const [activeOpp, setActiveOpp]           = React.useState<Opportunity | null>(null)
   const [previewOpp, setPreviewOpp]         = React.useState<Opportunity | null>(null)
   const [sheetOpen, setSheetOpen]           = React.useState(false)
@@ -475,18 +509,76 @@ export function FunnelKanban() {
     }).catch(() => {})
   }, [])
 
-  // ── Fetch kanban opportunities when flowId or refreshKey changes ─────────────
+  // ── Fetch kanban opportunities por etapa (paginado) cuando cambia flowId/refreshKey ──
+  // Un fetch independiente por columna, no uno solo para todo el flow — así ninguna
+  // etapa queda vacía esperando que el cupo global "le toque" en el orden del fetch.
+  React.useEffect(() => {
+    if (flowId === null || stages.length === 0) return
+    let cancelled = false
+
+    Promise.all(
+      stages.map((stage) =>
+        opportunityService
+          .list({ flow_id: flowId, flow_stage_id: stage.id, take: STAGE_PAGE_SIZE, page: 1 })
+          .then((page) => ({ stageId: stage.id, page }))
+      )
+    ).then((results) => {
+      if (cancelled) return
+      const allOpps: Opportunity[] = []
+      const pages: Record<number, StagePageState> = {}
+      for (const { stageId, page } of results) {
+        allOpps.push(...page.data.map(mapOpportunity))
+        pages[stageId] = { page: 1, hasMore: page.nextPage !== null, loadingMore: false }
+      }
+      setKanbanOpps(allOpps)
+      setStagePages(pages)
+    }).catch(() => {
+      if (!cancelled) { setKanbanOpps([]); setStagePages({}) }
+    })
+
+    return () => { cancelled = true }
+  }, [flowId, refreshKey, stages])
+
+  function loadMoreForStage(stageId: number) {
+    if (flowId === null) return
+    const current = stagePages[stageId]
+    if (!current || !current.hasMore || current.loadingMore) return
+    const nextPage = current.page + 1
+
+    setStagePages((prev) => ({ ...prev, [stageId]: { ...prev[stageId], loadingMore: true } }))
+
+    opportunityService
+      .list({ flow_id: flowId, flow_stage_id: stageId, take: STAGE_PAGE_SIZE, page: nextPage })
+      .then((page) => {
+        setKanbanOpps((prev) => {
+          const existingIds = new Set(prev.map((o) => o.id))
+          const fresh = page.data.map(mapOpportunity).filter((o) => !existingIds.has(o.id))
+          return [...prev, ...fresh]
+        })
+        setStagePages((prev) => ({
+          ...prev,
+          [stageId]: { page: nextPage, hasMore: page.nextPage !== null, loadingMore: false },
+        }))
+      })
+      .catch(() => {
+        setStagePages((prev) => ({ ...prev, [stageId]: { ...prev[stageId], loadingMore: false } }))
+      })
+  }
+
+  // Conteo real por etapa — independiente del tope de 500 de arriba, para que el
+  // número de cada columna sea siempre correcto aunque el flow tenga muchas más
+  // oportunidades de las que se llegan a cargar (ej. Prohabla, 500+).
+  const [stageCounts, setStageCounts] = React.useState<Record<number, number>>({})
   React.useEffect(() => {
     if (flowId === null) return
     let cancelled = false
     opportunityService
-      .list({ flow_id: flowId, take: 500 })
-      .then((page) => {
+      .getStageCounts(flowId)
+      .then((counts) => {
         if (cancelled) return
-        setKanbanOpps(page.data.map(mapOpportunity))
+        setStageCounts(Object.fromEntries(counts.map((c) => [c.stage_id, c.count])))
       })
-      .catch(() => { if (!cancelled) setKanbanOpps([]) })
-
+      .catch(() => { if (!cancelled) setStageCounts({}) })
     return () => { cancelled = true }
   }, [flowId, refreshKey])
 
@@ -518,6 +610,10 @@ export function FunnelKanban() {
       })
       .map((o) => ({ value: o.responsible.name, label: o.responsible.name }))
   }, [kanbanOpps])
+
+  // Con un filtro activo, el número de columna debe reflejar lo filtrado (lo que
+  // ya hacía antes) — el conteo real de backend solo aplica a la vista sin filtrar.
+  const hasActiveFilters = !!search || statusFilter !== "all" || responsibleFilter.length > 0
 
   // ── Board filtering ──────────────────────────────────────────────────────────
   const filtered = React.useMemo(() => {
@@ -583,11 +679,27 @@ export function FunnelKanban() {
     const nextStage = stagesRef.current.find((s) => s.id === targetStageId)?.name
 
     setKanbanOpps((prev) => prev.map((o) => o.id === oppId ? { ...o, stageId: targetStageId } : o))
+    // Contador optimista — si no, queda desactualizado hasta el próximo refresh
+    // (el conteo real del backend no se refresca en cada drag).
+    if (originalStageId !== null) {
+      setStageCounts((prev) => ({
+        ...prev,
+        [originalStageId]: Math.max(0, (prev[originalStageId] ?? 0) - 1),
+        [targetStageId]: (prev[targetStageId] ?? 0) + 1,
+      }))
+    }
     if (nextStage) notify.success({ title: `Oportunidad movida a ${nextStage}`, description: "El pipeline se actualizó correctamente." })
 
     opportunityService.moveStage(oppId, targetStageId, prevStage, nextStage)
       .catch(() => {
         setKanbanOpps((prev) => prev.map((o) => o.id === oppId ? { ...o, stageId: originalStageId } : o))
+        if (originalStageId !== null) {
+          setStageCounts((prev) => ({
+            ...prev,
+            [originalStageId]: (prev[originalStageId] ?? 0) + 1,
+            [targetStageId]: Math.max(0, (prev[targetStageId] ?? 0) - 1),
+          }))
+        }
         opportunityNotify.error()
       })
   }, [])
@@ -838,6 +950,10 @@ export function FunnelKanban() {
                 stage={stage}
                 opps={filtered}
                 statsOpps={statsOpps}
+                realCount={hasActiveFilters ? undefined : stageCounts[stage.id]}
+                hasMore={stagePages[stage.id]?.hasMore}
+                loadingMore={stagePages[stage.id]?.loadingMore}
+                onLoadMore={loadMoreForStage}
                 stages={stages}
                 onMove={handleMoveStage}
                 onPreview={handlePreview}

@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import {
-  BadgeCheck,
   CalendarIcon,
   CheckIcon,
   ChevronDownIcon,
@@ -42,8 +41,9 @@ import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { getInitials } from "@/lib/table-utils"
-import { contactService } from "@/services/contact.service"
-import { organizationService } from "@/services/organization.service"
+import type { OrganizationOption } from "@/services/organization.service"
+import { OrgAsyncSelect } from "@/components/shared/OrgAsyncSelect"
+import { ContactAsyncSelect, type ContactPickerOption } from "@/components/shared/ContactAsyncSelect"
 import { teamService } from "@/services/team.service"
 import { flowService } from "@/services/flow.service"
 import { currencyService } from "@/services/currency.service"
@@ -59,8 +59,6 @@ import { CURRENCY_FLAG } from "@/lib/currency-utils"
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-interface PickerContact { id: number; name: string; organization: { id: number; name: string } | null }
-interface PickerOrg     { id: number; name: string; industry: string | null }
 interface PickerUser    { id: number; name: string }
 
 const CURRENCY_LOCALE: Record<string, string> = {
@@ -215,118 +213,6 @@ function ContactAvatar({ name }: { name: string }) {
   )
 }
 
-function OrgAvatar({ name }: { name: string }) {
-  return (
-    <div className="relative shrink-0">
-      <Avatar className="size-6">
-        <AvatarImage src="https://github.com/shadcn.png" alt={name} />
-        <AvatarFallback className="text-[10px] font-semibold">{getInitials(name)}</AvatarFallback>
-      </Avatar>
-      <BadgeCheck className="absolute -bottom-1 -right-1 size-3.5 rounded-full fill-blue-500 text-white" />
-    </div>
-  )
-}
-
-function ContactPicker({ value, onChange }: { value: PickerContact | null; onChange: (v: PickerContact | null) => void }) {
-  const [search, setSearch]       = React.useState("")
-  const [items, setItems]         = React.useState<PickerContact[]>([])
-  const [searching, setSearching] = React.useState(false)
-
-  React.useEffect(() => {
-    let cancelled = false
-    setSearching(true)
-    const t = setTimeout(async () => {
-      try {
-        const res = await contactService.list({ filter: search || undefined, take: 20 })
-        if (!cancelled) setItems(res.data.map((p) => ({
-          id:           p.id,
-          name:         p.name,
-          organization: p.organization ? { id: p.organization.id, name: p.organization.name } : null,
-        })))
-      } catch {
-        if (!cancelled) setItems([])
-      } finally {
-        if (!cancelled) setSearching(false)
-      }
-    }, 300)
-    return () => { cancelled = true; clearTimeout(t) }
-  }, [search])
-
-  return (
-    <EntityPickerBase
-      items={items}
-      value={value}
-      onChange={onChange}
-      placeholder="Selecciona un contacto"
-      search={search}
-      onSearchChange={setSearch}
-      searching={searching}
-      renderSelected={(c) => (
-        <>
-          <ContactAvatar name={c.name} />
-          <span className="truncate">{c.name}</span>
-        </>
-      )}
-      renderRow={(c) => (
-        <>
-          <ContactAvatar name={c.name} />
-          <span>{c.name}</span>
-        </>
-      )}
-    />
-  )
-}
-
-function OrgPicker({ value, onChange }: { value: PickerOrg | null; onChange: (v: PickerOrg | null) => void }) {
-  const [search, setSearch]       = React.useState("")
-  const [items, setItems]         = React.useState<PickerOrg[]>([])
-  const [searching, setSearching] = React.useState(false)
-
-  React.useEffect(() => {
-    let cancelled = false
-    setSearching(true)
-    const t = setTimeout(async () => {
-      try {
-        const res = await organizationService.list({ filter: search || undefined, take: 20 })
-        if (!cancelled) setItems(res.data.map((o) => ({
-          id:       o.id,
-          name:     o.name,
-          industry: o.industry ?? null,
-        })))
-      } catch {
-        if (!cancelled) setItems([])
-      } finally {
-        if (!cancelled) setSearching(false)
-      }
-    }, 300)
-    return () => { cancelled = true; clearTimeout(t) }
-  }, [search])
-
-  return (
-    <EntityPickerBase
-      items={items}
-      value={value}
-      onChange={onChange}
-      placeholder="Selecciona una organización"
-      search={search}
-      onSearchChange={setSearch}
-      searching={searching}
-      renderSelected={(o) => (
-        <>
-          <OrgAvatar name={o.name} />
-          <span className="truncate">{o.name}</span>
-        </>
-      )}
-      renderRow={(o) => (
-        <>
-          <OrgAvatar name={o.name} />
-          <span className="truncate">{o.name}</span>
-        </>
-      )}
-    />
-  )
-}
-
 function ResponsiblePicker({ value, onChange }: { value: PickerUser | null; onChange: (v: PickerUser | null) => void }) {
   const [search, setSearch]   = React.useState("")
   const [all, setAll]         = React.useState<PickerUser[]>([])
@@ -404,8 +290,8 @@ export function CreateOpportunitySheet({
   const [amountRaw, setAmountRaw]     = React.useState("")
   const [currencyId, setCurrencyId]   = React.useState<number | null>(null)
   const [currencies, setCurrencies]   = React.useState<CurrencyRaw[]>([])
-  const [contact, setContact]         = React.useState<PickerContact | null>(null)
-  const [organization, setOrganization] = React.useState<PickerOrg | null>(null)
+  const [contact, setContact]         = React.useState<ContactPickerOption | null>(null)
+  const [organization, setOrganization] = React.useState<OrganizationOption | null>(null)
   const [priorityOptionId, setPriorityOptionId] = React.useState<number | null>(null)
   const [priorityLabelId, setPriorityLabelId]   = React.useState<number | null>(null)
   const [priorityOptions, setPriorityOptions]   = React.useState<CatalogOption[]>([])
@@ -479,7 +365,7 @@ export function CreateOpportunitySheet({
             })
           }
           if (detail.organization) {
-            setOrganization({ id: detail.organization.id, name: detail.organization.name, industry: null })
+            setOrganization({ id: detail.organization.id, name: detail.organization.name })
           }
           if (detail.planned_clousure_date) {
             setCloseDate(detail.planned_clousure_date.slice(0, 10))
@@ -530,9 +416,9 @@ export function CreateOpportunitySheet({
   }, [open, opportunityId, defaultFlowId, defaultStageId])
 
   // ── Handlers ──────────────────────────────────────────────────────────────────
-  function handleContactChange(c: PickerContact | null) {
+  function handleContactChange(c: ContactPickerOption | null) {
     setContact(c)
-    if (c?.organization) setOrganization({ id: c.organization.id, name: c.organization.name, industry: null })
+    if (c?.organization) setOrganization({ id: c.organization.id, name: c.organization.name })
   }
 
   function handleFlowChange(id: string | null) {
@@ -736,7 +622,11 @@ export function CreateOpportunitySheet({
                       Crear
                     </Button>
                   </div>
-                  <ContactPicker value={contact} onChange={handleContactChange} />
+                  <ContactAsyncSelect
+                    value={contact?.id ?? null}
+                    selectedName={contact?.name ?? null}
+                    onChange={handleContactChange}
+                  />
                 </div>
 
                 <div className="space-y-1.5">
@@ -753,7 +643,11 @@ export function CreateOpportunitySheet({
                       Crear
                     </Button>
                   </div>
-                  <OrgPicker value={organization} onChange={setOrganization} />
+                  <OrgAsyncSelect
+                    value={organization?.id ?? null}
+                    selectedName={organization?.name ?? null}
+                    onChange={setOrganization}
+                  />
                 </div>
               </div>
             </Section>
@@ -902,7 +796,7 @@ export function CreateOpportunitySheet({
         onOpenChange={(v) => { if (!v) setCreateOrgOpen(false) }}
         breadcrumb="Crear Oportunidad"
         onSuccess={(org) => {
-          setOrganization({ id: org.id, name: org.name, industry: null })
+          setOrganization({ id: org.id, name: org.name })
           setCreateOrgOpen(false)
         }}
       />

@@ -6,6 +6,7 @@ export interface OpportunityListParams {
   take?: number
   filter?: string
   flow_id?: number
+  flow_stage_id?: number
   personId?: number
   organizationId?: number
 }
@@ -28,6 +29,17 @@ export const opportunityService = {
   async list(params: OpportunityListParams = {}): Promise<OpportunityPage> {
     const res = await api.get<never, { opportunities: OpportunityPage }>("opportunity", { params })
     return res.opportunities
+  },
+
+  // Conteo real por etapa (no depende de cuántas oportunidades haya cargadas en el
+  // Kanban) — para flows grandes como el de Prohabla (500+), el número de la columna
+  // no puede salir de contar lo ya renderizado.
+  async getStageCounts(flowId: number): Promise<{ stage_id: number; count: number }[]> {
+    const res = await api.get<never, { counts: { stage_id: number; count: number }[] }>(
+      "opportunity/stage-counts",
+      { params: { flowId } }
+    )
+    return res.counts
   },
 
   async getById(id: number): Promise<OpportunityDetailRaw> {
