@@ -62,7 +62,7 @@ import type { WorkspaceIntegrationRaw } from "@/types/integration"
 type Mode     = "actividad" | "google"
 type Priority = string
 
-interface PickerUser { id: number; name: string }
+interface PickerUser { id: number; name: string; avatarUrl: string | null }
 
 const FIELD_LABEL = "text-xs font-medium tracking-wider text-muted-foreground"
 
@@ -72,10 +72,10 @@ const TEAM_CACHE_TTL = 5 * 60_000
 
 // ─── Responsible picker ───────────────────────────────────────────────────────
 
-function UserAvatar({ name }: { name: string }) {
+function UserAvatar({ name, avatarUrl }: { name: string; avatarUrl?: string | null }) {
   return (
     <Avatar className="size-6 shrink-0">
-      <AvatarImage src="https://github.com/shadcn.png" alt={name} />
+      <AvatarImage src={avatarUrl ?? "https://github.com/shadcn.png"} alt={name} />
       <AvatarFallback className="text-[10px] font-semibold">{getInitials(name)}</AvatarFallback>
     </Avatar>
   )
@@ -100,7 +100,7 @@ function ResponsiblePicker({ value, onChange }: { value: PickerUser | null; onCh
     teamService.list({ take: 100, is_active: true })
       .then((res) => {
         if (cancelled) return
-        const users = res.data.map((m) => ({ id: m.user_id, name: m.user.name }))
+        const users = res.data.map((m) => ({ id: m.user_id, name: m.user.name, avatarUrl: m.user.avatar_url }))
         _teamCache = { data: users, ts: Date.now() }
         setAll(users)
       })
@@ -148,7 +148,7 @@ function ResponsiblePicker({ value, onChange }: { value: PickerUser | null; onCh
         <span className={cn("flex min-w-0 items-center gap-2", value ? "text-foreground" : "text-muted-foreground")}>
           {value ? (
             <>
-              <UserAvatar name={value.name} />
+              <UserAvatar name={value.name} avatarUrl={value.avatarUrl} />
               <span className="truncate">{value.name}</span>
             </>
           ) : "Selecciona un responsable"}
@@ -186,7 +186,7 @@ function ResponsiblePicker({ value, onChange }: { value: PickerUser | null; onCh
                   )}
                 >
                   <CheckIcon className={cn("size-3.5 shrink-0 opacity-0", value?.id === u.id && "opacity-100")} />
-                  <UserAvatar name={u.name} />
+                  <UserAvatar name={u.name} avatarUrl={u.avatarUrl} />
                   <span>{u.name}</span>
                 </button>
               ))
@@ -285,12 +285,6 @@ export function CreateActivitySheet({
     if (mode === "google") setActivityType("Reunión")
   }, [mode])
 
-  // En modo Google se precarga el responsable con el usuario actual (sigue siendo editable).
-  React.useEffect(() => {
-    if (mode !== "google" || !currentUser) return
-    setResponsible((prev) => prev ?? { id: currentUser.id, name: currentUser.name })
-  }, [mode, currentUser])
-
   // Precarga el contacto de la oportunidad como invitado sugerido (una vez por
   // oportunidad) — el usuario puede quitarlo o agregar cualquier otro correo.
   React.useEffect(() => {
@@ -386,7 +380,7 @@ export function CreateActivitySheet({
       const endParts   = activity.date_to   ? toWorkspaceDateTimeParts(activity.date_to, timezone)   : null
       setStartDate(startParts ? `${startParts.date}T${startParts.time}` : "")
       setEndDate(endParts ? `${endParts.date}T${endParts.time}` : "")
-      setResponsible(activity.user ? { id: activity.user.id, name: activity.user.name } : null)
+      setResponsible(activity.user ? { id: activity.user.id, name: activity.user.name, avatarUrl: activity.user.avatar_url } : null)
       setErrors({})
     } else if (!isEdit) {
       resetForm()
@@ -400,7 +394,7 @@ export function CreateActivitySheet({
     setStartDate(defaultDate ? `${defaultDate}T09:00` : "")
     setEndDate("")
     setPriority("")
-    setResponsible(null)
+    setResponsible(currentUser ? { id: currentUser.id, name: currentUser.name, avatarUrl: currentUser.avatar_url ?? null } : null)
     setErrors({})
     setLinkOpportunity(false)
     setSelectedFlowId(null)

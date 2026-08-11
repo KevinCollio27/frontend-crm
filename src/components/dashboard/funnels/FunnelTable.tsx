@@ -63,7 +63,7 @@ export interface Opportunity {
   flowName: string
   company: string
   contact: string
-  responsible: { name: string; initials: string }
+  responsible: { name: string; initials: string; avatarUrl: string | null }
   value: number
   currency: string
   closeDate: string | null
@@ -97,7 +97,7 @@ export function mapOpportunity(d: OpportunityRaw): Opportunity {
     flowName:  d.flow?.name ?? "—",
     company:   d.organization?.name ?? "—",
     contact:   d.person?.name ?? "—",
-    responsible: { name: respName, initials: getInitials(respName) },
+    responsible: { name: respName, initials: getInitials(respName), avatarUrl: mainResp?.users?.avatar_url ?? null },
     value:     originalSale?.value ?? 0,
     currency:  originalSale?.currency?.symbol ?? "$",
     closeDate: d.planned_clousure_date
@@ -272,11 +272,11 @@ function getColumns(
         </Button>
       ),
       cell: ({ row }) => {
-        const { name, initials } = row.original.responsible
+        const { name, initials, avatarUrl } = row.original.responsible
         return (
           <div className="flex items-center gap-2">
             <Avatar className="default">
-              <AvatarImage src="https://github.com/shadcn.png" alt={name} />
+              <AvatarImage src={avatarUrl ?? "https://github.com/shadcn.png"} alt={name} />
               <AvatarFallback className="text-[10px] font-medium">
                 {initials}
               </AvatarFallback>

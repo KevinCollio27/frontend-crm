@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Eye, EyeOff, Loader2Icon, PencilIcon, ShieldCheckIcon, UploadIcon } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Controller, useForm } from "react-hook-form"
 import type { Value as PhoneValue } from "react-phone-number-input"
 import { z } from "zod"
@@ -47,6 +47,15 @@ const passwordSchema = z
 type ProfileValues = z.infer<typeof profileSchema>
 type PasswordValues = z.infer<typeof passwordSchema>
 
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
 export function ProfileForm() {
   const user = useSessionStore((s) => s.user)
   const workspaceId = useSessionStore((s) => s.workspaceId)
@@ -58,6 +67,11 @@ export function ProfileForm() {
   const [showConfirm, setShowConfirm] = useState(false)
   const [savingProfile, setSavingProfile] = useState(false)
   const [savingPassword, setSavingPassword] = useState(false)
+
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const avatarInputRef = useRef<HTMLInputElement>(null)
+  const avatarBlobRef = useRef<string>("")
 
   const [waConfig, setWaConfig] = useState<MyWhatsAppNumberRaw | null>(null)
   const [loadingWa, setLoadingWa] = useState(true)
@@ -86,6 +100,34 @@ export function ProfileForm() {
   useEffect(() => {
     if (user) profileForm.reset({ name: user.name, email: user.email, phone: user.phone ?? "" })
   }, [user]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    return () => { if (avatarBlobRef.current) URL.revokeObjectURL(avatarBlobRef.current) }
+  }, [])
+
+  async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ""
+    if (!file || !user) return
+
+    // Preview local inmediato — la subida real corre después, en segundo plano
+    if (avatarBlobRef.current) URL.revokeObjectURL(avatarBlobRef.current)
+    const blob = URL.createObjectURL(file)
+    avatarBlobRef.current = blob
+    setAvatarPreview(blob)
+
+    setUploadingAvatar(true)
+    try {
+      const base64 = await fileToBase64(file)
+      const avatarUrl = await userService.uploadAvatar(file.name, base64)
+      setSession({ ...user, avatar_url: avatarUrl }, workspaceId)
+    } catch {
+      notify.error({ title: "No se pudo subir la imagen", description: "Intenta de nuevo en unos segundos." })
+      setAvatarPreview(null)
+    } finally {
+      setUploadingAvatar(false)
+    }
+  }
 
   useEffect(() => {
     whatsappService.getMyNumber()
@@ -160,17 +202,35 @@ export function ProfileForm() {
           <CardContent className="pt-5 space-y-5">
             <div className="flex items-center gap-4">
               <Avatar className="size-16">
-                <AvatarImage src="https://github.com/shadcn.png" alt={user?.name ?? ""} />
+                <AvatarImage src={avatarPreview ?? user?.avatar_url ?? "https://github.com/shadcn.png"} alt={user?.name ?? ""} />
                 <AvatarFallback className="text-base">
                   {getInitials(user?.name ?? "")}
                 </AvatarFallback>
               </Avatar>
               <div className="flex flex-col gap-1.5">
-                <Button type="button" variant="outline" size="sm" className="w-fit gap-2" disabled>
-                  <UploadIcon className="size-3.5" />
-                  Subir imagen
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-fit gap-2"
+                  disabled={!editingProfile || uploadingAvatar}
+                  onClick={() => avatarInputRef.current?.click()}
+                >
+                  {uploadingAvatar ? (
+                    <Loader2Icon className="size-3.5 animate-spin" />
+                  ) : (
+                    <UploadIcon className="size-3.5" />
+                  )}
+                  {uploadingAvatar ? "Subiendo..." : "Subir imagen"}
                 </Button>
-                <p className="text-xs text-muted-foreground">Próximamente</p>
+                {editingProfile && <p className="text-xs text-muted-foreground">PNG, JPG o WEBP</p>}
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  onChange={handleAvatarChange}
+                />
               </div>
             </div>
 

@@ -52,6 +52,7 @@ import { catalogService, activeOptions } from "@/services/catalog.service"
 import { opportunityNotify } from "@/lib/notify"
 import { CreateContactSheet } from "@/components/dashboard/contacts/CreateContactSheet"
 import { CreateOrganizationSheet } from "@/components/dashboard/organizations/CreateOrganizationSheet"
+import { useSessionStore } from "@/store/session.store"
 import type { Flow } from "@/types/flow"
 import type { CurrencyRaw } from "@/types/currency"
 import type { CatalogOption } from "@/types/catalog"
@@ -59,7 +60,7 @@ import { CURRENCY_FLAG } from "@/lib/currency-utils"
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-interface PickerUser    { id: number; name: string }
+interface PickerUser    { id: number; name: string; avatarUrl: string | null }
 
 const CURRENCY_LOCALE: Record<string, string> = {
   CLP: "es-CL",
@@ -204,10 +205,10 @@ function EntityPickerBase<T extends { id: number; name: string }>({
   )
 }
 
-function ContactAvatar({ name }: { name: string }) {
+function ContactAvatar({ name, avatarUrl }: { name: string; avatarUrl?: string | null }) {
   return (
     <Avatar className="size-6 shrink-0">
-      <AvatarImage src="https://github.com/shadcn.png" alt={name} />
+      <AvatarImage src={avatarUrl ?? "https://github.com/shadcn.png"} alt={name} />
       <AvatarFallback className="text-[10px] font-semibold">{getInitials(name)}</AvatarFallback>
     </Avatar>
   )
@@ -223,7 +224,7 @@ function ResponsiblePicker({ value, onChange }: { value: PickerUser | null; onCh
     setLoading(true)
     teamService.list({ take: 100, is_active: true })
       .then((res) => {
-        if (!cancelled) setAll(res.data.map((m) => ({ id: m.user_id, name: m.user.name })))
+        if (!cancelled) setAll(res.data.map((m) => ({ id: m.user_id, name: m.user.name, avatarUrl: m.user.avatar_url })))
       })
       .catch(() => { if (!cancelled) setAll([]) })
       .finally(() => { if (!cancelled) setLoading(false) })
@@ -245,13 +246,13 @@ function ResponsiblePicker({ value, onChange }: { value: PickerUser | null; onCh
       searching={loading}
       renderSelected={(u) => (
         <>
-          <ContactAvatar name={u.name} />
+          <ContactAvatar name={u.name} avatarUrl={u.avatarUrl} />
           <span className="truncate">{u.name}</span>
         </>
       )}
       renderRow={(u) => (
         <>
-          <ContactAvatar name={u.name} />
+          <ContactAvatar name={u.name} avatarUrl={u.avatarUrl} />
           <span>{u.name}</span>
         </>
       )}
@@ -281,6 +282,7 @@ export function CreateOpportunitySheet({
   onSuccess,
 }: CreateOpportunitySheetProps) {
   const isEditMode = !!opportunityId
+  const currentUser = useSessionStore((s) => s.user)
 
   // ── Form state ───────────────────────────────────────────────────────────────
   const [name, setName]               = React.useState("")
@@ -379,7 +381,7 @@ export function CreateOpportunitySheet({
             if (defaultCurrency) setCurrencyId(defaultCurrency.id)
           }
           const mainResp = detail.opportunity_responsible.find((r) => r.is_main) ?? detail.opportunity_responsible[0]
-          if (mainResp?.users) setResponsible({ id: mainResp.users.id, name: mainResp.users.name })
+          if (mainResp?.users) setResponsible({ id: mainResp.users.id, name: mainResp.users.name, avatarUrl: mainResp.users.avatar_url })
           const priorityDetail = detail.opportunity_detail.find((d) => d.label?.key === "priority")
           if (priorityDetail && options.length > 0) {
             const match =
@@ -407,6 +409,9 @@ export function CreateOpportunitySheet({
           }
           const defaultCurrency = allCurrencies.find((c) => c.code === "CLP") ?? allCurrencies[0]
           if (defaultCurrency) setCurrencyId(defaultCurrency.id)
+          if (currentUser) {
+            setResponsible({ id: currentUser.id, name: currentUser.name, avatarUrl: currentUser.avatar_url ?? null })
+          }
         }
       })
       .catch((err) => { console.error("[opp:sheet] load error", err); console.groupEnd() })

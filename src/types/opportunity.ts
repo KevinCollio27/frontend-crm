@@ -16,7 +16,7 @@ export interface OpportunityEmailRaw {
 export interface OpportunityResponsibleRaw {
   id: number
   is_main: boolean
-  users: { id: number; name: string } | null
+  users: { id: number; name: string; avatar_url: string | null } | null
 }
 
 export interface OpportunitySalesRaw {
@@ -94,7 +94,7 @@ export interface OpportunityDetailRaw {
   opportunity_responsible: {
     id: number
     is_main: boolean
-    users: { id: number; name: string } | null
+    users: { id: number; name: string; avatar_url: string | null } | null
   }[]
   opportunity_net_cost: {
     id: number

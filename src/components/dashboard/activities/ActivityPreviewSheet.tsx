@@ -27,7 +27,7 @@ interface ActivityLike {
   endDate: string
   stageId: string
   createdAt: string
-  responsible: { name: string; initials: string; avatar?: string }
+  responsible: { name: string; initials: string; avatarUrl?: string | null }
   opportunityName?: string
   funnelName?: string
 }
@@ -176,7 +176,7 @@ export function ActivityPreviewSheet({ activity, open, onOpenChange, onViewDetai
           <div className="flex flex-col gap-1.5 px-4 py-3">
             <div className="flex items-center gap-2.5 px-3 py-2 bg-muted/50 rounded-lg">
               <Avatar className="size-7 shrink-0">
-                <AvatarImage src={activity.responsible.avatar} alt={activity.responsible.name} />
+                <AvatarImage src={activity.responsible.avatarUrl ?? "https://github.com/shadcn.png"} alt={activity.responsible.name} />
                 <AvatarFallback className="text-[10px] font-medium">
                   {activity.responsible.initials}
                 </AvatarFallback>

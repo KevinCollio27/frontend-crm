@@ -24,4 +24,12 @@ export const userService = {
   async updatePassword(payload: UpdatePasswordPayload): Promise<void> {
     await api.post("user/update-password", payload)
   },
+
+  async uploadAvatar(fileName: string, base64File: string): Promise<string> {
+    const res = await api.post<never, { data: { avatar_url: string } }>(
+      "user/upload-avatar",
+      { fileName, base64File }
+    )
+    return res.data.avatar_url
+  },
 }

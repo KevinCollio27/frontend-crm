@@ -21,7 +21,7 @@ export interface ActivityRaw {
   status: string
   created_at: string
   ubication: string | null
-  user: { id: number; name: string } | null
+  user: { id: number; name: string; avatar_url: string | null } | null
   opportunity: {
     id: number
     name: string

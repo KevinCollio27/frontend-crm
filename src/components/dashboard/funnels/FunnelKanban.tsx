@@ -238,7 +238,7 @@ const OppCard = React.memo(function OppCard({
 
       <div className="flex min-w-0 items-center gap-1.5">
         <Avatar className="size-5 shrink-0">
-          <AvatarImage src="https://github.com/shadcn.png" alt={opp.responsible.name} />
+          <AvatarImage src={opp.responsible.avatarUrl ?? "https://github.com/shadcn.png"} alt={opp.responsible.name} />
           <AvatarFallback className="text-[9px] font-semibold">{opp.responsible.initials}</AvatarFallback>
         </Avatar>
         <span className="truncate text-xs text-muted-foreground">{opp.responsible.name}</span>

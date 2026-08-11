@@ -16,6 +16,7 @@ export interface User {
   name: string;
   email: string;
   phone?: string | null;
+  avatar_url?: string | null;
   is_email_verified: boolean;
   is_active: boolean;
   user_workspace?: UserWorkspace[];

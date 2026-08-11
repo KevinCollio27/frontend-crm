@@ -41,7 +41,7 @@ export interface Activity {
   startTime?: string
   stageId: string
   createdAt: string
-  responsible: { name: string; initials: string; avatar?: string }
+  responsible: { name: string; initials: string; avatarUrl?: string | null }
   opportunityName: string
   funnelName: string
   googleEventId?: string
@@ -63,8 +63,9 @@ export function mapActivity(d: ActivityRaw, timezone: string): Activity {
     stageId:         d.status ?? (d.is_completed ? "completada" : "pendiente"),
     createdAt:       (d.created_at ?? "").slice(0, 10),
     responsible: {
-      name:     d.user?.name ?? "—",
-      initials: getInitials(d.user?.name ?? ""),
+      name:      d.user?.name ?? "—",
+      initials:  getInitials(d.user?.name ?? ""),
+      avatarUrl: d.user?.avatar_url ?? null,
     },
     opportunityName: d.opportunity?.name ?? "",
     funnelName:      d.opportunity?.flow?.name ?? "",

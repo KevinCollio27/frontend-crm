@@ -80,7 +80,7 @@ interface BoardActivity {
   stageId: string
   startDate: string
   endDate: string
-  responsible: { name: string; initials: string }
+  responsible: { name: string; initials: string; avatarUrl: string | null }
   opportunityName: string
   funnelName: string
 }
@@ -98,8 +98,9 @@ function mapBoardActivity(d: ActivityRaw, timezone: string): BoardActivity {
     startDate:       d.date_from ? toWorkspaceDateTimeParts(d.date_from, timezone).date : "",
     endDate:         d.date_to   ? toWorkspaceDateTimeParts(d.date_to, timezone).date   : "",
     responsible: {
-      name:     d.user?.name ?? "—",
-      initials: getInitials(d.user?.name ?? ""),
+      name:      d.user?.name ?? "—",
+      initials:  getInitials(d.user?.name ?? ""),
+      avatarUrl: d.user?.avatar_url ?? null,
     },
     opportunityName: d.opportunity?.name ?? "",
     funnelName:      d.opportunity?.flow?.name ?? "",
@@ -276,7 +277,7 @@ const ActivityCard = React.memo(function ActivityCard({
 
       <div className="flex min-w-0 items-center gap-1.5">
         <Avatar className="size-5 shrink-0">
-          <AvatarImage src="https://github.com/shadcn.png" alt={activity.responsible.name} />
+          <AvatarImage src={activity.responsible.avatarUrl ?? "https://github.com/shadcn.png"} alt={activity.responsible.name} />
           <AvatarFallback className="text-[9px] font-semibold">{activity.responsible.initials}</AvatarFallback>
         </Avatar>
         <span className="truncate text-xs text-muted-foreground">{activity.responsible.name}</span>

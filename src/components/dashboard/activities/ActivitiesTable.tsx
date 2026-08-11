@@ -303,7 +303,7 @@ function getColumns(
         return (
           <div className="flex items-center gap-2">
             <Avatar size="default">
-              <AvatarImage src="https://github.com/shadcn.png" alt={r.name} />
+              <AvatarImage src={r.avatarUrl ?? "https://github.com/shadcn.png"} alt={r.name} />
               <AvatarFallback className="text-base">
                 {getInitials(r.name)}
               </AvatarFallback>

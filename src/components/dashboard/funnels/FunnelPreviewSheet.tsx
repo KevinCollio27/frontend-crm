@@ -32,7 +32,7 @@ interface DealLike {
   value: number
   currency?: string
   closeDate: string | null
-  responsible: { name: string; initials: string; avatar?: string }
+  responsible: { name: string; initials: string; avatarUrl?: string | null }
   priority?: string
   quotationCount?: number
   activityCount?: number
@@ -224,7 +224,7 @@ export function FunnelPreviewSheet({ deal, open, onOpenChange }: Props) {
           <div className="flex flex-col gap-1.5 px-4 py-3">
             <div className="flex items-center gap-2.5 px-3 py-2 bg-muted/50 rounded-lg">
               <Avatar className="size-7 shrink-0">
-                <AvatarImage src={deal.responsible.avatar} alt={deal.responsible.name} />
+                <AvatarImage src={deal.responsible.avatarUrl ?? "https://github.com/shadcn.png"} alt={deal.responsible.name} />
                 <AvatarFallback className="text-[10px] font-medium">
                   {deal.responsible.initials}
                 </AvatarFallback>
