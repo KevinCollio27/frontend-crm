@@ -42,6 +42,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import { useSidebar } from "@/components/ui/sidebar"
 import {
@@ -70,6 +71,13 @@ import type { ActivityRaw } from "@/types/activity"
 import type { Flow } from "@/types/flow"
 
 interface OppOption { id: number; name: string }
+
+type ActivityView = "board" | "lista"
+
+const VIEW_OPTIONS: { value: ActivityView; label: string; icon: React.ElementType }[] = [
+  { value: "lista", label: "Lista", icon: ListIcon         },
+  { value: "board", label: "Board", icon: KanbanSquareIcon },
+]
 
 // Cuántas actividades carga cada columna al abrir el board, y cuántas trae cada
 // "Cargar más" — antes un solo fetch (tope 300) alimentaba las 4 columnas juntas,
@@ -440,8 +448,8 @@ export function ActivityKanban() {
   const { setOpen }  = useSidebar()
   const timezone     = useWorkspaceTimezone()
 
-  const [view, setView] = React.useState<"board" | "lista">(
-    () => (searchParams.get("view") as "board" | "lista") ?? "lista"
+  const [view, setView] = React.useState<ActivityView>(
+    () => (searchParams.get("view") as ActivityView) ?? "lista"
   )
 
   React.useEffect(() => {
@@ -452,7 +460,7 @@ export function ActivityKanban() {
     return () => setOpen(true)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  function changeView(v: "board" | "lista") {
+  function changeView(v: ActivityView) {
     setView(v)
     const params = new URLSearchParams(searchParams.toString())
     params.set("view", v)
@@ -800,7 +808,35 @@ export function ActivityKanban() {
     <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
       {/* Row 1 — view toggle */}
       <div className="flex shrink-0 items-center justify-between border-b px-4 py-2">
-        <div className="flex items-center gap-0.5 rounded-lg border bg-muted/40 p-0.5">
+        {/* Mobile — el grupo de píldoras no cabe junto al botón "Crear Actividad",
+            se colapsa en un selector (mismo patrón que Formularios/Oportunidades). */}
+        <Select value={view} onValueChange={(v) => changeView(v as ActivityView)}>
+          <SelectTrigger size="sm" className="w-28 shrink-0 md:hidden">
+            <SelectValue placeholder="Vista">
+              {(v: ActivityView) => {
+                const opt = VIEW_OPTIONS.find((o) => o.value === v)
+                if (!opt) return v
+                return (
+                  <span className="flex items-center gap-1.5">
+                    <opt.icon className="size-3.5" />
+                    {opt.label}
+                  </span>
+                )
+              }}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {VIEW_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>
+                <opt.icon className="size-3.5" />
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Desktop — grupo de píldoras original, sin cambios */}
+        <div className="hidden items-center gap-0.5 rounded-lg border bg-muted/40 p-0.5 md:flex">
           <button
             type="button"
             onClick={() => changeView("lista")}
