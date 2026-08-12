@@ -20,6 +20,7 @@ import {
   MoreHorizontal,
   PlusCircleIcon,
   RefreshCwIcon,
+  SearchIcon,
   Trash2Icon,
   UserPlusIcon,
   XIcon,
@@ -55,6 +56,7 @@ import type { InvitationRaw } from "@/types/team"
 import { getSortIcon } from "@/lib/table-utils"
 import { orgConfirm } from "@/lib/confirm"
 import { useIsWorkspaceAdmin } from "@/hooks/useIsWorkspaceAdmin"
+import { useIsMobile } from "@/hooks/use-mobile"
 import { notify } from "@/lib/notify"
 
 interface Invitation {
@@ -103,6 +105,12 @@ const columnLabels: Record<string, string> = {
 }
 
 const DEFAULT_COLUMN_VISIBILITY: VisibilityState = {
+  expiresAt: false,
+}
+
+const MOBILE_COLUMN_VISIBILITY: VisibilityState = {
+  status:    false,
+  sentAt:    false,
   expiresAt: false,
 }
 
@@ -296,6 +304,11 @@ export function InvitedUsersTable() {
   const [inviteOpen, setInviteOpen] = React.useState(false)
   const [refreshKey, setRefreshKey] = React.useState(0)
 
+  const isMobile = useIsMobile()
+  React.useEffect(() => {
+    if (isMobile) setColumnVisibility(MOBILE_COLUMN_VISIBILITY)
+  }, [isMobile])
+
   React.useEffect(() => {
     const t = setTimeout(
       () => setQuery((q) => ({ ...q, page: 1, search: searchInput })),
@@ -399,49 +412,65 @@ export function InvitedUsersTable() {
 
   return (
     <div className="w-full">
-      <div className="flex flex-wrap items-center gap-2 py-4">
-        <Input
-          className="w-full sm:max-w-xs"
-          placeholder="Filtrar por email..."
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-        />
-        <StatusFilter value={statusFilter} onChange={setStatusFilter} />
-        {hasActiveFilters && (
-          <Button variant="ghost" size="sm" className="h-8" onClick={resetFilters}>
-            Reset
-            <XIcon className="ml-1 size-4" />
-          </Button>
-        )}
-        <div className="ml-auto flex items-center gap-2">
-          <span className="hidden sm:block text-sm text-muted-foreground">
+      {/* Toolbar. En mobile se apila en filas propias en vez de forzar scroll
+          horizontal; desde md hacia arriba queda igual que antes. */}
+      <div className="flex flex-col gap-2 py-4 md:flex-row md:items-center">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center">
+          <div className="relative w-full shrink-0 md:w-44">
+            <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Filtrar por email..."
+              className="h-8 pl-8 text-xs"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+            />
+          </div>
+
+          {/* Un solo filtro — ocupa todo el ancho en mobile en vez de quedar
+              apretado a la izquierda con espacio vacío al lado. */}
+          <div className="[&_button]:w-full md:[&_button]:w-auto">
+            <StatusFilter value={statusFilter} onChange={setStatusFilter} />
+          </div>
+
+          {hasActiveFilters && (
+            <Button variant="ghost" size="sm" className="h-8 w-full md:w-auto" onClick={resetFilters}>
+              Reset
+              <XIcon className="ml-1 size-4" />
+            </Button>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-2 md:ml-auto">
+          <span className="w-full text-sm text-muted-foreground md:w-auto">
             {total} invitaciones
           </span>
-          <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="outline" size="sm" />}>
-              <LayoutIcon className="size-4" />
-              <span className="hidden sm:inline">Visualización</span>
-              <ChevronDown className="size-4" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {table
-                .getAllColumns()
-                .filter((col) => col.getCanHide())
-                .map((col) => (
-                  <DropdownMenuCheckboxItem
-                    key={col.id}
-                    checked={col.getIsVisible()}
-                    onCheckedChange={(v) => col.toggleVisibility(!!v)}
-                  >
-                    {columnLabels[col.id] ?? col.id}
-                  </DropdownMenuCheckboxItem>
-                ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="[&_button]:w-full md:[&_button]:w-auto">
+            <DropdownMenu>
+              <DropdownMenuTrigger render={<Button variant="outline" size="sm" />}>
+                <LayoutIcon className="size-4" />
+                Visualización
+                <ChevronDown className="size-4" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {table
+                  .getAllColumns()
+                  .filter((col) => col.getCanHide())
+                  .map((col) => (
+                    <DropdownMenuCheckboxItem
+                      key={col.id}
+                      checked={col.getIsVisible()}
+                      onCheckedChange={(v) => col.toggleVisibility(!!v)}
+                    >
+                      {columnLabels[col.id] ?? col.id}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
           {isWorkspaceAdmin && (
-            <Button size="sm" onClick={() => setInviteOpen(true)}>
+            <Button size="sm" className="w-full md:w-auto" onClick={() => setInviteOpen(true)}>
               <UserPlusIcon className="size-4" />
-              <span className="hidden sm:inline">Invitar Usuario</span>
+              Invitar Usuario
             </Button>
           )}
         </div>
