@@ -3,13 +3,17 @@
 import * as React from "react"
 import { formatDistanceToNow } from "date-fns"
 import { es } from "date-fns/locale"
-import { MessagesSquareIcon } from "lucide-react"
+import { InboxIcon, MessagesSquareIcon, MessageSquareTextIcon } from "lucide-react"
+import { SiFacebook, SiInstagram, SiWhatsapp } from "react-icons/si"
+import { cn } from "@/lib/utils"
 import { PageHeader } from "@/components/dashboard/PageHeader"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { MessagingNav, type AgentNavItem } from "@/components/dashboard/messaging/MessagingNav"
 import { ConversationList } from "@/components/dashboard/messaging/ConversationList"
 import { ConversationView } from "@/components/dashboard/messaging/ConversationView"
 import { conversationKey } from "@/components/dashboard/messaging/data"
 import type { Conversation, MessagingView } from "@/components/dashboard/messaging/data"
+import { useIsMobile } from "@/hooks/use-mobile"
 import { widgetAIService } from "@/services/widget-ai.service"
 import { whatsappService } from "@/services/whatsapp.service"
 import { instagramService } from "@/services/instagram.service"
@@ -24,6 +28,19 @@ import { useSessionStore } from "@/store/session.store"
 import { useEntityRealtime } from "@/hooks/useEntityRealtime"
 
 const PAGE_SIZE = 20
+
+// ─── Mobile — selector de canal (reemplaza a MessagingNav, section 6 pattern) ──
+
+const CHANNEL_META: Record<"my_inbox" | "whatsapp" | "instagram" | "facebook", { label: string; icon: React.ElementType }> = {
+  my_inbox:  { label: "Mi bandeja", icon: InboxIcon   },
+  whatsapp:  { label: "WhatsApp",   icon: SiWhatsapp   },
+  instagram: { label: "Instagram",  icon: SiInstagram  },
+  facebook:  { label: "Messenger",  icon: SiFacebook   },
+}
+
+function isFixedChannel(v: string): v is "my_inbox" | "whatsapp" | "instagram" | "facebook" {
+  return v === "my_inbox" || v === "whatsapp" || v === "instagram" || v === "facebook"
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -206,6 +223,12 @@ export default function MessagingPage() {
   const [hasMoreFacebook, setHasMoreFacebook] = React.useState(false)
   const [selectedConversation, setSelectedConversation] = React.useState<Conversation | undefined>(undefined)
   const [loadingMessages, setLoadingMessages] = React.useState(false)
+
+  const isMobile = useIsMobile()
+  // Lista ⇄ Chat en mobile — arranca en la lista (no en un paso de "elegir canal"),
+  // el canal se cambia con el Select sin salir de este paso.
+  const [mobileShowChat, setMobileShowChat] = React.useState(false)
+  React.useEffect(() => { setMobileShowChat(false) }, [activeView])
 
   // widgetId -> próxima página a pedir (se borra cuando ese widget ya no tiene más)
   const cursorsRef = React.useRef<Map<number, number>>(new Map())
@@ -542,7 +565,9 @@ export default function MessagingPage() {
         description="Conversaciones de WhatsApp, Instagram, Facebook Messenger y tus agentes de Widget IA"
       />
       <div className="flex flex-1 min-h-0 overflow-hidden">
-        <div className="flex w-52 shrink-0 flex-col overflow-hidden border-r">
+        {/* Col 1 — Nav de canales. En mobile se reemplaza por el Select dentro de
+            ConversationList, así que acá nunca se muestra. */}
+        <div className="hidden w-52 shrink-0 flex-col overflow-hidden border-r md:flex">
           <MessagingNav
             activeView={activeView}
             onViewChange={setActiveView}
@@ -553,25 +578,79 @@ export default function MessagingPage() {
             agents={agents}
           />
         </div>
-        <div className="flex w-105 shrink-0 flex-col overflow-hidden border-r">
+
+        {/* Col 2 — Lista. En mobile, pantalla completa y solo si no se está viendo el chat. */}
+        <div className={cn(
+          "w-full shrink-0 flex-col overflow-hidden border-r md:flex md:w-105",
+          mobileShowChat ? "hidden md:flex" : "flex"
+        )}>
           <ConversationList
             activeView={activeView}
             title={listTitle}
             conversations={conversations}
             selectedId={selectedId}
-            onSelect={setSelectedId}
+            onSelect={(id) => { setSelectedId(id); if (isMobile) setMobileShowChat(true) }}
             loading={loading}
             hasMore={hasMoreForView}
             loadingMore={loadingMore}
             onLoadMore={loadMoreConversations}
             onRefresh={handleRefresh}
             refreshing={refreshing}
+            channelSelect={
+              <div className="w-full md:hidden">
+                <Select
+                  value={String(activeView)}
+                  onValueChange={(v) => { if (v !== null) setActiveView((isFixedChannel(v) ? v : Number(v)) as MessagingView) }}
+                >
+                  <SelectTrigger size="sm" className="w-full">
+                    <SelectValue placeholder="Canal">
+                      {(v: string) => {
+                        if (isFixedChannel(v)) {
+                          const meta = CHANNEL_META[v]
+                          return (
+                            <span className="flex items-center gap-1.5">
+                              <meta.icon className="size-3.5" />
+                              {meta.label}
+                            </span>
+                          )
+                        }
+                        const agent = agents.find((a) => a.id === Number(v))
+                        return (
+                          <span className="flex items-center gap-1.5">
+                            <MessageSquareTextIcon className="size-3.5" />
+                            {agent?.name ?? "Agente"}
+                          </span>
+                        )
+                      }}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="my_inbox"><InboxIcon className="size-3.5" />Mi bandeja</SelectItem>
+                    <SelectItem value="whatsapp"><SiWhatsapp className="size-3.5" />WhatsApp</SelectItem>
+                    <SelectItem value="instagram"><SiInstagram className="size-3.5" />Instagram</SelectItem>
+                    <SelectItem value="facebook"><SiFacebook className="size-3.5" />Messenger</SelectItem>
+                    {agents.map((agent) => (
+                      <SelectItem key={agent.id} value={String(agent.id)}>
+                        <MessageSquareTextIcon className="size-3.5" />
+                        {agent.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            }
           />
         </div>
-        <div className="flex flex-1 flex-col overflow-hidden">
+
+        {/* Col 3 — Chat. En mobile, pantalla completa y solo cuando hay algo seleccionado. */}
+        <div className={cn(
+          "min-h-0 flex-1 flex-col overflow-hidden md:flex",
+          mobileShowChat ? "flex" : "hidden md:flex"
+        )}>
           <ConversationView
             conversation={selectedConversation}
             loadingMessages={loadingMessages}
+            onBack={isMobile ? () => setMobileShowChat(false) : undefined}
             onConversationChange={(updated) =>
               setConversations((prev) => prev.map((c) => (conversationKey(c) === conversationKey(updated) ? updated : c)))
             }

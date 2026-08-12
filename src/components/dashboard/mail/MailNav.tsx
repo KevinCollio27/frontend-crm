@@ -8,14 +8,16 @@ import {
 import { cn } from "@/lib/utils"
 import type { Folder } from "./data"
 
-interface FolderItem {
+export interface FolderItem {
   id: Folder
   label: string
   icon: React.ElementType
   count?: number
 }
 
-const folders: FolderItem[] = [
+// Exportado — el selector de carpeta en mobile (page.tsx) reusa esta misma lista
+// en vez de mantener una copia aparte.
+export const folders: FolderItem[] = [
   { id: "inbox", label: "Recibidos", icon: InboxIcon, count: 128 },
   { id: "sent", label: "Enviado", icon: SendIcon },
   { id: "junk", label: "Correo no deseado", icon: ShieldAlertIcon, count: 23 },

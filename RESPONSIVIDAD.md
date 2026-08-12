@@ -90,6 +90,8 @@ Sheets ya arreglados así: `CreateContactSheet`, `DuplicateContactsSheet`, `Merg
 
 **Pendiente separado:** evaluar el fix a nivel base (`sheet.tsx`) para no tener que repetir `w-full!` sheet por sheet — más alto impacto pero requiere probarlo con cuidado (afecta a todos los sheets del proyecto de una).
 
+**Variante al revés — sheet angosto que el bug ensancha/descuadra (`ContactSheet` de Mensajería):** no todos los sheets deben terminar en `w-full!` — `ContactSheet.tsx` es un panel angosto tipo tarjeta de contacto (diseño original: fijo en `w-80`/`max-w-80`, 320px, en cualquier pantalla). Mismo bug de especificidad, pero acá ni siquiera el ancho angosto intencional se aplicaba: la clase suelta `w-80` (y `sm:max-w-80`, que tampoco comparte la cadena de modificadores `data-[side=right]:sm:` de la base) perdían igual contra `data-[side=right]:w-3/4` / `data-[side=right]:sm:max-w-sm`. Fix: `w-80!` + `max-w-80!` — mismo mecanismo de `!important`, pero preservando el ancho angosto en vez de forzar `w-full`. Antes de aplicar `w-full!` en automático a un sheet nuevo, confirmar que el diseño realmente lo pide — si es un panel chico tipo preview/tarjeta, puede que la clase correcta sea la propia con `!`, no `w-full!`.
+
 **Nota sobre "Crear Contacto"/"Crear Organización":** el ancho ya quedó bien (`w-full!`), pero el contenido interno (grids de 2 columnas: Nombre/Organización, etc.) todavía se ve apretado en mobile — eso es un ajuste aparte, por formulario, más grande. No se ha tocado todavía.
 
 ### 5. Layouts de 2 columnas (lista + detalle) — patrón "master-detail collapse"
@@ -110,6 +112,21 @@ Para vistas tipo inbox (Col 1 = lista de items, Col 2 = detalle/preview del item
 **Generalización a N columnas (Vacantes, 3 columnas):** el mismo patrón escala sin drama — en vez de un booleano, un estado con las N etapas (`"vacantes" | "postulantes" | "detalle"`), y cada columna se muestra solo si `mobileStep` coincide con su etapa (`md:flex` siempre fuerza visible en desktop). Cada columna intermedia (no la última) necesita su propio botón "Volver" local hacia la etapa anterior — la última columna reusa el mismo `onBack` que ya tenía el componente de detalle, sin tocarlo. El toolbar/filtros de la primera columna también se ocultan en mobile cuando no se está en esa etapa (`{(!isMobile || mobileStep === "primera-etapa") && (...)}`), porque dejan de tener sentido con esa columna fuera de vista.
 
 Este mismo patrón debería aplicar a **Correo** cuando le toque, y a **Blog > BlogManager** si se decide hacerlo responsive (queda marcado como "aparte" más abajo).
+
+**Variante con "Nav" en vez de columna de contenido (Mensajería):** cuando la Col 1 no es una lista de items sino un *nav/filtro* (ej. `MessagingNav` — Mi bandeja/WhatsApp/Instagram/Messenger/agentes), **no** conviene tratarla como una etapa más del drill-down (obligaría a pasar por una pantalla de "elegir canal" antes de ver nada, incluso cuando el default — "Mi bandeja" — ya trae todo). En vez de eso:
+
+- La Col 1 (nav) se oculta del todo en mobile (`hidden ... md:flex`, nunca se muestra ahí) — no se convierte en un paso.
+- Se reemplaza por un **`Select`** (mismo patrón de la sección 6) metido en el header de la Col 2 (la lista), donde antes iba el título fijo — cambia de canal sin salir de la lista, sin pantalla intermedia.
+- El componente de la lista (`ConversationList`) recibe ese Select ya armado como prop (`channelSelect?: React.ReactNode`) en vez de construirlo él mismo — así no necesita conocer `agents`/counts/etc., eso vive en la página padre que ya lo tenía.
+- El truco de layout: el Select se pasa con clase `w-full md:hidden`; el header de la lista pasa de `flex items-center` a `flex flex-wrap items-center` — en mobile el Select (100% ancho) fuerza un salto de línea y el resto (refrescar, tabs Todos/No leídos) cae a la fila de abajo; en desktop el Select ni se renderiza, así que no hay wrap y la fila queda idéntica a como estaba.
+- Col 2 ⇄ Col 3 (lista ⇄ detalle) quedan como el master-detail normal de 2 pasos de más arriba, **arrancando en la lista** (`mobileShowChat` default `false`), no en un paso "nav" — el nav nunca fue un paso, así que no hay nada antes de la lista.
+- Al cambiar de canal (`activeView`) hay que resetear `mobileShowChat` a `false` — mismo motivo que resetear `mobileShowDetail` al cambiar de filtro: si no, se puede quedar "atrapado" viendo un chat que ya no pertenece al canal filtrado.
+
+Aplicado en Mensajería (`crm/messaging/page.tsx` + `ConversationList.tsx` + `ConversationView.tsx`) y en Correo (`crm/mail/page.tsx` + `MailList.tsx` + `MailDisplay.tsx`), casi calcado.
+
+**Nota de Correo — acción extra en la Col 1 (Nav):** a diferencia de Mensajería, `MailNav` tenía un botón "Redactar" propio arriba de las carpetas — al ocultar la Col 1 en mobile ese botón también desaparecía. Se resolvió agregándolo **junto al Select de carpeta** en el mismo bloque `mobileHeader` (Select `flex-1` + botón `shrink-0`, una sola fila) — mismo criterio que un Row 1 de "selector + crear" (sección 6), no algo nuevo. Si otra vista con esta variante tiene una acción de nivel-Nav así, el mismo truco aplica: se cuela en el bloque del Select en vez de perderse.
+
+**Nota de Correo — estados vacíos de la lista (sin Gmail conectado / carpeta no conectada / cargando):** esos 3 estados viven en `page.tsx`, no dentro de `MailList`, así que no reciben `mobileHeader` automáticamente — hay que pasárselo a mano en cada rama (`<div className="border-b px-4 py-2 md:hidden">{mobileHeader}</div>` antes del contenido del estado) para que el selector de carpeta siga disponible aunque la carpeta activa esté vacía o Gmail no esté conectado.
 
 ### 6. Selector de vista en mobile (Row 1 con 3+ píldoras + botón "Crear")
 
@@ -160,6 +177,16 @@ Distinto del patrón de la sección 5 (lista → detalle, jerárquico): acá las
 
 Aplicado en Contactos (`ContactDetail.tsx`). Candidato directo para replicar en Organizaciones (`organizations/detail/`, misma estructura de carpeta Col1Info/Col2Tabs/Col3Related) cuando le toque.
 
+### 8. Shell compartido — `PageHeader.tsx`
+
+Adelantado del ítem "shell post-login, al final" — surgió al pasar por Mensajería porque el header se veía roto ahí (descripción envolviendo en 3 líneas dentro de un `h-16` fijo). `PageHeader.tsx` lo usan **16 páginas** (Contactos, Organizaciones, Actividades, Cotizaciones, Mensajería, etc.), así que el fix beneficia a todas de una:
+
+- La descripción (segunda línea, bajo el título) se oculta en mobile (`hidden ... md:block`) — ahí no hay espacio para dos líneas de texto dentro de un header de altura fija, y el título solo ya identifica la página.
+- Título y descripción llevan `truncate` + el contenedor `min-w-0` en cada nivel del flex (el bloque izquierdo, el bloque ícono+texto, y el `leading-tight` final) — sin `min-w-0` en la cadena, `truncate` no tiene efecto porque el flex item no se deja achicar por debajo de su contenido.
+- `SidebarTrigger`, el `Separator` y el ícono llevan `shrink-0` — así lo que se achica/trunca es siempre el texto, nunca los controles.
+
+El resto del shell (sidebar, layout general) sigue pendiente para el final, como quedamos — esto fue solo el header porque estaba a la vista y el fix era chico y acotado.
+
 ## Checklist — qué falta replicar
 
 - [x] Contactos — toolbar, tabla, sheets (Crear, Fusionar, Fusión manual, Importar/Exportar)
@@ -191,10 +218,13 @@ Aplicado en Contactos (`ContactDetail.tsx`). Candidato directo para replicar en 
 - [x] Paginación — arreglado a nivel de componente compartido (afecta a todas las tablas ya)
 - [x] Formularios > Respuestas (`FormAnswersBoard.tsx`) — primer caso del patrón "master-detail collapse" (sección 5): toolbar + navegación lista→detalle en mobile con botón "Volver" en `FormAnswerDetail.tsx`
 - [x] Formularios > Vacantes (`VacantesBoard.tsx`) — generalización a 3 columnas del mismo patrón (Vacante → Postulantes → Detalle), navegación por etapas con `mobileStep`
+- [x] Mensajería (`crm/messaging/page.tsx`) — variante "Nav" del master-detail (sección 5): Col1 `MessagingNav` se oculta en mobile y se reemplaza por un `Select` de canal dentro del header de la lista (patrón sección 6); Lista ⇄ Chat es master-detail normal de 2 pasos, arrancando en la lista (no hay paso de "elegir canal")
+- [x] Mensajería > sheets (`ContactSheet.tsx`) — variante angosta del bug de sheets (sección 4): `w-80!`/`max-w-80!` en vez de `w-full!`, porque el diseño original es un panel chico, no uno full-width
+- [x] Correo (`crm/mail/page.tsx`) — misma variante "Nav" que Mensajería: Col1 `MailNav` oculta, Select de carpeta (reusa la lista `folders` exportada de `MailNav.tsx`) + botón "Redactar" juntos en el header de la lista; Lista ⇄ Correo arranca en la lista. Estados vacíos de la lista (sin Gmail, carpeta no conectada, cargando) reciben el `mobileHeader` a mano porque viven en `page.tsx`, no en `MailList`
+- [x] Shell — `PageHeader.tsx` (sección 8), adelantado del ítem de shell de más abajo: descripción oculta en mobile, título con truncate real (cadena de `min-w-0`). Beneficia a las 16 páginas que lo usan.
 - [ ] Oportunidades — vista **Sugerencias** (`suggestions/SuggestionsView.tsx`): es un feed de cards, no un datatable — fuera de este patrón, como BlogManager
 - [ ] Blog — `BlogManager.tsx` (gestor de artículos dentro de un blog, drag-and-drop): tampoco es un datatable — aparte
-- [ ] Correo — layout de 2 columnas, candidato directo para el patrón master-detail de la sección 5
 - [ ] Usuarios (`UsersTable.tsx` / Configuración > Equipo)
 - [ ] Contenido interno de los sheets "Crear ___" (grids de 2 columnas → 1 columna en mobile) — aparte, por formulario
-- [ ] Evaluar fix del bug de `Sheet` a nivel de componente base, para no repetir `w-full!` en cada sheet nuevo
-- [ ] El shell post-login completo (sidebar, layout general) — al final, como quedamos
+- [ ] Evaluar fix del bug de `Sheet` a nivel de componente base, para no repetir `w-full!`/`w-N!` en cada sheet nuevo
+- [ ] El shell post-login completo (sidebar, layout general) — el header (`PageHeader.tsx`) ya quedó, falta el resto

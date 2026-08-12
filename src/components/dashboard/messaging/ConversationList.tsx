@@ -33,6 +33,7 @@ interface ConversationListProps {
   onLoadMore?: () => void
   onRefresh?: () => void
   refreshing?: boolean
+  channelSelect?: React.ReactNode
 }
 
 export function ConversationList({
@@ -47,6 +48,7 @@ export function ConversationList({
   onLoadMore,
   onRefresh,
   refreshing = false,
+  channelSelect,
 }: ConversationListProps) {
   const [search, setSearch]   = React.useState("")
   const [tab, setTab]         = React.useState<FilterTab>("all")
@@ -73,9 +75,12 @@ export function ConversationList({
 
   return (
     <div className="flex h-full flex-col">
-      {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-2">
-        <h2 className="flex-1 truncate text-base font-semibold">{title}</h2>
+      {/* Header. En mobile, channelSelect (w-full) fuerza el resto a la fila
+          de abajo vía flex-wrap; en desktop channelSelect no se renderiza
+          (md:hidden) y queda como antes, una sola fila. */}
+      <div className="flex flex-wrap items-center gap-2 px-4 py-2">
+        {channelSelect}
+        <h2 className="hidden flex-1 truncate text-base font-semibold md:block">{title}</h2>
         {onRefresh && (
           <Button
             variant="ghost"

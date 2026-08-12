@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import {
+  ArrowLeftIcon,
   HandIcon,
   Loader2Icon,
   MessageSquareTextIcon,
@@ -137,9 +138,10 @@ interface ConversationViewProps {
   conversation: Conversation | undefined
   loadingMessages?: boolean
   onConversationChange?: (updated: Conversation) => void
+  onBack?: () => void
 }
 
-export function ConversationView({ conversation, loadingMessages = false, onConversationChange }: ConversationViewProps) {
+export function ConversationView({ conversation, loadingMessages = false, onConversationChange, onBack }: ConversationViewProps) {
   const [message, setMessage]       = React.useState("")
   const [contactOpen, setContactOpen] = React.useState(false)
   const [sending, setSending]       = React.useState(false)
@@ -152,9 +154,21 @@ export function ConversationView({ conversation, loadingMessages = false, onConv
 
   if (!conversation) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-2 text-muted-foreground">
-        <MessagesSquareIcon className="size-8 opacity-30" />
-        <p className="text-sm">Selecciona una conversación</p>
+      <div className="flex h-full flex-col">
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="flex shrink-0 items-center gap-1.5 border-b px-4 py-2.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ArrowLeftIcon className="size-3.5" />
+            Volver a la bandeja
+          </button>
+        )}
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 text-muted-foreground">
+          <MessagesSquareIcon className="size-8 opacity-30" />
+          <p className="text-sm">Selecciona una conversación</p>
+        </div>
       </div>
     )
   }
@@ -236,6 +250,17 @@ export function ConversationView({ conversation, loadingMessages = false, onConv
 
   return (
     <div className="flex h-full flex-col">
+
+      {onBack && (
+        <button
+          type="button"
+          onClick={onBack}
+          className="flex shrink-0 items-center gap-1.5 border-b px-4 py-2.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ArrowLeftIcon className="size-3.5" />
+          Volver a la bandeja
+        </button>
+      )}
 
       {/* Header */}
       <div className="flex shrink-0 items-center gap-3 border-b px-4 py-2.5">

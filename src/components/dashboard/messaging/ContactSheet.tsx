@@ -35,7 +35,7 @@ export function ContactSheet({ open, onOpenChange, conversation }: ContactSheetP
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="flex w-80 flex-col overflow-y-auto p-0 sm:max-w-80">
+      <SheetContent side="right" className="flex w-80! max-w-80! flex-col overflow-y-auto p-0">
 
         {/* Avatar + nombre */}
         <div className="flex flex-col items-center gap-3 px-6 pb-6 pt-10">

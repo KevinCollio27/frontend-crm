@@ -7,6 +7,7 @@ import { es } from "date-fns/locale"
 import {
   ArchiveIcon,
   ArchiveXIcon,
+  ArrowLeftIcon,
   ChevronDownIcon,
   ClockIcon,
   CornerUpLeftIcon,
@@ -74,6 +75,20 @@ function EmailBody({ html }: { html: string }) {
       className="w-full rounded-lg border bg-white"
       style={{ height }}
     />
+  )
+}
+
+function BackBar({ onBack }: { onBack?: () => void }) {
+  if (!onBack) return null
+  return (
+    <button
+      type="button"
+      onClick={onBack}
+      className="flex shrink-0 items-center gap-1.5 border-b px-4 py-2.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+    >
+      <ArrowLeftIcon className="size-3.5" />
+      Volver a la bandeja
+    </button>
   )
 }
 
@@ -427,9 +442,10 @@ interface MailDisplayProps {
   connectionId: number | null
   accountEmail: string | null
   onReplySent?: () => void
+  onBack?: () => void
 }
 
-export function MailDisplay({ thread, loading, connectionId, accountEmail, onReplySent }: MailDisplayProps) {
+export function MailDisplay({ thread, loading, connectionId, accountEmail, onReplySent, onBack }: MailDisplayProps) {
   const [reply, setReply] = React.useState("")
   const [muted, setMuted] = React.useState(false)
   const [replyOpen, setReplyOpen] = React.useState(false)
@@ -502,18 +518,24 @@ export function MailDisplay({ thread, loading, connectionId, accountEmail, onRep
 
   if (loading) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-2 text-muted-foreground">
-        <Loader2Icon className="size-6 animate-spin" />
-        <p className="text-sm">Cargando correo...</p>
+      <div className="flex h-full flex-col">
+        <BackBar onBack={onBack} />
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 text-muted-foreground">
+          <Loader2Icon className="size-6 animate-spin" />
+          <p className="text-sm">Cargando correo...</p>
+        </div>
       </div>
     )
   }
 
   if (!thread) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-2 text-muted-foreground">
-        <CornerUpLeftIcon className="size-8 opacity-30" />
-        <p className="text-sm">Selecciona un correo para leerlo</p>
+      <div className="flex h-full flex-col">
+        <BackBar onBack={onBack} />
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 text-muted-foreground">
+          <CornerUpLeftIcon className="size-8 opacity-30" />
+          <p className="text-sm">Selecciona un correo para leerlo</p>
+        </div>
       </div>
     )
   }
@@ -522,6 +544,8 @@ export function MailDisplay({ thread, loading, connectionId, accountEmail, onRep
 
   return (
     <div className="flex h-full flex-col">
+      <BackBar onBack={onBack} />
+
       {/* Toolbar */}
       <div className="flex items-center border-b px-2 py-1.5">
         <div className="flex items-center gap-0.5">

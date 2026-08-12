@@ -7,13 +7,15 @@ import DOMPurify from "dompurify"
 import { MailIcon, Loader2Icon, PencilLineIcon } from "lucide-react"
 import { PageHeader } from "@/components/dashboard/PageHeader"
 import { ComposeDialog } from "@/components/dashboard/mail/ComposeDialog"
-import { MailNav } from "@/components/dashboard/mail/MailNav"
+import { MailNav, folders as MAIL_FOLDERS } from "@/components/dashboard/mail/MailNav"
 import { MailList } from "@/components/dashboard/mail/MailList"
 import { MailDisplay } from "@/components/dashboard/mail/MailDisplay"
 import type { Folder, Mail, MailSummary, MailThread, MailThreadSummary } from "@/components/dashboard/mail/data"
 import { Button } from "@/components/ui/button"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useSidebar } from "@/components/ui/sidebar"
-import { stripHtml } from "@/lib/utils"
+import { useIsMobile } from "@/hooks/use-mobile"
+import { cn, stripHtml } from "@/lib/utils"
 import { integrationService } from "@/services/integration.service"
 import type {
   GmailMessageRaw,
@@ -156,6 +158,12 @@ function MailPageContent() {
   // responder, para que la respuesta aparezca de una en la conversación sin recargar todo.
   const [threadRefreshTick, setThreadRefreshTick] = React.useState(0)
 
+  const isMobile = useIsMobile()
+  // Lista ⇄ Correo en mobile — arranca en la lista (no en un paso de "elegir carpeta"),
+  // la carpeta se cambia con el Select sin salir de este paso. Mismo patrón que Mensajería.
+  const [mobileShowMail, setMobileShowMail] = React.useState(false)
+  React.useEffect(() => { setMobileShowMail(false) }, [activeFolder])
+
   function updateUrl(folder: Folder, threadId: string | null, goxt: boolean = goxtOnly) {
     const params = new URLSearchParams()
     params.set("folder", folder)
@@ -264,6 +272,46 @@ function MailPageContent() {
     setPageIndex((i) => Math.max(0, i - 1))
   }
 
+  // Select de carpeta + Redactar — mobile only, reemplaza a la Col 1 (MailNav) que
+  // queda oculta. Va dentro del header de MailList (mismo patrón que Mensajería).
+  const mobileHeader = (
+    <div className="flex w-full items-center gap-2 md:hidden">
+      <Select value={activeFolder} onValueChange={(v) => { if (v) updateUrl(v as Folder, null, false) }}>
+        <SelectTrigger size="sm" className="min-w-0 flex-1">
+          <SelectValue placeholder="Carpeta">
+            {(v: Folder) => {
+              const f = MAIL_FOLDERS.find((f) => f.id === v)
+              if (!f) return v
+              return (
+                <span className="flex items-center gap-1.5">
+                  <f.icon className="size-3.5" />
+                  {f.label}
+                </span>
+              )
+            }}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          {MAIL_FOLDERS.map((f) => (
+            <SelectItem key={f.id} value={f.id}>
+              <f.icon className="size-3.5" />
+              {f.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Button
+        size="sm"
+        className="h-8 shrink-0 gap-1.5 text-xs"
+        disabled={!gmailConnectionId}
+        onClick={() => setComposeOpen(true)}
+      >
+        <PencilLineIcon className="size-3.5" />
+        Redactar
+      </Button>
+    </div>
+  )
+
   return (
     <>
       <PageHeader
@@ -272,8 +320,9 @@ function MailPageContent() {
         description="Bandeja de entrada del workspace"
       />
       <div className="flex flex-1 min-h-0 overflow-hidden">
-        {/* Columna 1 — carpetas */}
-        <div className="flex w-52 shrink-0 flex-col overflow-hidden border-r">
+        {/* Columna 1 — carpetas. En mobile se reemplaza por el Select dentro de
+            MailList, así que acá nunca se muestra. */}
+        <div className="hidden w-52 shrink-0 flex-col overflow-hidden border-r md:flex">
           <div className="p-2">
             <Button
               className="w-full justify-start gap-2"
@@ -287,30 +336,43 @@ function MailPageContent() {
           <MailNav activeFolder={activeFolder} onFolderChange={(folder) => updateUrl(folder, null, false)} />
         </div>
 
-        {/* Columna 2 — lista (único scroll) */}
-        <div className="flex w-105 shrink-0 flex-col overflow-hidden border-r">
+        {/* Columna 2 — lista (único scroll). En mobile, pantalla completa y
+            solo si no se está viendo el correo. */}
+        <div className={cn(
+          "w-full shrink-0 flex-col overflow-hidden border-r md:flex md:w-105",
+          mobileShowMail ? "hidden md:flex" : "flex"
+        )}>
           {gmailConnectionId === null ? (
-            <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center">
-              <MailIcon className="size-8 text-muted-foreground/40" />
-              <p className="text-sm font-medium">Gmail no está conectado</p>
-              <p className="text-xs text-muted-foreground">
-                Conéctalo en Configuración → Integraciones para ver tu correo real acá.
-              </p>
+            <div className="flex h-full flex-col">
+              <div className="border-b px-4 py-2 md:hidden">{mobileHeader}</div>
+              <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center">
+                <MailIcon className="size-8 text-muted-foreground/40" />
+                <p className="text-sm font-medium">Gmail no está conectado</p>
+                <p className="text-xs text-muted-foreground">
+                  Conéctalo en Configuración → Integraciones para ver tu correo real acá.
+                </p>
+              </div>
             </div>
           ) : !goxtOnly && !FOLDER_TO_LABEL[activeFolder] ? (
-            <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center">
-              <p className="text-sm text-muted-foreground">Esta carpeta todavía no está conectada.</p>
+            <div className="flex h-full flex-col">
+              <div className="border-b px-4 py-2 md:hidden">{mobileHeader}</div>
+              <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center">
+                <p className="text-sm text-muted-foreground">Esta carpeta todavía no está conectada.</p>
+              </div>
             </div>
           ) : listLoading ? (
-            <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-              <Loader2Icon className="mr-2 size-4 animate-spin" /> Cargando correos...
+            <div className="flex h-full flex-col">
+              <div className="border-b px-4 py-2 md:hidden">{mobileHeader}</div>
+              <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+                <Loader2Icon className="mr-2 size-4 animate-spin" /> Cargando correos...
+              </div>
             </div>
           ) : (
             <MailList
               folder={activeFolder}
               threads={threads}
               selectedId={selectedThreadId}
-              onSelect={(threadId) => updateUrl(activeFolder, threadId)}
+              onSelect={(threadId) => { updateUrl(activeFolder, threadId); if (isMobile) setMobileShowMail(true) }}
               goxtOnly={goxtOnly}
               onGoxtOnlyChange={(value) => updateUrl(activeFolder, null, value)}
               hasPrevPage={pageIndex > 0}
@@ -320,17 +382,23 @@ function MailPageContent() {
               rangeStart={threads.length === 0 ? 0 : pageIndex * PAGE_SIZE + 1}
               rangeEnd={pageIndex * PAGE_SIZE + threads.length}
               resultSizeEstimate={resultSizeEstimate}
+              mobileHeader={mobileHeader}
             />
           )}
         </div>
 
-        {/* Columna 3 — vista previa */}
-        <div className="flex flex-1 flex-col overflow-hidden">
+        {/* Columna 3 — vista previa. En mobile, pantalla completa y solo
+            cuando hay algo seleccionado. */}
+        <div className={cn(
+          "min-h-0 flex-1 flex-col overflow-hidden md:flex",
+          mobileShowMail ? "flex" : "hidden md:flex"
+        )}>
           <MailDisplay
             thread={selectedThread}
             loading={threadLoading}
             connectionId={gmailConnectionId ?? null}
             accountEmail={gmailAccountEmail}
+            onBack={isMobile ? () => setMobileShowMail(false) : undefined}
             onReplySent={() => {
               setThreadRefreshTick((t) => t + 1)
               setRefreshTick((t) => t + 1)

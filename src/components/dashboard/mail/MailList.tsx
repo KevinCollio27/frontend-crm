@@ -37,6 +37,9 @@ interface MailListProps {
   // Estimación de Gmail (mismo campo que usa su propia bandeja) — no es exacto, así que se
   // muestra con "~" cuando hay más de una página, igual que Gmail para carpetas grandes.
   resultSizeEstimate?: number
+  // Select de carpeta + botón Redactar armados en page.tsx (mobile only) — reemplaza
+  // al título fijo, mismo patrón que el channelSelect de Mensajería.
+  mobileHeader?: React.ReactNode
 }
 
 export function MailList({
@@ -53,6 +56,7 @@ export function MailList({
   rangeStart,
   rangeEnd,
   resultSizeEstimate,
+  mobileHeader,
 }: MailListProps) {
   const [search, setSearch] = React.useState("")
   const [tab, setTab] = React.useState<"all" | "unread">("all")
@@ -72,9 +76,12 @@ export function MailList({
 
   return (
     <div className="flex h-full flex-col">
-      {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-2">
-        <h2 className="flex-1 text-base font-semibold">{goxtOnly ? "Bandeja" : FOLDER_LABELS[folder]}</h2>
+      {/* Header. En mobile, mobileHeader (w-full) fuerza el resto a la fila de
+          abajo vía flex-wrap; en desktop no se renderiza (md:hidden) y queda
+          como antes, una sola fila. */}
+      <div className="flex flex-wrap items-center gap-2 px-4 py-2">
+        {mobileHeader}
+        <h2 className="hidden flex-1 text-base font-semibold md:block">{goxtOnly ? "Bandeja" : FOLDER_LABELS[folder]}</h2>
         <Tabs value={tab} onValueChange={(v) => setTab(v as "all" | "unread")}>
           <TabsList>
             <TabsTrigger value="all">Todos</TabsTrigger>
