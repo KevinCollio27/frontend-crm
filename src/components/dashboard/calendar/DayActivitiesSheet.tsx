@@ -48,7 +48,7 @@ export function DayActivitiesSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="flex flex-col gap-0 p-0 data-[side=right]:sm:max-w-md">
+      <SheetContent className="flex w-full! flex-col gap-0 p-0 data-[side=right]:sm:max-w-md">
 
         <div className="shrink-0 border-b px-5 py-4">
           <SheetTitle className="text-lg font-bold">{capitalized}</SheetTitle>

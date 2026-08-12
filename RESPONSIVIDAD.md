@@ -187,6 +187,16 @@ Adelantado del ítem "shell post-login, al final" — surgió al pasar por Mensa
 
 El resto del shell (sidebar, layout general) sigue pendiente para el final, como quedamos — esto fue solo el header porque estaba a la vista y el fix era chico y acotado.
 
+### 9. Grilla de calendario (mes) — puntos en vez de pills en mobile
+
+`MonthView.tsx` (usado por Calendario) es un grid fijo de 7 columnas — cada celda mostraba hasta 3 "pills" de evento (título truncado + hora) más "+N más". Eso no cabe legible en un celular. A diferencia de las secciones 5/6/7, acá **no hace falta ningún paso ni Select nuevo** — tocar un día ya abría `DayActivitiesSheet` (el detalle completo de ese día) en cualquier pantalla, así que la solución es solo *aligerar la celda*, no navegar distinto:
+
+- **Solo en mobile**, la celda no lista pills — muestra el número del día + una fila de **puntos** (uno por evento, tope `MAX_DOTS = 4`, después "+N"). Actividades usan un color por tipo (`DOT_COLOR`, mismos matices que `ACTIVITY_TYPE_CONFIG` pero en tono sólido -500 en vez del fondo pálido -50 que usan las pills — a tamaño de punto un fondo pálido no se distingue). Eventos de Google usan un punto celeste fijo.
+- La altura mínima de cada fila de la grilla (`gridTemplateRows`, hoy `minmax(112px, 1fr)`) también depende de `isMobile` — en mobile baja a `64px` porque ya no necesita espacio para pills, solo para el número + una fila de puntos. Como es un `style` inline (el número de semanas del mes varía, no se puede resolver con clases Tailwind fijas), el alto se calcula en JS: `isMobile ? 64 : 112`.
+- Tocar el día sigue abriendo el mismo `DayActivitiesSheet` de siempre — cero cambios ahí más que el fix de ancho de la sección 4 (tenía el mismo bug `data-[side=right]:sm:max-w-md` sin `w-full!`).
+
+Aplicado en `MonthView.tsx`. Sheets del flujo de Calendario arreglados de paso: `DayActivitiesSheet`, `GoogleEventPreviewSheet` (mismo bug, mismo fix `w-full!`) — `ActivityPreviewSheet`/`CreateActivitySheet` ya venían arreglados desde la sección de Actividades.
+
 ## Checklist — qué falta replicar
 
 - [x] Contactos — toolbar, tabla, sheets (Crear, Fusionar, Fusión manual, Importar/Exportar)
@@ -222,6 +232,7 @@ El resto del shell (sidebar, layout general) sigue pendiente para el final, como
 - [x] Mensajería > sheets (`ContactSheet.tsx`) — variante angosta del bug de sheets (sección 4): `w-80!`/`max-w-80!` en vez de `w-full!`, porque el diseño original es un panel chico, no uno full-width
 - [x] Correo (`crm/mail/page.tsx`) — misma variante "Nav" que Mensajería: Col1 `MailNav` oculta, Select de carpeta (reusa la lista `folders` exportada de `MailNav.tsx`) + botón "Redactar" juntos en el header de la lista; Lista ⇄ Correo arranca en la lista. Estados vacíos de la lista (sin Gmail, carpeta no conectada, cargando) reciben el `mobileHeader` a mano porque viven en `page.tsx`, no en `MailList`
 - [x] Shell — `PageHeader.tsx` (sección 8), adelantado del ítem de shell de más abajo: descripción oculta en mobile, título con truncate real (cadena de `min-w-0`). Beneficia a las 16 páginas que lo usan.
+- [x] Calendario (`CrmCalendar.tsx` + `MonthView.tsx`) — grilla compacta con puntos en mobile (sección 9), reusa `DayActivitiesSheet` sin cambios de flujo. Sheets `DayActivitiesSheet`/`GoogleEventPreviewSheet` — fix `w-full!`
 - [ ] Oportunidades — vista **Sugerencias** (`suggestions/SuggestionsView.tsx`): es un feed de cards, no un datatable — fuera de este patrón, como BlogManager
 - [ ] Blog — `BlogManager.tsx` (gestor de artículos dentro de un blog, drag-and-drop): tampoco es un datatable — aparte
 - [ ] Usuarios (`UsersTable.tsx` / Configuración > Equipo)

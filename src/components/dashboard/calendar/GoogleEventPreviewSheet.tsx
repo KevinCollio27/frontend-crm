@@ -177,7 +177,7 @@ export function GoogleEventPreviewSheet({ event, open, onOpenChange, integration
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="flex flex-col gap-0 p-0 data-[side=right]:sm:max-w-md">
+      <SheetContent className="flex w-full! flex-col gap-0 p-0 data-[side=right]:sm:max-w-md">
 
         {/* Identity */}
         <div className="flex shrink-0 items-center gap-4 border-b px-5 py-4">
