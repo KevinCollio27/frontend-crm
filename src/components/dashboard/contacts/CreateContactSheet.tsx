@@ -472,7 +472,7 @@ export function CreateContactSheet({ open, onOpenChange, contactId, onSuccess, b
         side="right"
         showCloseButton={false}
         style={{ maxWidth: 720, padding: 0, gap: 0 }}
-        className="w-full"
+        className="w-full!"
       >
         {/* Header */}
         <div className="flex items-start justify-between border-b p-5">

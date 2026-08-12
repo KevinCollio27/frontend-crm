@@ -109,7 +109,7 @@ export function MergeContactsSheet({ open, group, onOpenChange, onMerged }: Prop
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" showCloseButton={false} style={{ maxWidth: 720, padding: 0, gap: 0 }} className="w-full flex flex-col">
+      <SheetContent side="right" showCloseButton={false} style={{ maxWidth: 720, padding: 0, gap: 0 }} className="w-full! flex flex-col">
         <div className="flex items-start justify-between gap-4 border-b px-5 py-4">
           <div className="space-y-2">
             <SheetTitle className="flex items-center gap-2">

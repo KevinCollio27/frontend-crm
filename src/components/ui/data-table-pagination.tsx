@@ -18,19 +18,19 @@ interface DataTablePaginationProps<TData> {
 
 export function DataTablePagination<TData>({ table }: DataTablePaginationProps<TData>) {
   return (
-    <div className="flex items-center justify-between">
-      <div className="flex-1 text-sm text-muted-foreground">
+    <div className="flex flex-col items-center gap-2 md:flex-row md:justify-between">
+      <div className="hidden flex-1 text-sm text-muted-foreground md:block">
         {table.getFilteredSelectedRowModel().rows.length} de{" "}
         {table.getFilteredRowModel().rows.length} fila(s) seleccionada(s).
       </div>
-      <div className="flex items-center space-x-6 lg:space-x-8">
-        <div className="flex items-center space-x-2">
-          <p className="text-sm font-medium">Filas por página</p>
+      <div className="flex items-center justify-center gap-2 md:gap-0 md:space-x-6 lg:space-x-8">
+        <div className="flex items-center gap-1.5 md:space-x-2">
+          <p className="hidden text-sm font-medium md:block">Filas por página</p>
           <Select
             value={`${table.getState().pagination.pageSize}`}
             onValueChange={(value) => table.setPageSize(Number(value))}
           >
-            <SelectTrigger className="w-[70px]">
+            <SelectTrigger className="h-8 w-14 md:h-9 md:w-17.5">
               <SelectValue />
             </SelectTrigger>
             <SelectContent side="top" align="center">
@@ -42,11 +42,11 @@ export function DataTablePagination<TData>({ table }: DataTablePaginationProps<T
             </SelectContent>
           </Select>
         </div>
-        <div className="flex w-[110px] items-center justify-center text-sm font-medium">
+        <div className="flex items-center justify-center text-xs font-medium whitespace-nowrap md:w-27.5 md:text-sm">
           Página {table.getState().pagination.pageIndex + 1} de{" "}
           {table.getPageCount()}
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center gap-1.5 md:space-x-2">
           <Button
             variant="outline"
             size="icon"

@@ -71,6 +71,7 @@ import { organizationService, type OrganizationOption } from "@/services/organiz
 import { contactConfirm } from "@/lib/confirm"
 import { notify } from "@/lib/notify"
 import { useIntegrations } from "@/hooks/useIntegrations"
+import { useIsMobile } from "@/hooks/use-mobile"
 import type { Person } from "@/types/contact"
 import { getFlag, getSortIcon, getInitials } from "@/lib/table-utils"
 import { cn } from "@/lib/utils"
@@ -135,6 +136,18 @@ const DEFAULT_COLUMN_VISIBILITY: VisibilityState = {
   source: false,
   createdAt: false,
   internalPosition: false,
+}
+
+// En mobile no hay espacio para columnas de más — solo Nombre queda visible por
+// defecto (Acciones y el checkbox de selección no dependen de esto, siempre se ven).
+const MOBILE_COLUMN_VISIBILITY: VisibilityState = {
+  id: false,
+  org: false,
+  internalPosition: false,
+  phone: false,
+  country: false,
+  source: false,
+  createdAt: false,
 }
 
 function getColumns(
@@ -566,6 +579,10 @@ export function ContactsTable() {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>(DEFAULT_COLUMN_VISIBILITY)
+  const isMobile = useIsMobile()
+  React.useEffect(() => {
+    if (isMobile) setColumnVisibility(MOBILE_COLUMN_VISIBILITY)
+  }, [isMobile])
   const [rowSelection, setRowSelection] = React.useState({})
   const [selectedContact, setSelectedContact] = React.useState<Contact | null>(null)
   const [sheetOpen, setSheetOpen] = React.useState(false)
@@ -757,72 +774,119 @@ export function ContactsTable() {
         <Button size="sm" onClick={() => setCreateOpen(true)}>+ Crear Contacto</Button>
       </div>
 
-      {/* Row 2 — filters */}
-      <div className="flex items-center gap-2 border-b px-4 py-2">
-        <div className="relative w-44 shrink-0">
-          <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar contacto..."
-            className="h-8 pl-8 text-xs"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-          />
+      {/* Row 2 — filters. En mobile se apila en filas propias en vez de forzar scroll
+          horizontal; desde md hacia arriba queda igual que antes. */}
+      <div className="flex flex-col gap-2 border-b px-4 py-2 md:flex-row md:items-center">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center">
+          <div className="relative w-full shrink-0 md:w-44">
+            <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Buscar contacto..."
+              className="h-8 pl-8 text-xs"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:items-center">
+            <div className="[&_button]:w-full md:[&_button]:w-auto">
+              <OrgFilter selected={query.orgId} onChange={handleOrgFilter} />
+            </div>
+
+            <Separator orientation="vertical" className="mx-0.5 hidden data-[orientation=vertical]:h-5 data-[orientation=vertical]:self-auto md:block" />
+
+            <div className="[&_button]:w-full md:[&_button]:w-auto">
+              <DataTableFacetedFilter
+                column={table.getColumn("country")!}
+                title="País"
+                options={countryOptions}
+                counts={countryCountsMap}
+              />
+            </div>
+
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" className="col-span-2 h-8 px-2 text-xs md:col-span-1 md:w-auto" onClick={resetFilters}>
+                <XIcon className="size-3.5" />
+                Restablecer
+              </Button>
+            )}
+          </div>
         </div>
 
-        <OrgFilter selected={query.orgId} onChange={handleOrgFilter} />
-
-        <Separator orientation="vertical" className="mx-0.5 data-[orientation=vertical]:h-5 data-[orientation=vertical]:self-auto" />
-
-        <DataTableFacetedFilter
-          column={table.getColumn("country")!}
-          title="País"
-          options={countryOptions}
-          counts={countryCountsMap}
-        />
-
-        {hasActiveFilters && (
-          <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={resetFilters}>
-            <XIcon className="size-3.5" />
-            Restablecer
-          </Button>
-        )}
-
-        <div className="ml-auto flex items-center gap-2">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-2 md:ml-auto">
           <span className="text-xs text-muted-foreground">{total} contactos</span>
-          <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8" />}>
-              Columnas <ChevronDown className="ml-1.5 size-3.5" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {table
-                .getAllColumns()
-                .filter((col) => col.getCanHide())
-                .map((col) => (
-                  <DropdownMenuCheckboxItem
-                    key={col.id}
-                    className="capitalize"
-                    checked={col.getIsVisible()}
-                    onCheckedChange={(value) => col.toggleVisibility(!!value)}
-                  >
-                    {columnLabels[col.id] ?? col.id}
-                  </DropdownMenuCheckboxItem>
-                ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          {googleContactsIntegration && (
-            <Button variant="outline" size="sm" className="h-8" onClick={() => setImportOpen(true)}>
-              <FcGoogle className="size-3.5" />
-              Importar con Google
-            </Button>
-          )}
-          <Button variant="outline" size="sm" className="h-8" onClick={() => setMergeOpen(true)}>
-            <GitMergeIcon className="size-3.5" />
-            Fusionar duplicados
-          </Button>
-          <Button variant="outline" size="sm" className="h-8" onClick={() => setImportExportOpen(true)}>
-            <ArrowDownUpIcon className="size-3.5" />
-            Importar / Exportar
-          </Button>
+
+          <div className="grid grid-cols-2 gap-2 md:flex md:items-center md:gap-2">
+            {/* Columnas siempre visible — es la acción más usada de las 4 */}
+            <div className="[&_button]:w-full md:[&_button]:w-auto">
+              <DropdownMenu>
+                <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8" />}>
+                  Columnas <ChevronDown className="ml-1.5 size-3.5" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {table
+                    .getAllColumns()
+                    .filter((col) => col.getCanHide())
+                    .map((col) => (
+                      <DropdownMenuCheckboxItem
+                        key={col.id}
+                        className="capitalize"
+                        checked={col.getIsVisible()}
+                        onCheckedChange={(value) => col.toggleVisibility(!!value)}
+                      >
+                        {columnLabels[col.id] ?? col.id}
+                      </DropdownMenuCheckboxItem>
+                    ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
+            {/* Desktop: el resto de acciones sueltas, igual que antes */}
+            <div className="hidden items-center gap-2 md:flex">
+              {googleContactsIntegration && (
+                <Button variant="outline" size="sm" className="h-8" onClick={() => setImportOpen(true)}>
+                  <FcGoogle className="size-3.5" />
+                  Importar con Google
+                </Button>
+              )}
+              <Button variant="outline" size="sm" className="h-8" onClick={() => setMergeOpen(true)}>
+                <GitMergeIcon className="size-3.5" />
+                Fusionar duplicados
+              </Button>
+              <Button variant="outline" size="sm" className="h-8" onClick={() => setImportExportOpen(true)}>
+                <ArrowDownUpIcon className="size-3.5" />
+                Importar / Exportar
+              </Button>
+            </div>
+
+            {/* Mobile: el resto de acciones agrupadas en un menú, para no apilar botones */}
+            <div className="[&_button]:w-full md:hidden">
+              <DropdownMenu>
+                <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8" />}>
+                  <MoreHorizontal className="size-3.5" />
+                  Más
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuGroup>
+                    {googleContactsIntegration && (
+                      <DropdownMenuItem onClick={() => setImportOpen(true)}>
+                        <FcGoogle className="size-3.5" />
+                        Importar con Google
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem onClick={() => setMergeOpen(true)}>
+                      <GitMergeIcon className="size-3.5" />
+                      Fusionar duplicados
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setImportExportOpen(true)}>
+                      <ArrowDownUpIcon className="size-3.5" />
+                      Importar / Exportar
+                    </DropdownMenuItem>
+                  </DropdownMenuGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
         </div>
       </div>
 
