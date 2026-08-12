@@ -10,6 +10,8 @@ import { ChatView } from "@/components/dashboard/chat/ChatView"
 import { type ChatConversation, type ChatMessage, type ChatDateGroup } from "@/components/dashboard/chat/data"
 import { notify } from "@/lib/notify"
 import { aiChatService } from "@/services/ai-chat.service"
+import { useIsMobile } from "@/hooks/use-mobile"
+import { cn } from "@/lib/utils"
 import type { AiConversationGrouped, AiConversationListItem } from "@/types/ai-chat"
 
 function groupedToList(grouped: AiConversationGrouped): ChatConversation[] {
@@ -39,6 +41,11 @@ export default function ChatPage() {
   const [selectedId, setSelectedId]       = React.useState<string | null>(null)
   const [currentMessages, setCurrentMessages] = React.useState<ChatMessage[]>([])
   const [sending, setSending]             = React.useState(false)
+
+  const isMobile = useIsMobile()
+  // Lista (historial) ⇄ Chat en mobile — a diferencia de Mensajería/Correo, acá se
+  // arranca en el chat (mismo prompt vacío que ya se ve en desktop), no en la lista.
+  const [mobileShowChat, setMobileShowChat] = React.useState(true)
 
   React.useEffect(() => {
     const welcome = searchParams.get("welcome")
@@ -73,6 +80,7 @@ export default function ChatPage() {
   React.useEffect(() => { loadConversations() }, [loadConversations])
 
   const handleSelect = async (id: string | null) => {
+    if (isMobile) setMobileShowChat(true)
     if (id === selectedId) return
     setSelectedId(id)
     setCurrentMessages([])
@@ -95,6 +103,7 @@ export default function ChatPage() {
   }
 
   const handleNew = () => {
+    if (isMobile) setMobileShowChat(true)
     setSelectedId(null)
     setCurrentMessages([])
   }
@@ -182,7 +191,12 @@ export default function ChatPage() {
         description="Asistente inteligente para gestión CRM"
       />
       <div className="flex flex-1 min-h-0 overflow-hidden">
-        <div className="flex w-64 shrink-0 flex-col overflow-hidden border-r">
+        {/* Col 1 — historial. En mobile, pantalla completa y solo cuando se abre
+            explícitamente desde el botón "Historial" del chat. */}
+        <div className={cn(
+          "w-full shrink-0 flex-col overflow-hidden border-r md:flex md:w-64",
+          mobileShowChat ? "hidden md:flex" : "flex"
+        )}>
           <ChatSidebar
             conversations={conversations}
             selectedId={selectedId}
@@ -190,13 +204,19 @@ export default function ChatPage() {
             onNew={handleNew}
             onDelete={handleDelete}
             onRename={handleRename}
+            onBack={isMobile ? () => setMobileShowChat(true) : undefined}
           />
         </div>
-        <div className="flex flex-1 flex-col overflow-hidden">
+        {/* Col 2 — chat. Es el default en mobile (mismo prompt vacío que en desktop). */}
+        <div className={cn(
+          "min-h-0 flex-1 flex-col overflow-hidden md:flex",
+          mobileShowChat ? "flex" : "hidden md:flex"
+        )}>
           <ChatView
             conversation={conversationForView}
             onSubmit={handleSubmit}
             sending={sending}
+            onOpenHistory={isMobile ? () => setMobileShowChat(false) : undefined}
           />
         </div>
       </div>

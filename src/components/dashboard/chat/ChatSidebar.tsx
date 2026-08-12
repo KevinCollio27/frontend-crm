@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import {
+  ArrowLeftIcon,
   MoreHorizontalIcon,
   PencilIcon,
   PlusIcon,
@@ -31,6 +32,7 @@ interface ChatSidebarProps {
   onNew: () => void
   onDelete: (id: string) => void
   onRename: (id: string, newTitle: string) => void
+  onBack?: () => void
 }
 
 export function ChatSidebar({
@@ -40,6 +42,7 @@ export function ChatSidebar({
   onNew,
   onDelete,
   onRename,
+  onBack,
 }: ChatSidebarProps) {
   const [search, setSearch] = React.useState("")
 
@@ -64,6 +67,16 @@ export function ChatSidebar({
 
   return (
     <div className="flex h-full flex-col gap-2 p-2">
+      {onBack && (
+        <button
+          type="button"
+          onClick={onBack}
+          className="-mx-2 -mt-2 flex shrink-0 items-center gap-1.5 border-b px-4 py-2.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ArrowLeftIcon className="size-3.5" />
+          Volver al chat
+        </button>
+      )}
       <Button className="w-full justify-start gap-2" onClick={onNew}>
         <PlusIcon className="size-4" />
         Nueva conversación

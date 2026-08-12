@@ -3,6 +3,7 @@
 import * as React from "react"
 import {
   CalendarPlusIcon,
+  HistoryIcon,
   MicIcon,
   PaperclipIcon,
   UserPlusIcon,
@@ -278,9 +279,22 @@ interface ChatViewProps {
   conversation: ChatConversation | undefined
   onSubmit: (prompt: string, files: File[]) => void
   sending?: boolean
+  onOpenHistory?: () => void
 }
 
-export function ChatView({ conversation, onSubmit, sending = false }: ChatViewProps) {
+function HistoryBar({ onOpenHistory }: { onOpenHistory?: () => void }) {
+  if (!onOpenHistory) return null
+  return (
+    <div className="flex shrink-0 items-center border-b px-4 py-2 md:hidden">
+      <Button variant="outline" size="sm" className="h-8 gap-1.5" onClick={onOpenHistory}>
+        <HistoryIcon className="size-3.5" />
+        Historial
+      </Button>
+    </div>
+  )
+}
+
+export function ChatView({ conversation, onSubmit, sending = false, onOpenHistory }: ChatViewProps) {
   const messagesEndRef = React.useRef<HTMLDivElement>(null)
 
   React.useEffect(() => {
@@ -290,7 +304,9 @@ export function ChatView({ conversation, onSubmit, sending = false }: ChatViewPr
   // ── Empty state ──────────────────────────────────────────────────────────
   if (!conversation) {
     return (
-      <div className="flex h-full flex-col items-center justify-center px-4">
+      <div className="flex h-full flex-col">
+      <HistoryBar onOpenHistory={onOpenHistory} />
+      <div className="flex flex-1 flex-col items-center justify-center px-4">
         <div className="flex w-full max-w-2xl flex-col items-center gap-8">
 
           <div className="text-center animate-[fade-blur_1.2s_ease-out_both]">
@@ -329,12 +345,14 @@ export function ChatView({ conversation, onSubmit, sending = false }: ChatViewPr
 
         </div>
       </div>
+      </div>
     )
   }
 
   // ── Active chat ──────────────────────────────────────────────────────────
   return (
     <div className="flex h-full flex-col">
+      <HistoryBar onOpenHistory={onOpenHistory} />
       <div className="flex-1 overflow-y-auto px-4 py-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <div className="mx-auto flex max-w-2xl flex-col gap-6">
           {conversation.messages.map((msg) =>

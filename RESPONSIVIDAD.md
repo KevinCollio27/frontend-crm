@@ -113,6 +113,14 @@ Para vistas tipo inbox (Col 1 = lista de items, Col 2 = detalle/preview del item
 
 Este mismo patrón debería aplicar a **Correo** cuando le toque, y a **Blog > BlogManager** si se decide hacerlo responsive (queda marcado como "aparte" más abajo).
 
+**Variante con el default invertido (Chat IA):** en Mensajería/Correo el default en mobile es la Col 2 (lista) porque es lo útil de entrada. En Chat IA es al revés — lo útil de entrada es la Col 2 pero es el **chat/prompt vacío** (`¿En qué puedo apoyarte hoy?`, mismo que ya se ve en desktop sin nada seleccionado), y la Col 1 (historial de conversaciones) es la que se abre bajo demanda. Mismo mecanismo, roles invertidos:
+- `const [mobileShowChat, setMobileShowChat] = React.useState(true)` — arranca en `true` (chat), no en `false` como en los otros casos.
+- Un botón **"Historial"** (mobile-only, `HistoryBar` en `ChatView.tsx`) abre la Col 1 (`setMobileShowChat(false)`) — hace de "ir a la lista" en vez de "Volver" hacia el detalle.
+- La Col 1 (`ChatSidebar.tsx`) recibe el `onBack` de siempre ("‹ Volver al chat") para cerrar sin elegir nada.
+- Elegir una conversación **o** tocar "Nueva conversación" en la Col 1 vuelve a mostrar el chat (`setMobileShowChat(true)`) — ambos flujos, no solo la selección.
+
+Aplicado en Chat IA (`chat/page.tsx` + `ChatSidebar.tsx` + `ChatView.tsx`).
+
 **Variante con "Nav" en vez de columna de contenido (Mensajería):** cuando la Col 1 no es una lista de items sino un *nav/filtro* (ej. `MessagingNav` — Mi bandeja/WhatsApp/Instagram/Messenger/agentes), **no** conviene tratarla como una etapa más del drill-down (obligaría a pasar por una pantalla de "elegir canal" antes de ver nada, incluso cuando el default — "Mi bandeja" — ya trae todo). En vez de eso:
 
 - La Col 1 (nav) se oculta del todo en mobile (`hidden ... md:flex`, nunca se muestra ahí) — no se convierte en un paso.
@@ -235,6 +243,7 @@ Aplicado en `MonthView.tsx`. Sheets del flujo de Calendario arreglados de paso: 
 - [x] Correo (`crm/mail/page.tsx`) — misma variante "Nav" que Mensajería: Col1 `MailNav` oculta, Select de carpeta (reusa la lista `folders` exportada de `MailNav.tsx`) + botón "Redactar" juntos en el header de la lista; Lista ⇄ Correo arranca en la lista. Estados vacíos de la lista (sin Gmail, carpeta no conectada, cargando) reciben el `mobileHeader` a mano porque viven en `page.tsx`, no en `MailList`
 - [x] Shell — `PageHeader.tsx` (sección 8), adelantado del ítem de shell de más abajo: descripción oculta en mobile, título con truncate real (cadena de `min-w-0`). Beneficia a las 16 páginas que lo usan.
 - [x] Calendario (`CrmCalendar.tsx` + `MonthView.tsx`) — grilla compacta con puntos en mobile (sección 9), reusa `DayActivitiesSheet` sin cambios de flujo. Sheets `DayActivitiesSheet`/`GoogleEventPreviewSheet` — fix `w-full!`
+- [x] Chat IA (`chat/page.tsx`) — master-detail con default invertido (sección 5, variante Chat IA): arranca en el chat/prompt vacío (`mobileShowChat = true`), botón "Historial" abre la lista de conversaciones
 - [x] Configuración (`settings/layout.tsx` + `SettingsNav.tsx`) — variante "solo Nav + contenido, ruta real" (sección 5): nav oculto en mobile, reemplazado por un `Select` agrupado por categoría; aterriza directo en Perfil, sin paso de menú previo. Contenido interno de cada página (`ProfileForm.tsx` y similares — grids de 2 columnas Nombre/Correo, fila de avatar) queda **pendiente**, mismo criterio que el contenido de los sheets "Crear ___"
 - [x] Configuración > Equipo > Usuarios (`UsersTable.tsx`) — toolbar (2 filtros fijos y pares, Restablecer en fila propia — mismo criterio que Contactos/Organizaciones), tabla, sheet (`InviteUserSheet` — fix `w-full!`, tenía `className="w-full"` sin el `!`). Esta tabla tenía un intento previo de responsividad con breakpoint `sm:` (640px) en vez de `md:` (768px) como el resto de la app — se normalizó a `md:` para que el punto de quiebre sea consistente con todas las demás tablas
 - [ ] Configuración > Equipo > Invitados (`InvitedUsersTable.tsx`) — misma página (tab al lado de Usuarios), mismo patrón directo a aplicar cuando le toque
