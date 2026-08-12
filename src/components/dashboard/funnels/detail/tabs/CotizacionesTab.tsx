@@ -55,6 +55,7 @@ import { notify } from "@/lib/notify"
 import { orgConfirm } from "@/lib/confirm"
 import { useEntityRealtime } from "@/hooks/useEntityRealtime"
 import { useCargoIntegration } from "@/hooks/useCargoIntegration"
+import { useIsMobile } from "@/hooks/use-mobile"
 
 // ─── Entity ───────────────────────────────────────────────────────────────────
 
@@ -143,6 +144,16 @@ const DEFAULT_VISIBILITY: VisibilityState = {
   type:       false,
   validUntil: false,
   createdAt:  false,
+}
+
+const MOBILE_COLUMN_VISIBILITY: VisibilityState = {
+  id:          false,
+  status:      false,
+  amount:      false,
+  responsible: false,
+  type:        false,
+  validUntil:  false,
+  createdAt:   false,
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -463,6 +474,11 @@ export function CotizacionesTab({ opportunityId, opportunityName, flowName, cont
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>(DEFAULT_VISIBILITY)
   const [rowSelection, setRowSelection] = React.useState({})
 
+  const isMobile = useIsMobile()
+  React.useEffect(() => {
+    if (isMobile) setColumnVisibility(MOBILE_COLUMN_VISIBILITY)
+  }, [isMobile])
+
   // Pre-warm products cache al montar el tab — cuando el usuario abra el wizard ya estarán listos
   React.useEffect(() => { productService.listAll().catch(() => {}) }, [])
 
@@ -645,40 +661,43 @@ export function CotizacionesTab({ opportunityId, opportunityName, flowName, cont
   return (
     <div className="p-4">
 
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2 pb-4">
+      {/* Toolbar. En mobile se apila en filas propias en vez de forzar scroll
+          horizontal; desde md hacia arriba queda igual que antes. */}
+      <div className="flex flex-col gap-2 pb-4 md:flex-row md:items-center">
         <Input
-          className="h-8 max-w-45 text-sm"
+          className="h-8 w-full text-sm md:max-w-45"
           placeholder="Filtrar por nombre..."
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         />
-        {!loading && (
-          <span className="text-sm text-muted-foreground">
-            {table.getFilteredRowModel().rows.length} cotización(es)
-          </span>
-        )}
-        <div className="ml-auto flex items-center gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8 text-xs" />}>
-              Columnas <ChevronDown className="ml-1 size-3.5" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {table.getAllColumns().filter((col) => col.getCanHide()).map((col) => (
-                <DropdownMenuCheckboxItem
-                  key={col.id}
-                  checked={col.getIsVisible()}
-                  onCheckedChange={(v) => col.toggleVisibility(!!v)}
-                >
-                  {COLUMN_LABELS[col.id] ?? col.id}
-                </DropdownMenuCheckboxItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={openOpportunityTemplateSheet}>
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-2 md:ml-auto">
+          {!loading && (
+            <span className="w-full text-sm text-muted-foreground md:w-auto">
+              {table.getFilteredRowModel().rows.length} cotización(es)
+            </span>
+          )}
+          <div className="[&_button]:w-full md:[&_button]:w-auto">
+            <DropdownMenu>
+              <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8 text-xs" />}>
+                Columnas <ChevronDown className="ml-1 size-3.5" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {table.getAllColumns().filter((col) => col.getCanHide()).map((col) => (
+                  <DropdownMenuCheckboxItem
+                    key={col.id}
+                    checked={col.getIsVisible()}
+                    onCheckedChange={(v) => col.toggleVisibility(!!v)}
+                  >
+                    {COLUMN_LABELS[col.id] ?? col.id}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+          <Button variant="outline" size="sm" className="h-8 w-full gap-1.5 text-xs md:w-auto" onClick={openOpportunityTemplateSheet}>
             <FileTextIcon className="size-3.5" /> Plantilla de la oportunidad
           </Button>
-          <Button size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setCreateOpen(true)}>
+          <Button size="sm" className="h-8 w-full gap-1.5 text-xs md:w-auto" onClick={() => setCreateOpen(true)}>
             <PlusIcon className="size-3.5" /> Cotización
           </Button>
         </div>

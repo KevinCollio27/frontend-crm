@@ -7,11 +7,15 @@ import {
   ArrowLeftIcon,
   ChevronDownIcon,
   ChevronRightIcon,
+  ClipboardListIcon,
   DownloadIcon,
   FileSpreadsheetIcon,
   PencilIcon,
   PrinterIcon,
+  UserIcon,
+  WalletIcon,
 } from "lucide-react"
+import { cn } from "@/lib/utils"
 import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
@@ -21,6 +25,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useEntityRealtime } from "@/hooks/useEntityRealtime"
 import { Col1Info } from "./detail/Col1Info"
 import { Col2Tabs } from "./detail/Col2Tabs"
@@ -30,6 +35,16 @@ import { organizationService } from "@/services/organization.service"
 import { teamService } from "@/services/team.service"
 import { prefetchHistorial } from "./detail/tabs/HistorialTab"
 import type { OrgDetailData } from "@/types/organization"
+
+// ─── Mobile — selector de columna (mismo patrón que Contactos > Detalle) ───────
+
+type MobileDetailView = "info" | "detalle" | "resumen"
+
+const DETAIL_VIEW_OPTIONS: { value: MobileDetailView; label: string; icon: React.ElementType }[] = [
+  { value: "info",    label: "Info",    icon: UserIcon         },
+  { value: "detalle", label: "Detalle", icon: ClipboardListIcon },
+  { value: "resumen", label: "Resumen", icon: WalletIcon       },
+]
 
 // ─── Skeletons ────────────────────────────────────────────────────────────────
 
@@ -97,6 +112,7 @@ export function OrganizationDetail({ id }: Props) {
   const [loading, setLoading]   = React.useState(true)
   const [editOpen, setEditOpen] = React.useState(false)
   const [refreshKey, setRefreshKey] = React.useState(0)
+  const [mobileView, setMobileView] = React.useState<MobileDetailView>("detalle")
 
   // Tiempo real, nivel 2: alguien más edita/elimina ESTA organización mientras
   // la estás viendo. Filtra por id (a diferencia de la tabla, acá solo importa
@@ -149,7 +165,7 @@ export function OrganizationDetail({ id }: Props) {
           instagram_url:    raw.instagram_url,
           twitter_url:      raw.twitter_url,
           facebook_url:     raw.facebook_url,
-          owner:            member ? { id: member.user_id, name: member.user.name } : null,
+          owner:            member ? { id: member.user_id, name: member.user.name, avatarUrl: member.user.avatar_url ?? null } : null,
           contacts:         raw.person ?? [],
         })
       })
@@ -202,15 +218,52 @@ export function OrganizationDetail({ id }: Props) {
         />
       )}
 
+      {/* Selector de columna — mobile only, las 3 columnas no caben en un celular */}
+      <div className="flex shrink-0 items-center border-b px-4 py-2 md:hidden">
+        <Select value={mobileView} onValueChange={(v) => setMobileView(v as MobileDetailView)}>
+          <SelectTrigger size="sm" className="w-36">
+            <SelectValue placeholder="Vista">
+              {(v: MobileDetailView) => {
+                const opt = DETAIL_VIEW_OPTIONS.find((o) => o.value === v)
+                if (!opt) return v
+                return (
+                  <span className="flex items-center gap-1.5">
+                    <opt.icon className="size-3.5" />
+                    {opt.label}
+                  </span>
+                )
+              }}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {DETAIL_VIEW_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>
+                <opt.icon className="size-3.5" />
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       {/* 3 columns */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
-        <div className="flex w-[25%] shrink-0 flex-col overflow-y-auto border-r [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className={cn(
+          "w-full shrink-0 flex-col overflow-y-auto border-r [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:flex md:w-[25%]",
+          mobileView === "info" ? "flex" : "hidden md:flex"
+        )}>
           {loading || !data ? <Col1Skeleton /> : <Col1Info data={data} />}
         </div>
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-r">
+        <div className={cn(
+          "min-h-0 flex-1 flex-col overflow-hidden border-r md:flex",
+          mobileView === "detalle" ? "flex" : "hidden md:flex"
+        )}>
           <Col2Tabs orgId={id} orgName={data?.name ?? ""} />
         </div>
-        <div className="flex w-[25%] shrink-0 flex-col overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className={cn(
+          "w-full shrink-0 flex-col overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:flex md:w-[25%]",
+          mobileView === "resumen" ? "flex" : "hidden md:flex"
+        )}>
           {loading || !data ? <Col3Skeleton /> : <Col3Related data={data} />}
         </div>
       </div>

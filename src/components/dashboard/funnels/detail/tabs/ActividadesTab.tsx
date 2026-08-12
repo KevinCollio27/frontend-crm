@@ -49,20 +49,22 @@ import { activityService } from "@/services/activity.service"
 import { orgConfirm } from "@/lib/confirm"
 import { notify } from "@/lib/notify"
 import { useEntityRealtime } from "@/hooks/useEntityRealtime"
+import { useIsMobile } from "@/hooks/use-mobile"
 import type { ActivityRaw } from "@/types/activity"
 import { CreateActivitySheet } from "@/components/dashboard/activities/CreateActivitySheet"
 
 // ─── Entity ───────────────────────────────────────────────────────────────────
 
 interface TabActivity {
-  id:          number
-  title:       string
-  type:        string
-  isCompleted: boolean
-  dateFrom:    string | null
-  responsible: string
-  ubication:   string | null
-  createdAt:   string
+  id:                 number
+  title:              string
+  type:               string
+  isCompleted:        boolean
+  dateFrom:           string | null
+  responsible:        string
+  responsibleAvatarUrl: string | null
+  ubication:          string | null
+  createdAt:          string
 }
 
 // ─── Map ──────────────────────────────────────────────────────────────────────
@@ -83,6 +85,7 @@ function mapActivity(d: ActivityRaw): TabActivity {
         })
       : null,
     responsible: d.user?.name ?? "—",
+    responsibleAvatarUrl: d.user?.avatar_url ?? null,
     ubication:   d.ubication,
     createdAt:   new Date(d.created_at).toLocaleDateString("es-CL", {
       day: "numeric", month: "short", year: "numeric",
@@ -107,6 +110,15 @@ const DEFAULT_VISIBILITY: VisibilityState = {
   status:    false,
   ubication: false,
   createdAt: false,
+}
+
+const MOBILE_COLUMN_VISIBILITY: VisibilityState = {
+  id:          false,
+  dateFrom:    false,
+  status:      false,
+  responsible: false,
+  ubication:   false,
+  createdAt:   false,
 }
 
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
@@ -245,7 +257,7 @@ function getColumns(opts: {
       cell: ({ row }) => (
         <div className="flex items-center gap-2">
           <Avatar className="size-6 shrink-0">
-            <AvatarImage src="https://github.com/shadcn.png" alt={row.original.responsible} />
+            <AvatarImage src={row.original.responsibleAvatarUrl ?? "https://github.com/shadcn.png"} alt={row.original.responsible} />
             <AvatarFallback className="text-[9px] font-semibold">
               {getInitials(row.original.responsible)}
             </AvatarFallback>
@@ -322,6 +334,11 @@ export function ActividadesTab({ opportunityId, opportunityName, flowName }: Pro
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>(DEFAULT_VISIBILITY)
   const [rowSelection, setRowSelection] = React.useState({})
 
+  const isMobile = useIsMobile()
+  React.useEffect(() => {
+    if (isMobile) setColumnVisibility(MOBILE_COLUMN_VISIBILITY)
+  }, [isMobile])
+
   React.useEffect(() => { rawDataRef.current = rawData }, [rawData])
 
   // A diferencia de Organización/Contacto (donde "activity" no se puede filtrar por
@@ -396,37 +413,40 @@ export function ActividadesTab({ opportunityId, opportunityName, flowName }: Pro
   return (
     <div className="p-4">
 
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2 pb-4">
+      {/* Toolbar. En mobile se apila en filas propias en vez de forzar scroll
+          horizontal; desde md hacia arriba queda igual que antes. */}
+      <div className="flex flex-col gap-2 pb-4 md:flex-row md:items-center">
         <Input
-          className="h-8 max-w-45 text-sm"
+          className="h-8 w-full text-sm md:max-w-45"
           placeholder="Filtrar por título..."
           value={(table.getColumn("title")?.getFilterValue() as string) ?? ""}
           onChange={(e) => table.getColumn("title")?.setFilterValue(e.target.value)}
         />
-        {!loading && (
-          <span className="text-sm text-muted-foreground">
-            {table.getFilteredRowModel().rows.length} actividad(es)
-          </span>
-        )}
-        <div className="ml-auto flex items-center gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8 text-xs" />}>
-              Columnas <ChevronDown className="ml-1 size-3.5" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {table.getAllColumns().filter((col) => col.getCanHide()).map((col) => (
-                <DropdownMenuCheckboxItem
-                  key={col.id}
-                  checked={col.getIsVisible()}
-                  onCheckedChange={(v) => col.toggleVisibility(!!v)}
-                >
-                  {COLUMN_LABELS[col.id] ?? col.id}
-                </DropdownMenuCheckboxItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setCreateOpen(true)}>
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-2 md:ml-auto">
+          {!loading && (
+            <span className="w-full text-sm text-muted-foreground md:w-auto">
+              {table.getFilteredRowModel().rows.length} actividad(es)
+            </span>
+          )}
+          <div className="[&_button]:w-full md:[&_button]:w-auto">
+            <DropdownMenu>
+              <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8 text-xs" />}>
+                Columnas <ChevronDown className="ml-1 size-3.5" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {table.getAllColumns().filter((col) => col.getCanHide()).map((col) => (
+                  <DropdownMenuCheckboxItem
+                    key={col.id}
+                    checked={col.getIsVisible()}
+                    onCheckedChange={(v) => col.toggleVisibility(!!v)}
+                  >
+                    {COLUMN_LABELS[col.id] ?? col.id}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+          <Button size="sm" className="h-8 w-full gap-1.5 text-xs md:w-auto" onClick={() => setCreateOpen(true)}>
             <PlusIcon className="size-3.5" /> Actividad
           </Button>
         </div>

@@ -216,7 +216,7 @@ export function Col1Info({ data }: Props) {
           {data.owner && (
             <PropRow label="Propietario">
             <Avatar size="sm">
-              <AvatarImage src="https://github.com/shadcn.png" />
+              <AvatarImage src={data.owner.avatarUrl ?? "https://github.com/shadcn.png"} alt={data.owner.name} />
               <AvatarFallback className="text-base">
               </AvatarFallback>
             </Avatar>

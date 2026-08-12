@@ -3,7 +3,8 @@
 import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ArrowLeftIcon, ChevronDownIcon, ChevronRightIcon, DownloadIcon, FileSpreadsheetIcon, PrinterIcon } from "lucide-react"
+import { ArrowLeftIcon, ChevronDownIcon, ChevronRightIcon, ClipboardListIcon, DownloadIcon, FileSpreadsheetIcon, PrinterIcon, UserIcon, WalletIcon } from "lucide-react"
+import { cn } from "@/lib/utils"
 import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
@@ -13,10 +14,21 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Col1Info } from "./detail/Col1Info"
 import { Col2Tabs } from "./detail/Col2Tabs"
 import { Col3Related } from "./detail/Col3Related"
 import type { OpportunityDetailData } from "@/types/opportunity"
+
+// ─── Mobile — selector de columna (mismo patrón que Contactos/Organizaciones/Actividades > Detalle) ──
+
+type MobileDetailView = "info" | "detalle" | "resumen"
+
+const DETAIL_VIEW_OPTIONS: { value: MobileDetailView; label: string; icon: React.ElementType }[] = [
+  { value: "info",    label: "Info",    icon: UserIcon         },
+  { value: "detalle", label: "Detalle", icon: ClipboardListIcon },
+  { value: "resumen", label: "Resumen", icon: WalletIcon       },
+]
 
 interface Props {
   data:           OpportunityDetailData
@@ -26,6 +38,7 @@ interface Props {
 export function FunnelDetail({ data, onStatusChange }: Props) {
   const router     = useRouter()
   const { setOpen } = useSidebar()
+  const [mobileView, setMobileView] = React.useState<MobileDetailView>("detalle")
 
   React.useEffect(() => {
     setOpen(false)
@@ -62,15 +75,49 @@ export function FunnelDetail({ data, onStatusChange }: Props) {
         </DropdownMenu>
       </header>
 
+      {/* Selector de columna — mobile only, las 3 columnas no caben en un celular */}
+      <div className="flex shrink-0 items-center border-b px-4 py-2 md:hidden">
+        <Select value={mobileView} onValueChange={(v) => setMobileView(v as MobileDetailView)}>
+          <SelectTrigger size="sm" className="w-36">
+            <SelectValue placeholder="Vista">
+              {(v: MobileDetailView) => {
+                const opt = DETAIL_VIEW_OPTIONS.find((o) => o.value === v)
+                if (!opt) return v
+                return (
+                  <span className="flex items-center gap-1.5">
+                    <opt.icon className="size-3.5" />
+                    {opt.label}
+                  </span>
+                )
+              }}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {DETAIL_VIEW_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>
+                <opt.icon className="size-3.5" />
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       {/* 3 columns */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Col 1 */}
-        <div className="flex w-[25%] shrink-0 flex-col overflow-y-auto border-r [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className={cn(
+          "w-full shrink-0 flex-col overflow-y-auto border-r [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:flex md:w-[25%]",
+          mobileView === "info" ? "flex" : "hidden md:flex"
+        )}>
           <Col1Info data={data} />
         </div>
 
         {/* Col 2 */}
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-r">
+        <div className={cn(
+          "min-h-0 flex-1 flex-col overflow-hidden border-r md:flex",
+          mobileView === "detalle" ? "flex" : "hidden md:flex"
+        )}>
           <Col2Tabs
             opportunityId={data.id}
             opportunityName={data.name}
@@ -82,7 +129,10 @@ export function FunnelDetail({ data, onStatusChange }: Props) {
         </div>
 
         {/* Col 3 */}
-        <div className="flex w-[25%] shrink-0 flex-col overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className={cn(
+          "w-full shrink-0 flex-col overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:flex md:w-[25%]",
+          mobileView === "resumen" ? "flex" : "hidden md:flex"
+        )}>
           <Col3Related data={data} onStatusChange={onStatusChange} />
         </div>
       </div>

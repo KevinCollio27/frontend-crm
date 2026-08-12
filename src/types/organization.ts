@@ -122,6 +122,6 @@ export interface OrgDetailData {
   instagram_url: string | null
   twitter_url: string | null
   facebook_url: string | null
-  owner: { id: number; name: string } | null
+  owner: { id: number; name: string; avatarUrl: string | null } | null
   contacts: { id: number; name: string }[]
 }

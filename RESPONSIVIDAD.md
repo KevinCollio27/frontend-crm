@@ -82,9 +82,9 @@ Ya arreglado a nivel de **componente compartido** (`src/components/ui/data-table
 
 **Fix aplicado (por sheet, no a nivel base todavía):** cambiar `className="w-full"` por `className="w-full!"` (sintaxis de `!important` de Tailwind v4 — el `!` va al final, no al principio). Esto gana pase lo que pase con la especificidad, sin tocar el componente compartido ni arriesgar los sheets que no hemos revisado.
 
-Sheets ya arreglados así: `CreateContactSheet`, `DuplicateContactsSheet`, `MergeContactsSheet`, `ContactsImportExportSheet`, `CreateOrganizationSheet`, `DuplicateOrganizationsSheet`, `MergeOrganizationsSheet`, `OrganizationsImportExportSheet`, `CreateActivitySheet`, `ActivityPreviewSheet`, `contacts/detail/sheets/InterestSheet`, `contacts/detail/sheets/NoteSheet`.
+Sheets ya arreglados así: `CreateContactSheet`, `DuplicateContactsSheet`, `MergeContactsSheet`, `ContactsImportExportSheet`, `CreateOrganizationSheet`, `DuplicateOrganizationsSheet`, `MergeOrganizationsSheet`, `OrganizationsImportExportSheet`, `CreateActivitySheet`, `ActivityPreviewSheet`, `contacts/detail/sheets/InterestSheet`, `contacts/detail/sheets/NoteSheet`, `organizations/detail/sheets/ChallengeSheet`, `organizations/detail/sheets/NoteSheet`, `organizations/detail/sheets/LinkContactSheet`.
 
-**Variante con `style={{ maxWidth: N }}` en vez de clase de ancho máximo:** algunos sheets (los de `contacts/detail/sheets/`, ej. `InterestSheet`, `NoteSheet`) fijan el ancho máximo con un `style={{ maxWidth: 420 }}` inline en vez de una clase Tailwind — funciona igual, pero si falta el `className="w-full!"` al lado, el sheet se queda angosto en mobile (mismo bug base, solo que sin el `className="w-full"` de partida que hiciera evidente el problema). Mismo fix: agregar `className="w-full!"` sin tocar el `style` existente. `organizations/detail/sheets/` (`ChallengeSheet`, `LinkContactSheet`, `NoteSheet`) probablemente tiene el mismo patrón — pendiente de revisar cuando le toque a Organizaciones.
+**Variante con `style={{ maxWidth: N }}` en vez de clase de ancho máximo:** algunos sheets (los de `contacts/detail/sheets/` y `organizations/detail/sheets/`) fijan el ancho máximo con un `style={{ maxWidth: 420 }}` inline en vez de una clase Tailwind — funciona igual, pero si falta el `className="w-full!"` al lado, el sheet se queda angosto en mobile (mismo bug base, solo que sin el `className="w-full"` de partida que hiciera evidente el problema). Mismo fix: agregar `className="w-full!"` sin tocar el `style` existente. Confirmado en los 5 sheets de ambas carpetas `detail/sheets/` — si aparece una carpeta `detail/sheets/` nueva (Oportunidades, Actividades), revisar ahí primero por este mismo patrón.
 
 **Variante del mismo bug — sheets de "preview" (al hacer clic en una card/fila):** algunos, como `ActivityPreviewSheet`, ni siquiera tenían `className="w-full"` — solo usaban `data-[side=right]:sm:max-w-md` (que sí anula correctamente el `max-w-sm` base porque comparten el mismo "modifier chain" `data-[side=right]:sm:`, a diferencia de `w-full` suelto). Bajo `sm` seguían heredando el `w-3/4` base igual. Mismo fix: agregar `w-full!` al `className`. Vale la pena revisar el resto de los sheets de "preview" (`FunnelPreviewSheet`, `ContactPreviewSheet`, `OrganizationPreviewSheet`, `QuotationPreviewSheet`, etc.) por si tienen el mismo patrón cuando les toque su tabla.
 
@@ -167,7 +167,14 @@ Aplicado en Contactos (`ContactDetail.tsx`). Candidato directo para replicar en 
 - [x] Contactos > Detalle > tab Oportunidades (`detail/tabs/OportunidadesTab.tsx`) — mismo patrón de toolbar+columnas que Contactos/Organizaciones, aplicado dentro de un datatable anidado en un tab
 - [x] Contactos > Detalle > tab Actividades (`detail/tabs/ActividadesTab.tsx`) — ídem
 - [x] Organizaciones — toolbar, tabla, sheets (Crear, Fusionar, Fusión manual, Importar/Exportar)
+- [x] Organizaciones > Detalle (`OrganizationDetail.tsx`) — 3 columnas paralelas (sección 7): selector Info/Detalle/Resumen, default "Detalle"
+- [x] Organizaciones > Detalle > tab Oportunidades (`detail/tabs/OportunidadesTab.tsx`) — toolbar+columnas, mismo patrón
+- [x] Organizaciones > Detalle > tab Actividades (`detail/tabs/ActividadesTab.tsx`) — ídem
+- [x] Organizaciones > Detalle > tab Contactos (`detail/tabs/ContactosTab.tsx`) — ídem, con 2 botones de acción (Columnas + Vincular contacto) en vez de 1
+- [x] Organizaciones > Detalle > sheets (`ChallengeSheet`, `NoteSheet`, `LinkContactSheet`) — fix `w-full!`
 - [x] Actividades — toolbar (compartido entre vista Lista y Board, con hasta 4 filtros variables según la vista), tabla (Lista), sheets (Crear Actividad, Preview), selector de vista en mobile (sección 6, Lista/Board)
+- [x] Actividades > Detalle (`ActivityDetail.tsx`) — 3 columnas paralelas (sección 7): selector Info/Detalle/Resumen, default "Detalle". Sin tabs datatable acá (`HistorialTab`/`NotasTab` son listas de cards) — solo hizo falta el selector + el sheet
+- [x] Actividades > Detalle > sheet `NoteSheet` — fix `w-full!` (mismo bug de siempre)
 - [x] Cotizaciones — toolbar (3 filtros + Restablecer como ítem del grid), tabla, 6 sheets (Crear, Preview, PDF Preview, Historial, Enviar, Asignar Plantilla)
 - [x] Documentos — toolbar (2 filtros, grid de 2), tabla, sheets (Subir Documento, Preview)
 - [x] Campañas — toolbar (1 filtro, ancho completo, con badge extra de "uso diario"), tabla, sheets (Crear Campaña, Preview)
@@ -175,13 +182,18 @@ Aplicado en Contactos (`ContactDetail.tsx`). Candidato directo para replicar en 
 - [x] Widgets AI — toolbar (2 filtros, grid de 2), tabla, sheet (Crear Widget)
 - [x] Blog — solo la tabla de **Blogs** (`BlogsTable.tsx`, lista de blogs): toolbar (1 filtro, ancho completo), tabla, sheet (Crear/Editar Blog)
 - [x] Oportunidades — toolbar (compartido entre Lista y Board, con Pipeline+Estado siempre y Responsable+Restablecer solo en Board — mismo criterio de Restablecer-como-ítem-del-grid que Actividades/Cotizaciones), tabla (Lista), sheets (Crear Oportunidad, Preview), selector de vista en mobile (sección 6, Lista/Board/Sugerencias)
+- [x] Oportunidades > Detalle (`FunnelDetail.tsx`) — 3 columnas paralelas (sección 7): selector Info/Detalle/Resumen, default "Detalle". El más grande hasta ahora: 8 tabs (Historial, Notas, Actividades, Documentos, Cotizaciones, Facturas, Correo, WhatsApp)
+- [x] Oportunidades > Detalle > tab Actividades (`detail/tabs/ActividadesTab.tsx`) — toolbar+columnas (2 botones de acción: Columnas + "+ Actividad"), más fix de avatar hardcodeado en Responsable (mismo bug que Col1Info, `d.user.avatar_url`)
+- [x] Oportunidades > Detalle > tab Documentos (`detail/tabs/DocumentosTab.tsx`) — toolbar+columnas (solo Nombre queda visible, sin Responsable involucrado)
+- [x] Oportunidades > Detalle > tab Cotizaciones (`detail/tabs/CotizacionesTab.tsx`) — toolbar+columnas (3 botones de acción: Columnas + "Plantilla de la oportunidad" + "+ Cotización"); el avatar de Responsable ya estaba bien hecho acá (`responsible.avatarUrl`), no hizo falta tocarlo
+- [x] Oportunidades > Detalle > tab Facturas (`detail/tabs/FacturasTab.tsx`) — toolbar+columnas+filtros (grid de 2, mismo criterio que tablas principales); es un stub "Próximamente" con overlay y `data: []` fijo, pero el toolbar igual se renderiza así que se ajustó por consistencia
+- [x] Oportunidades > Detalle > sheets (`FileOpportunitySheet`, `NoteSheet`) — fix `w-full!`
 - [x] Paginación — arreglado a nivel de componente compartido (afecta a todas las tablas ya)
 - [x] Formularios > Respuestas (`FormAnswersBoard.tsx`) — primer caso del patrón "master-detail collapse" (sección 5): toolbar + navegación lista→detalle en mobile con botón "Volver" en `FormAnswerDetail.tsx`
 - [x] Formularios > Vacantes (`VacantesBoard.tsx`) — generalización a 3 columnas del mismo patrón (Vacante → Postulantes → Detalle), navegación por etapas con `mobileStep`
 - [ ] Oportunidades — vista **Sugerencias** (`suggestions/SuggestionsView.tsx`): es un feed de cards, no un datatable — fuera de este patrón, como BlogManager
 - [ ] Blog — `BlogManager.tsx` (gestor de artículos dentro de un blog, drag-and-drop): tampoco es un datatable — aparte
 - [ ] Correo — layout de 2 columnas, candidato directo para el patrón master-detail de la sección 5
-- [ ] Organizaciones > Detalle (`organizations/detail/`) — misma estructura de 3 columnas que Contactos > Detalle, candidato directo para el patrón de la sección 7; sus tabs `OportunidadesTab.tsx`/`ActividadesTab.tsx` son casi el mismo código que los de Contacto (el propio código los referencia entre sí como "mismo criterio"), así que la sección 1+2 aplica igual de directo ahí
 - [ ] Usuarios (`UsersTable.tsx` / Configuración > Equipo)
 - [ ] Contenido interno de los sheets "Crear ___" (grids de 2 columnas → 1 columna en mobile) — aparte, por formulario
 - [ ] Evaluar fix del bug de `Sheet` a nivel de componente base, para no repetir `w-full!` en cada sheet nuevo

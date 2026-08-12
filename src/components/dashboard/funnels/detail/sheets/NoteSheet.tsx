@@ -81,6 +81,7 @@ export function NoteSheet({ open, onOpenChange, opportunityId, note, onSuccess }
       <SheetContent
         side="right"
         style={{ maxWidth: 540, display: "flex", flexDirection: "column", gap: 0, padding: 0 }}
+        className="w-full!"
       >
         <SheetHeader className="border-b px-5 py-4">
           <SheetTitle>{isEdit ? "Editar nota" : "Nueva nota"}</SheetTitle>

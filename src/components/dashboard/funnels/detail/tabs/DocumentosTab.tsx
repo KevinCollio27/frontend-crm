@@ -50,6 +50,7 @@ import {
 import { fileOpportunityService } from "@/services/file-opportunity.service"
 import { FileOpportunitySheet } from "../sheets/FileOpportunitySheet"
 import { useEntityRealtime } from "@/hooks/useEntityRealtime"
+import { useIsMobile } from "@/hooks/use-mobile"
 import type { FileOpportunityRaw } from "@/types/file-opportunity"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -72,6 +73,11 @@ const COLUMN_LABELS: Record<string, string> = {
   id:         "ID",
   name:       "Nombre",
   created_at: "Fecha",
+}
+
+const MOBILE_COLUMN_VISIBILITY: VisibilityState = {
+  id:         false,
+  created_at: false,
 }
 
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
@@ -234,6 +240,11 @@ export function DocumentosTab({ opportunityId }: Props) {
   const [filter, setFilter]           = React.useState("")
   const [refreshKey, setRefreshKey]   = React.useState(0)
 
+  const isMobile = useIsMobile()
+  React.useEffect(() => {
+    if (isMobile) setColumnVisibility(MOBILE_COLUMN_VISIBILITY)
+  }, [isMobile])
+
   // Evento real es "opportunity_file" (con guion bajo, no "-") — ver
   // fileOpportunity.service.ts. Trae opportunity_id en las 3 acciones.
   useEntityRealtime("opportunity_file", (payload) => {
@@ -310,37 +321,40 @@ export function DocumentosTab({ opportunityId }: Props) {
   return (
     <div className="p-4">
 
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2 pb-4">
+      {/* Toolbar. En mobile se apila en filas propias en vez de forzar scroll
+          horizontal; desde md hacia arriba queda igual que antes. */}
+      <div className="flex flex-col gap-2 pb-4 md:flex-row md:items-center">
         <Input
-          className="h-8 max-w-45 text-sm"
+          className="h-8 w-full text-sm md:max-w-45"
           placeholder="Filtrar por nombre..."
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         />
-        {!loading && (
-          <span className="text-sm text-muted-foreground">
-            {table.getFilteredRowModel().rows.length} documento(s)
-          </span>
-        )}
-        <div className="ml-auto flex items-center gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8 text-xs" />}>
-              Columnas <ChevronDown className="ml-1 size-3.5" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {table.getAllColumns().filter((col) => col.getCanHide()).map((col) => (
-                <DropdownMenuCheckboxItem
-                  key={col.id}
-                  checked={col.getIsVisible()}
-                  onCheckedChange={(v) => col.toggleVisibility(!!v)}
-                >
-                  {COLUMN_LABELS[col.id] ?? col.id}
-                </DropdownMenuCheckboxItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setCreateOpen(true)}>
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-2 md:ml-auto">
+          {!loading && (
+            <span className="w-full text-sm text-muted-foreground md:w-auto">
+              {table.getFilteredRowModel().rows.length} documento(s)
+            </span>
+          )}
+          <div className="[&_button]:w-full md:[&_button]:w-auto">
+            <DropdownMenu>
+              <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8 text-xs" />}>
+                Columnas <ChevronDown className="ml-1 size-3.5" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {table.getAllColumns().filter((col) => col.getCanHide()).map((col) => (
+                  <DropdownMenuCheckboxItem
+                    key={col.id}
+                    checked={col.getIsVisible()}
+                    onCheckedChange={(v) => col.toggleVisibility(!!v)}
+                  >
+                    {COLUMN_LABELS[col.id] ?? col.id}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+          <Button size="sm" className="h-8 w-full gap-1.5 text-xs md:w-auto" onClick={() => setCreateOpen(true)}>
             <PlusIcon className="size-3.5" /> Documento
           </Button>
         </div>

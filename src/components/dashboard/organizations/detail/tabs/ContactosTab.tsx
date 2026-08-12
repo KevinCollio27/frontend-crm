@@ -38,6 +38,7 @@ import {
 import { getFlag, getSortIcon, getInitials, SOURCE_LABEL } from "@/lib/table-utils"
 import { contactService } from "@/services/contact.service"
 import { useEntityRealtime } from "@/hooks/useEntityRealtime"
+import { useIsMobile } from "@/hooks/use-mobile"
 import { contactConfirm } from "@/lib/confirm"
 import { notify } from "@/lib/notify"
 import type { Person } from "@/types/contact"
@@ -92,6 +93,14 @@ const COLUMN_LABELS: Record<string, string> = {
 const DEFAULT_VISIBILITY: VisibilityState = {
   phone:      false,
   created_at: false,
+}
+
+const MOBILE_COLUMN_VISIBILITY: VisibilityState = {
+  id:           false,
+  phone:        false,
+  country_code: false,
+  origin:       false,
+  created_at:   false,
 }
 
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
@@ -271,6 +280,11 @@ export function ContactosTab({ orgId, orgName = "esta organización" }: Props) {
   const [editContactId, setEditContactId] = React.useState<number | null>(null)
   const [editOpen, setEditOpen]     = React.useState(false)
 
+  const isMobile = useIsMobile()
+  React.useEffect(() => {
+    if (isMobile) setColumnVisibility(MOBILE_COLUMN_VISIBILITY)
+  }, [isMobile])
+
   async function handleUnlink(c: TabContact) {
     const confirmed = await contactConfirm.unlink(c.name, orgName)
     if (!confirmed) return
@@ -353,35 +367,38 @@ export function ContactosTab({ orgId, orgName = "esta organización" }: Props) {
   return (
     <div className="flex flex-col gap-3 p-4">
 
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2">
+      {/* Toolbar. En mobile se apila en filas propias en vez de forzar scroll
+          horizontal; desde md hacia arriba queda igual que antes. */}
+      <div className="flex flex-col gap-2 md:flex-row md:items-center">
         <Input
-          className="h-8 max-w-45 text-sm"
+          className="h-8 w-full text-sm md:max-w-45"
           placeholder="Buscar contacto..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <div className="ml-auto flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-2 md:ml-auto">
+          <span className="w-full text-sm text-muted-foreground md:w-auto">
             {total} contacto{total !== 1 ? "s" : ""}
           </span>
-          <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8 text-xs" />}>
-              Columnas <ChevronDown className="ml-1 size-3.5" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {table.getAllColumns().filter((col) => col.getCanHide()).map((col) => (
-                <DropdownMenuCheckboxItem
-                  key={col.id}
-                  checked={col.getIsVisible()}
-                  onCheckedChange={(v) => col.toggleVisibility(!!v)}
-                >
-                  {COLUMN_LABELS[col.id] ?? col.id}
-                </DropdownMenuCheckboxItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setLinkOpen(true)}>
+          <div className="[&_button]:w-full md:[&_button]:w-auto">
+            <DropdownMenu>
+              <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8 text-xs" />}>
+                Columnas <ChevronDown className="ml-1 size-3.5" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {table.getAllColumns().filter((col) => col.getCanHide()).map((col) => (
+                  <DropdownMenuCheckboxItem
+                    key={col.id}
+                    checked={col.getIsVisible()}
+                    onCheckedChange={(v) => col.toggleVisibility(!!v)}
+                  >
+                    {COLUMN_LABELS[col.id] ?? col.id}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+          <Button size="sm" className="h-8 w-full gap-1.5 text-xs md:w-auto" onClick={() => setLinkOpen(true)}>
             <PlusIcon className="size-3.5" /> Vincular contacto
           </Button>
         </div>

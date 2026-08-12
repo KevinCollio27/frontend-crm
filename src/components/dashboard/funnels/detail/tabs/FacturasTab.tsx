@@ -54,7 +54,19 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { cn } from "@/lib/utils"
+import { useIsMobile } from "@/hooks/use-mobile"
 import type { DealInvoice, InvoiceStatus, InvoiceUnitOfMeasure } from "../../data"
+
+const MOBILE_COLUMN_VISIBILITY: VisibilityState = {
+  id:              false,
+  quotation_id:    false,
+  unit_of_measure: false,
+  period:          false,
+  amount:          false,
+  issue_date:      false,
+  due_date:        false,
+  status:          false,
+}
 
 // ─── Configs ──────────────────────────────────────────────────────────────────
 
@@ -289,6 +301,11 @@ export function FacturasTab({ opportunityId: _opportunityId }: Props) {
   })
   const [rowSelection, setRowSelection] = React.useState({})
 
+  const isMobile = useIsMobile()
+  React.useEffect(() => {
+    if (isMobile) setColumnVisibility(MOBILE_COLUMN_VISIBILITY)
+  }, [isMobile])
+
   const columns = React.useMemo(() => getColumns(), [])
 
   const table = useReactTable({
@@ -321,42 +338,51 @@ export function FacturasTab({ opportunityId: _opportunityId }: Props) {
         </p>
       </div>
 
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2 pb-4">
+      {/* Toolbar. En mobile se apila en filas propias en vez de forzar scroll
+          horizontal; desde md hacia arriba queda igual que antes. */}
+      <div className="flex flex-col gap-2 pb-4 md:flex-row md:items-center">
         <Input
-          className="h-8 max-w-45 text-sm"
+          className="h-8 w-full text-sm md:max-w-45"
           placeholder="Filtrar por N° factura..."
           value={(table.getColumn("invoice_number")?.getFilterValue() as string) ?? ""}
           onChange={(e) => table.getColumn("invoice_number")?.setFilterValue(e.target.value)}
         />
-        <DataTableFacetedFilter column={table.getColumn("status")!}          title="Estado"  options={STATUS_OPTIONS} />
-        <DataTableFacetedFilter column={table.getColumn("unit_of_measure")!} title="Unidad"  options={UM_OPTIONS}     />
-        {table.getState().columnFilters.length > 0 && (
-          <Button variant="ghost" size="sm" className="h-8" onClick={() => table.resetColumnFilters()}>
-            Reset <XIcon className="ml-1 size-4" />
-          </Button>
-        )}
-        <div className="ml-auto flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">
+        <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:items-center">
+          <div className="[&_button]:w-full md:[&_button]:w-auto">
+            <DataTableFacetedFilter column={table.getColumn("status")!}          title="Estado"  options={STATUS_OPTIONS} />
+          </div>
+          <div className="[&_button]:w-full md:[&_button]:w-auto">
+            <DataTableFacetedFilter column={table.getColumn("unit_of_measure")!} title="Unidad"  options={UM_OPTIONS}     />
+          </div>
+          {table.getState().columnFilters.length > 0 && (
+            <Button variant="ghost" size="sm" className="h-8" onClick={() => table.resetColumnFilters()}>
+              Reset <XIcon className="ml-1 size-4" />
+            </Button>
+          )}
+        </div>
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-2 md:ml-auto">
+          <span className="w-full text-sm text-muted-foreground md:w-auto">
             {table.getFilteredRowModel().rows.length} factura(s)
           </span>
-          <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8 text-xs" />}>
-              Columnas <ChevronDown className="ml-1 size-3.5" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {table.getAllColumns().filter((col) => col.getCanHide()).map((col) => (
-                <DropdownMenuCheckboxItem
-                  key={col.id}
-                  checked={col.getIsVisible()}
-                  onCheckedChange={(value) => col.toggleVisibility(!!value)}
-                >
-                  {columnLabels[col.id] ?? col.id}
-                </DropdownMenuCheckboxItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button size="sm" className="h-8 gap-1.5 text-xs">
+          <div className="[&_button]:w-full md:[&_button]:w-auto">
+            <DropdownMenu>
+              <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8 text-xs" />}>
+                Columnas <ChevronDown className="ml-1 size-3.5" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {table.getAllColumns().filter((col) => col.getCanHide()).map((col) => (
+                  <DropdownMenuCheckboxItem
+                    key={col.id}
+                    checked={col.getIsVisible()}
+                    onCheckedChange={(value) => col.toggleVisibility(!!value)}
+                  >
+                    {columnLabels[col.id] ?? col.id}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+          <Button size="sm" className="h-8 w-full gap-1.5 text-xs md:w-auto">
             <PlusIcon className="size-3.5" /> Factura
           </Button>
         </div>

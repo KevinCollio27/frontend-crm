@@ -130,7 +130,7 @@ function mapToDetailData(
     twitter_url:      person.twitter_url,
     facebook_url:     person.facebook_url,
     owner:            ownerMember
-      ? { id: ownerMember.user_id, name: ownerMember.user?.name ?? ownerMember.user?.email ?? "—" }
+      ? { id: ownerMember.user_id, name: ownerMember.user?.name ?? ownerMember.user?.email ?? "—", avatarUrl: ownerMember.user?.avatar_url ?? null }
       : null,
     organization:     person.organization
       ? {

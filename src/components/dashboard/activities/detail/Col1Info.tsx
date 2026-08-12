@@ -106,6 +106,7 @@ export function Col1Info({ activity }: Props) {
   const priority  = prioDetail?.value?.toLowerCase() ?? "media"
   const stageId   = activity.status ?? (activity.is_completed ? "completada" : "pendiente")
   const responsible = activity.user?.name ?? "—"
+  const responsibleAvatarUrl = activity.user?.avatar_url ?? null
 
   const typeStyle  = TYPE_STYLE[type]  ?? { bg: "bg-muted", icon: "text-muted-foreground" }
   const TypeIcon   = TYPE_ICON[type]   ?? CalendarIcon
@@ -141,7 +142,7 @@ export function Col1Info({ activity }: Props) {
         <div className="divide-y">
           <PropRow label="Responsable">
             <Avatar className="size-5 shrink-0">
-              <AvatarImage src="https://github.com/shadcn.png" alt={responsible} />
+              <AvatarImage src={responsibleAvatarUrl ?? "https://github.com/shadcn.png"} alt={responsible} />
               <AvatarFallback className="text-[9px] font-semibold">{getInitials(responsible)}</AvatarFallback>
             </Avatar>
             <span className="truncate text-sm font-medium">{responsible}</span>

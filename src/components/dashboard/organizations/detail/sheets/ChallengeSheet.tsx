@@ -67,6 +67,7 @@ export function ChallengeSheet({ open, onOpenChange, orgId, nextOrder, challenge
       <SheetContent
         side="right"
         style={{ maxWidth: 420, display: "flex", flexDirection: "column", gap: 0, padding: 0 }}
+        className="w-full!"
       >
         <SheetHeader className="border-b px-5 py-4">
           <SheetTitle>{isEdit ? "Editar desafío" : "Nuevo desafío"}</SheetTitle>

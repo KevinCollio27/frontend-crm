@@ -98,6 +98,7 @@ export function LinkContactSheet({ open, onOpenChange, orgId, orgName, onSuccess
       <SheetContent
         side="right"
         style={{ maxWidth: 460, display: "flex", flexDirection: "column", gap: 0, padding: 0 }}
+        className="w-full!"
       >
         {/* Header */}
         <SheetHeader className="border-b px-5 py-4">
