@@ -4,6 +4,7 @@ import * as React from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { BriefcaseIcon, InboxIcon, ListIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { FormsTable } from "./FormsTable"
 import { FormAnswersBoard } from "./FormAnswersBoard"
 import { VacantesBoard } from "./VacantesBoard"
@@ -11,51 +12,89 @@ import { formService } from "@/services/form.service"
 
 type View = "lista" | "respuestas" | "vacantes"
 
+const VIEW_OPTIONS: { value: View; label: string; icon: React.ElementType }[] = [
+  { value: "lista", label: "Lista", icon: ListIcon },
+  { value: "respuestas", label: "Respuestas", icon: InboxIcon },
+  { value: "vacantes", label: "Vacantes", icon: BriefcaseIcon },
+]
+
 function ViewToggle({ view, onChange, showVacantes }: { view: View; onChange: (v: View) => void; showVacantes: boolean | null }) {
+  const options = VIEW_OPTIONS.filter((o) => o.value !== "vacantes" || showVacantes)
+
   return (
-    <div className="flex shrink-0 items-center gap-0.5 rounded-lg border bg-muted/40 p-0.5">
-      <button
-        type="button"
-        onClick={() => onChange("lista")}
-        className={cn(
-          "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium whitespace-nowrap transition-colors",
-          view === "lista"
-            ? "bg-background shadow-sm"
-            : "text-muted-foreground hover:text-foreground",
-        )}
-      >
-        <ListIcon className="size-3.5" />
-        Lista
-      </button>
-      <button
-        type="button"
-        onClick={() => onChange("respuestas")}
-        className={cn(
-          "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium whitespace-nowrap transition-colors",
-          view === "respuestas"
-            ? "bg-background shadow-sm"
-            : "text-muted-foreground hover:text-foreground",
-        )}
-      >
-        <InboxIcon className="size-3.5" />
-        Respuestas
-      </button>
-      {showVacantes && (
+    <>
+      {/* Mobile — el grupo de píldoras no cabe junto al botón "Crear Formulario",
+          se colapsa en un selector. */}
+      <Select value={view} onValueChange={(v) => onChange(v as View)}>
+        <SelectTrigger size="sm" className="w-32 shrink-0 md:hidden">
+          <SelectValue placeholder="Vista">
+            {(v: View) => {
+              const opt = options.find((o) => o.value === v)
+              if (!opt) return v
+              return (
+                <span className="flex items-center gap-1.5">
+                  <opt.icon className="size-3.5" />
+                  {opt.label}
+                </span>
+              )
+            }}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((opt) => (
+            <SelectItem key={opt.value} value={opt.value}>
+              <opt.icon className="size-3.5" />
+              {opt.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      {/* Desktop — grupo de píldoras original, sin cambios */}
+      <div className="hidden shrink-0 items-center gap-0.5 rounded-lg border bg-muted/40 p-0.5 md:flex">
         <button
           type="button"
-          onClick={() => onChange("vacantes")}
+          onClick={() => onChange("lista")}
           className={cn(
             "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium whitespace-nowrap transition-colors",
-            view === "vacantes"
+            view === "lista"
               ? "bg-background shadow-sm"
               : "text-muted-foreground hover:text-foreground",
           )}
         >
-          <BriefcaseIcon className="size-3.5" />
-          Vacantes
+          <ListIcon className="size-3.5" />
+          Lista
         </button>
-      )}
-    </div>
+        <button
+          type="button"
+          onClick={() => onChange("respuestas")}
+          className={cn(
+            "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium whitespace-nowrap transition-colors",
+            view === "respuestas"
+              ? "bg-background shadow-sm"
+              : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          <InboxIcon className="size-3.5" />
+          Respuestas
+        </button>
+        {showVacantes && (
+          <button
+            type="button"
+            onClick={() => onChange("vacantes")}
+            className={cn(
+              "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium whitespace-nowrap transition-colors",
+              view === "vacantes"
+                ? "bg-background shadow-sm"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <BriefcaseIcon className="size-3.5" />
+            Vacantes
+          </button>
+        )}
+      </div>
+    </>
   )
 }
 

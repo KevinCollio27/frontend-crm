@@ -59,6 +59,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { KanbanBoard, KanbanColumn } from "@/components/ui/kanban"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useSidebar } from "@/components/ui/sidebar"
 import { SingleSelectFilter, type SingleSelectOption } from "@/components/ui/single-select-filter"
 import { KanbanFacetedFilter } from "@/components/ui/faceted-filter"
@@ -97,6 +98,14 @@ const STATUS_CONFIG: Record<OppStatus, { label: string; className: string; borde
   perdida:     { label: "Perdida",     className: "bg-red-50 text-red-700",         border: "border-l-2 border-l-red-400"    },
   reabierta:   { label: "Reabierta",   className: "bg-amber-50 text-amber-700",     border: "border-l-2 border-l-amber-400"  },
 }
+
+type FunnelView = "board" | "lista" | "sugerencias"
+
+const VIEW_OPTIONS: { value: FunnelView; label: string; icon: React.ElementType }[] = [
+  { value: "lista",       label: "Lista",       icon: ListIcon         },
+  { value: "board",       label: "Board",       icon: KanbanSquareIcon },
+  { value: "sugerencias", label: "Sugerencias", icon: SparklesIcon     },
+]
 
 const STATUS_FILTERS: { key: OppStatus | "all"; label: string }[] = [
   { key: "all",         label: "Todas"       },
@@ -451,8 +460,8 @@ export function FunnelKanban() {
   const searchParams = useSearchParams()
   const { setOpen }  = useSidebar()
 
-  const [view, setView] = React.useState<"board" | "lista" | "sugerencias">(
-    () => (searchParams.get("view") as "board" | "lista" | "sugerencias") ?? "lista"
+  const [view, setView] = React.useState<FunnelView>(
+    () => (searchParams.get("view") as FunnelView) ?? "lista"
   )
 
   React.useEffect(() => {
@@ -463,7 +472,7 @@ export function FunnelKanban() {
     return () => setOpen(true)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  function changeView(v: "board" | "lista" | "sugerencias") {
+  function changeView(v: FunnelView) {
     setView(v)
     const params = new URLSearchParams(searchParams.toString())
     params.set("view", v)
@@ -811,7 +820,35 @@ export function FunnelKanban() {
     <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
       {/* Row 1 — view toggle + create */}
       <div className="flex shrink-0 items-center justify-between border-b px-4 py-2">
-        <div className="flex items-center gap-0.5 rounded-lg border bg-muted/40 p-0.5">
+        {/* Mobile — el grupo de píldoras no cabe junto al botón "Crear Oportunidad",
+            se colapsa en un selector (mismo patrón que Formularios). */}
+        <Select value={view} onValueChange={(v) => changeView(v as FunnelView)}>
+          <SelectTrigger size="sm" className="w-32 shrink-0 md:hidden">
+            <SelectValue placeholder="Vista">
+              {(v: FunnelView) => {
+                const opt = VIEW_OPTIONS.find((o) => o.value === v)
+                if (!opt) return v
+                return (
+                  <span className="flex items-center gap-1.5">
+                    <opt.icon className="size-3.5" />
+                    {opt.label}
+                  </span>
+                )
+              }}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {VIEW_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>
+                <opt.icon className="size-3.5" />
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Desktop — grupo de píldoras original, sin cambios */}
+        <div className="hidden items-center gap-0.5 rounded-lg border bg-muted/40 p-0.5 md:flex">
           <button
             type="button"
             onClick={() => changeView("lista")}

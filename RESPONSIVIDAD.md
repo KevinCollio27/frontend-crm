@@ -109,6 +109,45 @@ Para vistas tipo inbox (Col 1 = lista de items, Col 2 = detalle/preview del item
 
 Este mismo patrón debería aplicar a **Correo** cuando le toque, y a **Blog > BlogManager** si se decide hacerlo responsive (queda marcado como "aparte" más abajo).
 
+### 6. Selector de vista en mobile (Row 1 con 3+ píldoras + botón "Crear")
+
+Cuando el Row 1 tiene un grupo de píldoras (Lista/Board/Sugerencias, o Lista/Respuestas/Vacantes) **más** un botón "+ Crear ___" a la derecha, con 3 píldoras el `justify-between` no da el ancho en mobile (se pisan/cortan). Con 2 píldoras (Actividades: Lista/Board) sí entra sin problema — no aplicar esto ahí, no hace falta.
+
+Fix: en mobile, el grupo de píldoras se reemplaza por un `Select` (mismo componente `@/components/ui/select` usado en toda la app) que muestra ícono+label de la vista activa y despliega el resto como opciones. En desktop el grupo de píldoras original queda intacto.
+
+```tsx
+const VIEW_OPTIONS: { value: View; label: string; icon: React.ElementType }[] = [
+  { value: "lista",  label: "Lista",  icon: ListIcon },
+  { value: "board",  label: "Board",  icon: KanbanSquareIcon },
+  // ...
+]
+
+<Select value={view} onValueChange={(v) => changeView(v as View)}>
+  <SelectTrigger size="sm" className="w-32 shrink-0 md:hidden">
+    <SelectValue placeholder="Vista">
+      {(v: View) => {
+        const opt = VIEW_OPTIONS.find((o) => o.value === v)
+        if (!opt) return v
+        return <span className="flex items-center gap-1.5"><opt.icon className="size-3.5" />{opt.label}</span>
+      }}
+    </SelectValue>
+  </SelectTrigger>
+  <SelectContent>
+    {VIEW_OPTIONS.map((opt) => (
+      <SelectItem key={opt.value} value={opt.value}><opt.icon className="size-3.5" />{opt.label}</SelectItem>
+    ))}
+  </SelectContent>
+</Select>
+
+<div className="hidden items-center gap-0.5 rounded-lg border bg-muted/40 p-0.5 md:flex">
+  {/* píldoras originales, sin cambios */}
+</div>
+```
+
+⚠️ Usar el patrón de función en `SelectValue` (no `{v}` directo) — ver bug conocido de `base-ui` donde `SelectValue` no mapea `value → label` solo.
+
+Aplicado en Formularios (`FormsView.tsx`, Lista/Respuestas/Vacantes) y Oportunidades (`FunnelKanban.tsx`, Lista/Board/Sugerencias).
+
 ## Checklist — qué falta replicar
 
 - [x] Contactos — toolbar, tabla, sheets (Crear, Fusionar, Fusión manual, Importar/Exportar)
@@ -117,10 +156,10 @@ Este mismo patrón debería aplicar a **Correo** cuando le toque, y a **Blog > B
 - [x] Cotizaciones — toolbar (3 filtros + Restablecer como ítem del grid), tabla, 6 sheets (Crear, Preview, PDF Preview, Historial, Enviar, Asignar Plantilla)
 - [x] Documentos — toolbar (2 filtros, grid de 2), tabla, sheets (Subir Documento, Preview)
 - [x] Campañas — toolbar (1 filtro, ancho completo, con badge extra de "uso diario"), tabla, sheets (Crear Campaña, Preview)
-- [x] Formularios — solo la vista **Lista** (`FormsTable.tsx`, es la que es datatable de verdad): toolbar (2 filtros, grid de 2), tabla, sheets (Crear Formulario, Integrar formulario)
+- [x] Formularios — solo la vista **Lista** (`FormsTable.tsx`, es la que es datatable de verdad): toolbar (2 filtros, grid de 2), tabla, sheets (Crear Formulario, Integrar formulario), selector de vista en mobile (sección 6, Lista/Respuestas/Vacantes)
 - [x] Widgets AI — toolbar (2 filtros, grid de 2), tabla, sheet (Crear Widget)
 - [x] Blog — solo la tabla de **Blogs** (`BlogsTable.tsx`, lista de blogs): toolbar (1 filtro, ancho completo), tabla, sheet (Crear/Editar Blog)
-- [x] Oportunidades — toolbar (compartido entre Lista y Board, con Pipeline+Estado siempre y Responsable+Restablecer solo en Board — mismo criterio de Restablecer-como-ítem-del-grid que Actividades/Cotizaciones), tabla (Lista), sheets (Crear Oportunidad, Preview)
+- [x] Oportunidades — toolbar (compartido entre Lista y Board, con Pipeline+Estado siempre y Responsable+Restablecer solo en Board — mismo criterio de Restablecer-como-ítem-del-grid que Actividades/Cotizaciones), tabla (Lista), sheets (Crear Oportunidad, Preview), selector de vista en mobile (sección 6, Lista/Board/Sugerencias)
 - [x] Paginación — arreglado a nivel de componente compartido (afecta a todas las tablas ya)
 - [x] Formularios > Respuestas (`FormAnswersBoard.tsx`) — primer caso del patrón "master-detail collapse" (sección 5): toolbar + navegación lista→detalle en mobile con botón "Volver" en `FormAnswerDetail.tsx`
 - [x] Formularios > Vacantes (`VacantesBoard.tsx`) — generalización a 3 columnas del mismo patrón (Vacante → Postulantes → Detalle), navegación por etapas con `mobileStep`
