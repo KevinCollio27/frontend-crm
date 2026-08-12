@@ -50,7 +50,7 @@ export function AgentPickerSheet({ open, onOpenChange, title, currentAgentId, on
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" showCloseButton={false} style={{ maxWidth: 460, padding: 0, gap: 0 }} className="w-full">
+      <SheetContent side="right" showCloseButton={false} style={{ maxWidth: 460, padding: 0, gap: 0 }} className="w-full!">
         <div className="flex items-start justify-between border-b p-5">
           <div className="space-y-0.5">
             <SheetTitle>{title}</SheetTitle>

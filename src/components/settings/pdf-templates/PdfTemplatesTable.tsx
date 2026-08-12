@@ -9,11 +9,13 @@ import {
   getSortedRowModel,
   type SortingState,
   useReactTable,
+  type VisibilityState,
 } from "@tanstack/react-table"
-import { EyeIcon, MoreHorizontalIcon, PencilIcon, PlusIcon, StarIcon, StarOffIcon, Trash2Icon } from "lucide-react"
+import { EyeIcon, MoreHorizontalIcon, PencilIcon, PlusIcon, SearchIcon, Settings2Icon, StarIcon, StarOffIcon, Trash2Icon } from "lucide-react"
 import { getSortIcon } from "@/lib/table-utils"
 import { EntityAccentBar } from "@/components/ui/entity-accent-bar"
 import { useIsWorkspaceAdmin } from "@/hooks/useIsWorkspaceAdmin"
+import { useIsMobile } from "@/hooks/use-mobile"
 import { pdfTemplateConfirm } from "@/lib/confirm"
 import { notify } from "@/lib/notify"
 import { Badge } from "@/components/ui/badge"
@@ -21,6 +23,7 @@ import { Button } from "@/components/ui/button"
 import { DataTablePagination } from "@/components/ui/data-table-pagination"
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
@@ -67,6 +70,21 @@ function mapTemplate(t: PdfTemplate): Row {
     }),
     raw: t,
   }
+}
+
+const COLUMN_LABELS: Record<string, string> = {
+  id:        "ID",
+  name:      "Nombre",
+  isDefault: "Predeterminada",
+  blocks:    "Bloques",
+  createdAt: "Creada",
+}
+
+const MOBILE_COLUMN_VISIBILITY: VisibilityState = {
+  id:        false,
+  isDefault: false,
+  blocks:    false,
+  createdAt: false,
 }
 
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
@@ -205,10 +223,16 @@ export function PdfTemplatesTable() {
   const [loading, setLoading] = React.useState(true)
   const [filter, setFilter]   = React.useState("")
   const [sorting, setSorting] = React.useState<SortingState>([])
+  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
   const [refreshKey, setRefreshKey] = React.useState(0)
   const [createOpen, setCreateOpen] = React.useState(false)
   const [editingTemplate, setEditingTemplate] = React.useState<PdfTemplate | undefined>(undefined)
   const [previewTemplate, setPreviewTemplate] = React.useState<PdfTemplate | null>(null)
+
+  const isMobile = useIsMobile()
+  React.useEffect(() => {
+    if (isMobile) setColumnVisibility(MOBILE_COLUMN_VISIBILITY)
+  }, [isMobile])
 
   React.useEffect(() => {
     let cancelled = false
@@ -259,10 +283,11 @@ export function PdfTemplatesTable() {
     data,
     columns,
     onSortingChange: setSorting,
+    onColumnVisibilityChange: setColumnVisibility,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    state: { sorting },
+    state: { sorting, columnVisibility },
     globalFilterFn: (row, _id, value: string) =>
       row.original.name.toLowerCase().includes(value.toLowerCase()),
   })
@@ -273,27 +298,51 @@ export function PdfTemplatesTable() {
 
   return (
     <div className="w-full space-y-4">
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2">
-        <Input
-          className="w-full sm:max-w-xs"
-          placeholder="Filtrar por nombre..."
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-        />
-        <div className="ml-auto flex items-center gap-2">
+      {/* Toolbar. En mobile se apila en filas propias en vez de forzar scroll
+          horizontal; desde md hacia arriba queda igual que antes. */}
+      <div className="flex flex-col gap-2 md:flex-row md:items-center">
+        <div className="relative w-full shrink-0 md:w-44">
+          <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Filtrar por nombre..."
+            className="h-8 pl-8 text-xs"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+          />
+        </div>
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-2 md:ml-auto">
           {!loading && (
-            <span className="hidden sm:block text-sm text-muted-foreground">
+            <span className="w-full text-sm text-muted-foreground md:w-auto">
               {table.getFilteredRowModel().rows.length} plantilla{table.getFilteredRowModel().rows.length !== 1 ? "s" : ""}
             </span>
           )}
+          <div className="[&_button]:w-full md:[&_button]:w-auto">
+            <DropdownMenu>
+              <DropdownMenuTrigger render={<Button variant="outline" size="sm" />}>
+                <Settings2Icon className="size-4" />
+                Visualización
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-40">
+                {table.getAllColumns().filter((col) => col.getCanHide()).map((col) => (
+                  <DropdownMenuCheckboxItem
+                    key={col.id}
+                    checked={col.getIsVisible()}
+                    onCheckedChange={(v) => col.toggleVisibility(!!v)}
+                  >
+                    {COLUMN_LABELS[col.id] ?? col.id}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
           {isAdmin && (
             <Button
               size="sm"
+              className="w-full md:w-auto"
               onClick={() => { setEditingTemplate(undefined); setCreateOpen(true) }}
             >
               <PlusIcon className="size-4" />
-              <span className="hidden sm:inline">Plantilla</span>
+              Plantilla
             </Button>
           )}
         </div>

@@ -15,11 +15,13 @@ import {
   MoreHorizontalIcon,
   PencilIcon,
   PlusIcon,
+  SearchIcon,
   Settings2Icon,
   Trash2Icon,
 } from "lucide-react"
 import { getSortIcon } from "@/lib/table-utils"
 import { useIsWorkspaceAdmin } from "@/hooks/useIsWorkspaceAdmin"
+import { useIsMobile } from "@/hooks/use-mobile"
 import { productConfirm } from "@/lib/confirm"
 import { productNotify } from "@/lib/notify"
 import { Button } from "@/components/ui/button"
@@ -108,6 +110,12 @@ const COLUMN_LABELS: Record<string, string> = {
 }
 
 const DEFAULT_COLUMN_VISIBILITY: VisibilityState = {}
+
+const MOBILE_COLUMN_VISIBILITY: VisibilityState = {
+  id:        false,
+  labels:    false,
+  createdAt: false,
+}
 
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
 
@@ -246,6 +254,11 @@ export function ProductsTable() {
   const [createOpen, setCreateOpen] = React.useState(false)
   const [editingProduct, setEditingProduct] = React.useState<ProductFormState | undefined>(undefined)
 
+  const isMobile = useIsMobile()
+  React.useEffect(() => {
+    if (isMobile) setColumnVisibility(MOBILE_COLUMN_VISIBILITY)
+  }, [isMobile])
+
   async function handleDelete(product: Product) {
     let t0 = Date.now()
     console.log(`[product] checkCanDelete start id=${product.id}`)
@@ -345,45 +358,52 @@ export function ProductsTable() {
 
   return (
     <div className="w-full space-y-4">
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2">
-        <Input
-          className="w-full sm:max-w-xs"
-          placeholder="Filtrar por nombre..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <div className="ml-auto flex items-center gap-2">
-          <span className="hidden sm:block text-sm text-muted-foreground">
+      {/* Toolbar. En mobile se apila en filas propias en vez de forzar scroll
+          horizontal; desde md hacia arriba queda igual que antes. */}
+      <div className="flex flex-col gap-2 md:flex-row md:items-center">
+        <div className="relative w-full shrink-0 md:w-44">
+          <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Filtrar por nombre..."
+            className="h-8 pl-8 text-xs"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-2 md:ml-auto">
+          <span className="w-full text-sm text-muted-foreground md:w-auto">
             {total} producto{total !== 1 ? "s" : ""}
           </span>
-          <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="outline" size="sm" />}>
-              <Settings2Icon className="size-4" />
-              Visualización
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-40">
-              {table.getAllColumns().filter((col) => col.getCanHide()).map((col) => (
-                <DropdownMenuCheckboxItem
-                  key={col.id}
-                  checked={col.getIsVisible()}
-                  onCheckedChange={(v) => col.toggleVisibility(!!v)}
-                >
-                  {COLUMN_LABELS[col.id] ?? col.id}
-                </DropdownMenuCheckboxItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="[&_button]:w-full md:[&_button]:w-auto">
+            <DropdownMenu>
+              <DropdownMenuTrigger render={<Button variant="outline" size="sm" />}>
+                <Settings2Icon className="size-4" />
+                Visualización
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-40">
+                {table.getAllColumns().filter((col) => col.getCanHide()).map((col) => (
+                  <DropdownMenuCheckboxItem
+                    key={col.id}
+                    checked={col.getIsVisible()}
+                    onCheckedChange={(v) => col.toggleVisibility(!!v)}
+                  >
+                    {COLUMN_LABELS[col.id] ?? col.id}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
           {isAdmin && (
             <Button
               size="sm"
+              className="w-full md:w-auto"
               onClick={() => {
                 setEditingProduct(undefined)
                 setCreateOpen(true)
               }}
             >
               <PlusIcon className="size-4" />
-              <span className="hidden sm:inline">Crear Producto</span>
+              Crear Producto
             </Button>
           )}
         </div>

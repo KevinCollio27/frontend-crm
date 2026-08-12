@@ -43,7 +43,7 @@ interface WhatsAppIntegrationSheetProps {
 export function WhatsAppIntegrationSheet({ open, onOpenChange, onSuccess }: WhatsAppIntegrationSheetProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" showCloseButton={false} style={{ maxWidth: 460, padding: 0, gap: 0 }} className="w-full">
+      <SheetContent side="right" showCloseButton={false} style={{ maxWidth: 460, padding: 0, gap: 0 }} className="w-full!">
         {open && <WhatsAppForm onClose={() => onOpenChange(false)} onSuccess={onSuccess} />}
       </SheetContent>
     </Sheet>

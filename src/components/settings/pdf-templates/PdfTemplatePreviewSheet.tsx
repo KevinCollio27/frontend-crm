@@ -60,7 +60,7 @@ export function PdfTemplatePreviewSheet({ open, onOpenChange, template }: Props)
         side="right"
         showCloseButton={false}
         style={{ maxWidth: 1400, padding: 0, gap: 0 }}
-        className="flex w-full flex-col"
+        className="flex w-full! flex-col"
       >
         <div className="flex items-start justify-between gap-4 border-b px-5 py-4">
           <div className="space-y-0.5">

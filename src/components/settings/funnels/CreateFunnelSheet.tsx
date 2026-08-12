@@ -31,7 +31,7 @@ export function CreateFunnelSheet({ open, onOpenChange, funnel, onSuccess }: Cre
         side="right"
         showCloseButton={false}
         style={{ maxWidth: 720, padding: 0, gap: 0 }}
-        className="w-full"
+        className="w-full!"
       >
         {open && <FunnelWizard funnel={funnel} onClose={() => onOpenChange(false)} onSuccess={onSuccess} />}
       </SheetContent>

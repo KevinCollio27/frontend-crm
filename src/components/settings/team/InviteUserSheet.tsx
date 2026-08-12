@@ -30,7 +30,7 @@ export function InviteUserSheet({ open, onOpenChange, onSuccess }: InviteUserShe
         side="right"
         showCloseButton={false}
         style={{ maxWidth: 460, padding: 0, gap: 0 }}
-        className="w-full"
+        className="w-full!"
       >
         {open && <InviteForm onClose={() => onOpenChange(false)} onSuccess={onSuccess} />}
       </SheetContent>

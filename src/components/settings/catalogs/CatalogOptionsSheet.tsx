@@ -62,7 +62,7 @@ export function CatalogOptionsSheet({ open, onOpenChange, catalog, icon, onChang
         side="right"
         showCloseButton={false}
         style={{ maxWidth: 500, padding: 0, gap: 0 }}
-        className="w-full"
+        className="w-full!"
       >
         {open && catalog && (
           <CatalogForm catalog={catalog} icon={icon} onClose={() => handleOpenChange(false)} dirtyRef={dirtyRef} />

@@ -33,7 +33,7 @@ export function CargoIntegrationSheet({ open, onOpenChange, connection, onSucces
         side="right"
         showCloseButton={false}
         style={{ maxWidth: 460, padding: 0, gap: 0 }}
-        className="w-full"
+        className="w-full!"
       >
         {open && (
           <CargoForm connection={connection} onClose={() => onOpenChange(false)} onSuccess={onSuccess} />

@@ -41,7 +41,7 @@ export function EditBlockSheet({ open, onOpenChange, initialTitle, initialConten
         side="right"
         showCloseButton={false}
         style={{ maxWidth: 720, padding: 0, gap: 0 }}
-        className="flex w-full flex-col"
+        className="flex w-full! flex-col"
       >
         {/* Header */}
         <div className="flex items-start justify-between gap-4 border-b px-5 py-4">

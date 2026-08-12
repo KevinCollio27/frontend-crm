@@ -39,7 +39,7 @@ interface InstagramIntegrationSheetProps {
 export function InstagramIntegrationSheet({ open, onOpenChange, onSuccess }: InstagramIntegrationSheetProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" showCloseButton={false} style={{ maxWidth: 460, padding: 0, gap: 0 }} className="w-full">
+      <SheetContent side="right" showCloseButton={false} style={{ maxWidth: 460, padding: 0, gap: 0 }} className="w-full!">
         {open && <InstagramForm onClose={() => onOpenChange(false)} onSuccess={onSuccess} />}
       </SheetContent>
     </Sheet>

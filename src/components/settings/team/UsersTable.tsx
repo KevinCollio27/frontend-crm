@@ -24,6 +24,7 @@ import {
   MoreHorizontal,
   PlusCircleIcon,
   PowerIcon,
+  SearchIcon,
   ShieldIcon,
   Trash2Icon,
   UserPlusIcon,
@@ -64,6 +65,7 @@ import { getInitials, getSortIcon } from "@/lib/table-utils"
 import { orgConfirm, confirmDialog } from "@/lib/confirm"
 import { useIsWorkspaceAdmin } from "@/hooks/useIsWorkspaceAdmin"
 import { useIsWorkspaceOwner } from "@/hooks/useIsWorkspaceOwner"
+import { useIsMobile } from "@/hooks/use-mobile"
 import { notify } from "@/lib/notify"
 import { useSessionStore } from "@/store/session.store"
 
@@ -119,6 +121,14 @@ const columnLabels: Record<string, string> = {
 const DEFAULT_COLUMN_VISIBILITY: VisibilityState = {
   owner: false,
   whatsapp: false,
+}
+
+const MOBILE_COLUMN_VISIBILITY: VisibilityState = {
+  active:   false,
+  admin:    false,
+  owner:    false,
+  whatsapp: false,
+  joinedAt: false,
 }
 
 function BoolCell({ value }: { value: boolean }) {
@@ -432,6 +442,11 @@ export function UsersTable() {
   const [shareOpen, setShareOpen] = React.useState(false)
   const [refreshKey, setRefreshKey] = React.useState(0)
 
+  const isMobile = useIsMobile()
+  React.useEffect(() => {
+    if (isMobile) setColumnVisibility(MOBILE_COLUMN_VISIBILITY)
+  }, [isMobile])
+
   React.useEffect(() => {
     const t = setTimeout(
       () => setQuery((q) => ({ ...q, page: 1, search: searchInput })),
@@ -631,61 +646,78 @@ export function UsersTable() {
 
   return (
     <div className="w-full">
-      <div className="flex flex-wrap items-center gap-2 py-4">
-        <Input
-          className="w-full sm:max-w-xs"
-          placeholder="Filtrar por nombre y correo..."
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-        />
-        <SimpleFilter
-          label="Activo"
-          value={query.isActive}
-          onChange={(v) => setQuery((q) => ({ ...q, page: 1, isActive: v }))}
-        />
-        <SimpleFilter
-          label="Admin"
-          value={query.isAdmin}
-          onChange={(v) => setQuery((q) => ({ ...q, page: 1, isAdmin: v }))}
-        />
-        {hasActiveFilters && (
-          <Button variant="ghost" size="sm" className="h-8" onClick={resetFilters}>
-            Reset
-            <XIcon className="ml-1 size-4" />
-          </Button>
-        )}
-        <div className="ml-auto flex items-center gap-2">
-          <span className="hidden sm:block text-sm text-muted-foreground">
+      {/* Toolbar. En mobile se apila en filas propias en vez de forzar scroll
+          horizontal; desde md hacia arriba queda igual que antes. */}
+      <div className="flex flex-col gap-2 py-4 md:flex-row md:items-center">
+        <div className="relative w-full shrink-0 md:w-44">
+          <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Filtrar por nombre y correo..."
+            className="h-8 pl-8 text-xs"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+          />
+        </div>
+
+        {/* 2 filtros fijos y pares — Restablecer va en fila propia (col-span-2),
+            no como ítem del grid, mismo criterio que Contactos/Organizaciones. */}
+        <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:items-center">
+          <div className="[&_button]:w-full md:[&_button]:w-auto">
+            <SimpleFilter
+              label="Activo"
+              value={query.isActive}
+              onChange={(v) => setQuery((q) => ({ ...q, page: 1, isActive: v }))}
+            />
+          </div>
+          <div className="[&_button]:w-full md:[&_button]:w-auto">
+            <SimpleFilter
+              label="Admin"
+              value={query.isAdmin}
+              onChange={(v) => setQuery((q) => ({ ...q, page: 1, isAdmin: v }))}
+            />
+          </div>
+          {hasActiveFilters && (
+            <Button variant="ghost" size="sm" className="col-span-2 h-8 px-2 text-xs md:col-span-1 md:w-auto" onClick={resetFilters}>
+              <XIcon className="size-3.5" />
+              Restablecer
+            </Button>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-2 md:ml-auto">
+          <span className="w-full text-xs text-muted-foreground md:w-auto">
             {total} usuarios
           </span>
-          <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="outline" size="sm" />}>
-              <LayoutIcon className="size-4" />
-              <span className="hidden sm:inline">Visualización</span>
-              <ChevronDown className="size-4" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {table
-                .getAllColumns()
-                .filter((col) => col.getCanHide())
-                .map((col) => (
-                  <DropdownMenuCheckboxItem
-                    key={col.id}
-                    checked={col.getIsVisible()}
-                    onCheckedChange={(v) => col.toggleVisibility(!!v)}
-                  >
-                    {columnLabels[col.id] ?? col.id}
-                  </DropdownMenuCheckboxItem>
-                ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button variant="outline" size="sm" className="hidden sm:flex" onClick={() => setShareOpen(true)}>
-            <span className="hidden md:inline">Compartir</span>
+          <div className="[&_button]:w-full md:[&_button]:w-auto">
+            <DropdownMenu>
+              <DropdownMenuTrigger render={<Button variant="outline" size="sm" />}>
+                <LayoutIcon className="size-4" />
+                Visualización
+                <ChevronDown className="size-4" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {table
+                  .getAllColumns()
+                  .filter((col) => col.getCanHide())
+                  .map((col) => (
+                    <DropdownMenuCheckboxItem
+                      key={col.id}
+                      checked={col.getIsVisible()}
+                      onCheckedChange={(v) => col.toggleVisibility(!!v)}
+                    >
+                      {columnLabels[col.id] ?? col.id}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+          <Button variant="outline" size="sm" className="w-full md:w-auto" onClick={() => setShareOpen(true)}>
+            Compartir
           </Button>
           {isWorkspaceAdmin && (
-            <Button size="sm" onClick={() => setInviteOpen(true)}>
+            <Button size="sm" className="w-full md:w-auto" onClick={() => setInviteOpen(true)}>
               <UserPlusIcon className="size-4" />
-              <span className="hidden sm:inline">Invitar Usuario</span>
+              Invitar Usuario
             </Button>
           )}
         </div>

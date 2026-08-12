@@ -10,7 +10,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
         title="Configuración"
         description="Gestiona tu cuenta y workspace"
       />
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      <div className="flex flex-1 min-h-0 flex-col overflow-hidden md:flex-row">
         <SettingsNav />
         <div className="flex-1 overflow-y-auto">
           {children}

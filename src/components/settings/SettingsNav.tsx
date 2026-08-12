@@ -2,7 +2,7 @@
 
 import { useEffect } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import {
   Building2Icon,
   CreditCardIcon,
@@ -20,6 +20,15 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useSidebar } from "@/components/ui/sidebar"
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 type NavItem = {
   label: string
@@ -32,7 +41,8 @@ type NavGroup = {
   items: NavItem[]
 }
 
-const navGroups: NavGroup[] = [
+// Exportado — el selector agrupado en mobile reusa esta misma lista.
+export const navGroups: NavGroup[] = [
   {
     label: "Cuenta",
     items: [
@@ -70,6 +80,7 @@ const navGroups: NavGroup[] = [
 
 export function SettingsNav() {
   const pathname = usePathname()
+  const router = useRouter()
   const { setOpen } = useSidebar()
 
   useEffect(() => {
@@ -77,8 +88,47 @@ export function SettingsNav() {
     return () => setOpen(true)
   }, [])
 
+  const allItems = navGroups.flatMap((g) => g.items)
+
   return (
-    <nav className="w-52 shrink-0 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden border-r p-3 flex flex-col gap-5">
+    <>
+      {/* Mobile — selector agrupado, reemplaza al nav fijo. Aterriza directo en
+          el contenido (Perfil, por el redirect de /settings) igual que antes —
+          acá solo se cambia de sección, sin paso de "menú" previo. */}
+      <div className="w-full shrink-0 border-b p-2 md:hidden">
+        <Select value={pathname} onValueChange={(v) => { if (v) router.push(v) }}>
+          <SelectTrigger size="sm" className="w-full">
+            <SelectValue placeholder="Sección">
+              {(v: string) => {
+                const item = allItems.find((i) => i.href === v)
+                if (!item) return v
+                return (
+                  <span className="flex items-center gap-1.5">
+                    <item.icon className="size-3.5" />
+                    {item.label}
+                  </span>
+                )
+              }}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {navGroups.map((group, i) => (
+              <SelectGroup key={i}>
+                {group.label && <SelectLabel>{group.label}</SelectLabel>}
+                {group.items.map((item) => (
+                  <SelectItem key={item.href} value={item.href}>
+                    <item.icon className="size-3.5" />
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Desktop — nav original, sin cambios */}
+      <nav className="hidden w-52 shrink-0 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden border-r p-3 md:flex md:flex-col gap-5">
       {navGroups.map((group, i) => (
         <div key={i} className="flex flex-col gap-0.5">
           {group.label && (
@@ -106,6 +156,7 @@ export function SettingsNav() {
           })}
         </div>
       ))}
-    </nav>
+      </nav>
+    </>
   )
 }

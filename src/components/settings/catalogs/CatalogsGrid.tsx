@@ -194,7 +194,7 @@ export function CatalogsGrid() {
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 xl:grid-cols-4">
           {Array.from({ length: 8 }).map((_, i) => (
             <CatalogCardSkeleton key={i} />
           ))}
@@ -202,7 +202,7 @@ export function CatalogsGrid() {
       ) : filtered.length === 0 ? (
         <p className="py-12 text-center text-sm text-muted-foreground">Sin resultados.</p>
       ) : (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 xl:grid-cols-4">
           {filtered.map((label) => (
             <CatalogCard key={label.id} label={label} onClick={() => openCatalog(label)} />
           ))}

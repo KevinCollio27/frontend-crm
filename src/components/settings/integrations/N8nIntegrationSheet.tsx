@@ -32,7 +32,7 @@ export function N8nIntegrationSheet({ open, onOpenChange, onConnected }: N8nInte
         side="right"
         showCloseButton={false}
         style={{ maxWidth: 460, padding: 0, gap: 0 }}
-        className="w-full"
+        className="w-full!"
       >
         {open && <N8nForm onClose={() => onOpenChange(false)} onConnected={onConnected} />}
       </SheetContent>
