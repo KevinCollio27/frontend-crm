@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/table"
 import { opportunityService } from "@/services/opportunity.service"
 import { useEntityRealtime } from "@/hooks/useEntityRealtime"
+import { useIsMobile } from "@/hooks/use-mobile"
 import type { OpportunityRaw } from "@/types/opportunity"
 
 // ─── Entity ──────────────────────────────────────────────────────────────────
@@ -95,6 +96,15 @@ const COLUMN_LABELS: Record<string, string> = {
 
 const DEFAULT_COLUMN_VISIBILITY: VisibilityState = {
   id:          false,
+  responsible: false,
+  createdAt:   false,
+}
+
+const MOBILE_COLUMN_VISIBILITY: VisibilityState = {
+  id:          false,
+  status:      false,
+  value:       false,
+  closeDate:   false,
   responsible: false,
   createdAt:   false,
 }
@@ -293,6 +303,11 @@ export function OportunidadesTab({ contactId }: Props) {
   const [query, setQuery]     = React.useState<QueryState>({ page: 1, pageSize: 10, search: "" })
   const [refreshKey, setRefreshKey] = React.useState(0)
 
+  const isMobile = useIsMobile()
+  React.useEffect(() => {
+    if (isMobile) setColumnVisibility(MOBILE_COLUMN_VISIBILITY)
+  }, [isMobile])
+
   // "opportunity" en created/updated/moved trae el registro completo (filtra por
   // person_id) — en deleted el backend solo manda { id }, así que ahí se refresca
   // sin condición (mismo trade-off que en la pestaña de Oportunidades de Organización).
@@ -350,35 +365,38 @@ export function OportunidadesTab({ contactId }: Props) {
 
   return (
     <div className="flex flex-col gap-3 p-4">
-      {/* Toolbar */}
-      <div className="flex items-center gap-2">
+      {/* Toolbar. En mobile se apila en filas propias en vez de forzar scroll
+          horizontal; desde md hacia arriba queda igual que antes. */}
+      <div className="flex flex-col gap-2 md:flex-row md:items-center">
         <Input
-          className="h-8 max-w-xs text-sm"
+          className="h-8 w-full text-sm md:max-w-xs"
           placeholder="Filtrar por nombre..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <div className="ml-auto flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-2 md:ml-auto">
+          <span className="w-full text-sm text-muted-foreground md:w-auto">
             {total} oportunidad{total !== 1 ? "es" : ""}
           </span>
-          <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8" />}>
-              <Settings2Icon className="size-4" />
-              Visualización
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-40">
-              {table.getAllColumns().filter((col) => col.getCanHide()).map((col) => (
-                <DropdownMenuCheckboxItem
-                  key={col.id}
-                  checked={col.getIsVisible()}
-                  onCheckedChange={(v) => col.toggleVisibility(!!v)}
-                >
-                  {COLUMN_LABELS[col.id] ?? col.id}
-                </DropdownMenuCheckboxItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="[&_button]:w-full md:[&_button]:w-auto">
+            <DropdownMenu>
+              <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8" />}>
+                <Settings2Icon className="size-4" />
+                Visualización
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-40">
+                {table.getAllColumns().filter((col) => col.getCanHide()).map((col) => (
+                  <DropdownMenuCheckboxItem
+                    key={col.id}
+                    checked={col.getIsVisible()}
+                    onCheckedChange={(v) => col.toggleVisibility(!!v)}
+                  >
+                    {COLUMN_LABELS[col.id] ?? col.id}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
           {/* Crear oportunidad deshabilitado por ahora — ver nota en el componente.
           <Button size="sm" className="h-8 gap-1.5 text-xs">
             <PlusIcon className="size-3.5" /> Oportunidad
