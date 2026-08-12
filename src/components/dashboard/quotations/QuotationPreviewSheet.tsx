@@ -40,7 +40,7 @@ export function QuotationPreviewSheet({
 }: QuotationPreviewSheetProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" showCloseButton={false} style={{ maxWidth: 1400, padding: 0, gap: 0 }} className="w-full">
+      <SheetContent side="right" showCloseButton={false} style={{ maxWidth: 1400, padding: 0, gap: 0 }} className="w-full!">
         {open && entity && (
           <QuotationPreview
             entity={entity}

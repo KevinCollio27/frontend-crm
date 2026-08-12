@@ -62,7 +62,7 @@ import { KanbanBoard, KanbanColumn } from "@/components/ui/kanban"
 import { useSidebar } from "@/components/ui/sidebar"
 import { SingleSelectFilter, type SingleSelectOption } from "@/components/ui/single-select-filter"
 import { KanbanFacetedFilter } from "@/components/ui/faceted-filter"
-import { FunnelTable, COLUMN_LABELS, DEFAULT_COLUMN_VISIBILITY, mapOpportunity, type Opportunity } from "./FunnelTable"
+import { FunnelTable, COLUMN_LABELS, DEFAULT_COLUMN_VISIBILITY, MOBILE_COLUMN_VISIBILITY, mapOpportunity, type Opportunity } from "./FunnelTable"
 import { SuggestionsView } from "./suggestions/SuggestionsView"
 import type { VisibilityState } from "@tanstack/react-table"
 import { FunnelPreviewSheet } from "./FunnelPreviewSheet"
@@ -72,6 +72,7 @@ import { opportunityService } from "@/services/opportunity.service"
 import { notify, opportunityNotify } from "@/lib/notify"
 import { opportunityConfirm } from "@/lib/confirm"
 import { useEntityRealtime } from "@/hooks/useEntityRealtime"
+import { useIsMobile } from "@/hooks/use-mobile"
 import type { Flow, FlowStage } from "@/types/flow"
 
 // ─── Configs ─────────────────────────────────────────────────────────────────
@@ -475,6 +476,10 @@ export function FunnelKanban() {
   const [flows, setFlows]                       = React.useState<Flow[]>([])
   const [statusFilter, setStatusFilter]         = React.useState<OppStatus | "all">("all")
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>(DEFAULT_COLUMN_VISIBILITY)
+  const isMobile = useIsMobile()
+  React.useEffect(() => {
+    if (isMobile) setColumnVisibility(MOBILE_COLUMN_VISIBILITY)
+  }, [isMobile])
   const [oppTotal, setOppTotal]                 = React.useState(0)
 
   // ── Board state ─────────────────────────────────────────────────────────────
@@ -850,84 +855,102 @@ export function FunnelKanban() {
         <Button size="sm" onClick={() => setCreateOpen(true)}>+ Crear Oportunidad</Button>
       </div>
 
-      {/* Row 2 — filters */}
+      {/* Row 2 — filters. En mobile se apila en filas propias en vez de forzar scroll
+          horizontal; desde md hacia arriba queda igual que antes. */}
       {view !== "sugerencias" && (
-      <div className="flex shrink-0 items-center gap-2 border-b px-4 py-2">
-        <div className="relative w-44 shrink-0">
-          <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar oportunidad..."
-            className="h-8 pl-8 text-xs"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+      <div className="flex shrink-0 flex-col gap-2 border-b px-4 py-2 md:flex-row md:items-center">
+        <div className="flex flex-col gap-2 border-b pb-2 md:flex-row md:items-center md:border-b-0 md:pb-0">
+          <div className="relative w-full shrink-0 md:w-44">
+            <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Buscar oportunidad..."
+              className="h-8 pl-8 text-xs"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+
+          {/* Grid de 2 columnas — Restablecer (Board) es un ítem más del grid, no
+              fila propia, así que si el total de filtros sale impar se empareja
+              con él en vez de quedar solo (ver RESPONSIVIDAD.md). */}
+          <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:items-center">
+            <div className="[&_button]:w-full md:[&_button]:w-auto">
+              <SingleSelectFilter
+                title="Pipeline"
+                options={flowOptions}
+                selected={flowId === null ? "all" : String(flowId)}
+                onChange={(v) => setFlowId(v === "all" ? null : Number(v))}
+              />
+            </div>
+
+            <Separator orientation="vertical" className="mx-0.5 hidden data-[orientation=vertical]:h-5 data-[orientation=vertical]:self-auto md:block" />
+
+            <div className="[&_button]:w-full md:[&_button]:w-auto">
+              <SingleSelectFilter
+                title="Estado"
+                options={statusOptions}
+                selected={statusFilter}
+                onChange={(v) => setStatusFilter(v as OppStatus | "all")}
+              />
+            </div>
+
+            {view === "board" && (
+              <>
+                <Separator orientation="vertical" className="mx-0.5 hidden data-[orientation=vertical]:h-5 data-[orientation=vertical]:self-auto md:block" />
+
+                <div className="[&_button]:w-full md:[&_button]:w-auto">
+                  <KanbanFacetedFilter
+                    title="Responsable"
+                    options={responsibleOptions}
+                    selected={responsibleFilter}
+                    onChange={setResponsibleFilter}
+                  />
+                </div>
+
+                {responsibleFilter.length > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full h-8 px-2 text-xs md:w-auto"
+                    onClick={() => setResponsibleFilter([])}
+                  >
+                    <XIcon className="size-3.5" />
+                    Restablecer
+                  </Button>
+                )}
+              </>
+            )}
+          </div>
         </div>
 
-        <SingleSelectFilter
-          title="Pipeline"
-          options={flowOptions}
-          selected={flowId === null ? "all" : String(flowId)}
-          onChange={(v) => setFlowId(v === "all" ? null : Number(v))}
-        />
-
-        <Separator orientation="vertical" className="mx-0.5 data-[orientation=vertical]:h-5 data-[orientation=vertical]:self-auto" />
-
-        <SingleSelectFilter
-          title="Estado"
-          options={statusOptions}
-          selected={statusFilter}
-          onChange={(v) => setStatusFilter(v as OppStatus | "all")}
-        />
-
         {view === "lista" && (
-          <div className="ml-auto flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">{oppTotal} oportunidades</span>
-            <DropdownMenu>
-              <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8" />}>
-                Columnas <ChevronDownIcon className="ml-1.5 size-3.5" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {Object.entries(COLUMN_LABELS).map(([id, label]) => (
-                  <DropdownMenuCheckboxItem
-                    key={id}
-                    checked={columnVisibility[id] !== false}
-                    onCheckedChange={(v) => setColumnVisibility((prev) => ({ ...prev, [id]: !!v }))}
-                  >
-                    {label}
-                  </DropdownMenuCheckboxItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-2 md:ml-auto">
+            <span className="w-full text-xs text-muted-foreground md:w-auto">{oppTotal} oportunidades</span>
+            <div className="[&_button]:w-full md:[&_button]:w-auto">
+              <DropdownMenu>
+                <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8" />}>
+                  Columnas <ChevronDownIcon className="ml-1.5 size-3.5" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {Object.entries(COLUMN_LABELS).map(([id, label]) => (
+                    <DropdownMenuCheckboxItem
+                      key={id}
+                      checked={columnVisibility[id] !== false}
+                      onCheckedChange={(v) => setColumnVisibility((prev) => ({ ...prev, [id]: !!v }))}
+                    >
+                      {label}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         )}
 
         {view === "board" && (
-          <>
-            <Separator orientation="vertical" className="mx-0.5 data-[orientation=vertical]:h-5 data-[orientation=vertical]:self-auto" />
-
-            <KanbanFacetedFilter
-              title="Responsable"
-              options={responsibleOptions}
-              selected={responsibleFilter}
-              onChange={setResponsibleFilter}
-            />
-
-            {responsibleFilter.length > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 px-2 text-xs"
-                onClick={() => setResponsibleFilter([])}
-              >
-                <XIcon className="size-3.5" />
-                Restablecer
-              </Button>
-            )}
-
-            <span className="ml-auto shrink-0 text-xs text-muted-foreground">
-              {filtered.length} oportunidades · {formatTotal(totalValue)}
-            </span>
-          </>
+          <span className="md:ml-auto shrink-0 text-xs text-muted-foreground">
+            {filtered.length} oportunidades · {formatTotal(totalValue)}
+          </span>
         )}
       </div>
       )}

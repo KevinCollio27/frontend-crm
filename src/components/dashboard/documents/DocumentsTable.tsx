@@ -63,6 +63,7 @@ import { DocumentPreviewSheet } from "./DocumentPreviewSheet"
 import { UploadDocumentSheet, type DocumentToEdit } from "./UploadDocumentSheet"
 import { documentService } from "@/services/document.service"
 import type { DocumentRaw } from "@/types/document"
+import { useIsMobile } from "@/hooks/use-mobile"
 import { getSortIcon } from "@/lib/table-utils"
 import { notify } from "@/lib/notify"
 import { orgConfirm } from "@/lib/confirm"
@@ -175,6 +176,18 @@ const columnLabels: Record<string, string> = {
 
 const DEFAULT_COLUMN_VISIBILITY: VisibilityState = {
   fileSize: false,
+}
+
+// En mobile no hay espacio para columnas de más — solo Nombre queda visible por
+// defecto (Acciones y el checkbox de selección no dependen de esto, siempre se ven).
+const MOBILE_COLUMN_VISIBILITY: VisibilityState = {
+  id:         false,
+  fileType:   false,
+  fileSize:   false,
+  category:   false,
+  visibility: false,
+  uploadedBy: false,
+  createdAt:  false,
 }
 
 function getColumns(
@@ -421,6 +434,10 @@ export function DocumentsTable() {
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>(
     DEFAULT_COLUMN_VISIBILITY
   )
+  const isMobile = useIsMobile()
+  React.useEffect(() => {
+    if (isMobile) setColumnVisibility(MOBILE_COLUMN_VISIBILITY)
+  }, [isMobile])
   const [rowSelection, setRowSelection] = React.useState({})
   const [selectedDocument, setSelectedDocument] = React.useState<Document | null>(null)
   const selectedDocumentRef = React.useRef<Document | null>(null)
@@ -565,63 +582,74 @@ export function DocumentsTable() {
         <Button size="sm" onClick={() => setUploadOpen(true)}>+ Subir Documento</Button>
       </div>
 
-      {/* Row 2 — filters */}
-      <div className="flex items-center gap-2 border-b px-4 py-2">
-        <div className="relative w-44 shrink-0">
-          <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar documento..."
-            className="h-8 pl-8 text-xs"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-          />
+      {/* Row 2 — filters. En mobile se apila en filas propias en vez de forzar scroll
+          horizontal; desde md hacia arriba queda igual que antes. */}
+      <div className="flex flex-col gap-2 border-b px-4 py-2 md:flex-row md:items-center">
+        <div className="flex flex-col gap-2 border-b pb-2 md:flex-row md:items-center md:border-b-0 md:pb-0">
+          <div className="relative w-full shrink-0 md:w-44">
+            <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Buscar documento..."
+              className="h-8 pl-8 text-xs"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:items-center">
+            <div className="[&_button]:w-full md:[&_button]:w-auto">
+              <SingleSelectFilter
+                title="Categoría"
+                options={CATEGORY_OPTIONS}
+                selected={query.category ?? "all"}
+                onChange={(v) => setQuery((q) => ({ ...q, page: 1, category: v === "all" ? null : v }))}
+              />
+            </div>
+
+            <Separator orientation="vertical" className="mx-0.5 hidden data-[orientation=vertical]:h-5 data-[orientation=vertical]:self-auto md:block" />
+
+            <div className="[&_button]:w-full md:[&_button]:w-auto">
+              <SingleSelectFilter
+                title="Visibilidad"
+                options={VISIBILITY_OPTIONS}
+                selected={query.visibility ?? "all"}
+                onChange={(v) => setQuery((q) => ({ ...q, page: 1, visibility: v === "all" ? null : v }))}
+              />
+            </div>
+
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" className="col-span-2 h-8 px-2 text-xs md:col-span-1 md:w-auto" onClick={resetFilters}>
+                <XIcon className="size-3.5" />
+                Restablecer
+              </Button>
+            )}
+          </div>
         </div>
 
-        <SingleSelectFilter
-          title="Categoría"
-          options={CATEGORY_OPTIONS}
-          selected={query.category ?? "all"}
-          onChange={(v) => setQuery((q) => ({ ...q, page: 1, category: v === "all" ? null : v }))}
-        />
-
-        <Separator orientation="vertical" className="mx-0.5 data-[orientation=vertical]:h-5 data-[orientation=vertical]:self-auto" />
-
-        <SingleSelectFilter
-          title="Visibilidad"
-          options={VISIBILITY_OPTIONS}
-          selected={query.visibility ?? "all"}
-          onChange={(v) => setQuery((q) => ({ ...q, page: 1, visibility: v === "all" ? null : v }))}
-        />
-
-        {hasActiveFilters && (
-          <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={resetFilters}>
-            <XIcon className="size-3.5" />
-            Restablecer
-          </Button>
-        )}
-
-        <div className="ml-auto flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">{total} documentos</span>
-          <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8" />}>
-              Columnas <ChevronDown className="ml-1.5 size-3.5" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {table
-                .getAllColumns()
-                .filter((col) => col.getCanHide())
-                .map((col) => (
-                  <DropdownMenuCheckboxItem
-                    key={col.id}
-                    className="capitalize"
-                    checked={col.getIsVisible()}
-                    onCheckedChange={(value) => col.toggleVisibility(!!value)}
-                  >
-                    {columnLabels[col.id] ?? col.id}
-                  </DropdownMenuCheckboxItem>
-                ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-2 md:ml-auto">
+          <span className="w-full text-xs text-muted-foreground md:w-auto">{total} documentos</span>
+          <div className="[&_button]:w-full md:[&_button]:w-auto">
+            <DropdownMenu>
+              <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8" />}>
+                Columnas <ChevronDown className="ml-1.5 size-3.5" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {table
+                  .getAllColumns()
+                  .filter((col) => col.getCanHide())
+                  .map((col) => (
+                    <DropdownMenuCheckboxItem
+                      key={col.id}
+                      className="capitalize"
+                      checked={col.getIsVisible()}
+                      onCheckedChange={(value) => col.toggleVisibility(!!value)}
+                    >
+                      {columnLabels[col.id] ?? col.id}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </div>
 

@@ -46,7 +46,7 @@ export function CreateWidgetSheet({ open, onOpenChange, widgetId, onSuccess }: C
         side="right"
         showCloseButton={false}
         style={{ maxWidth: 1400, padding: 0, gap: 0 }}
-        className="w-full"
+        className="w-full!"
       >
         {open && (
           <WidgetWizard

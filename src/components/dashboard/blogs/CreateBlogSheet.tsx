@@ -124,7 +124,7 @@ export function CreateBlogSheet({ open, onOpenChange, blog, blogId, onSuccess }:
         side="right"
         showCloseButton={false}
         style={{ maxWidth: 720, padding: 0, gap: 0 }}
-        className="w-full"
+        className="w-full!"
       >
         {open && (
           <BlogSheetForm

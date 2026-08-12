@@ -265,7 +265,7 @@ interface Props {
 export function QuotationHistorySheet({ open, onOpenChange, quotationId, quotationName }: Props) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" showCloseButton={false} style={{ maxWidth: 520, padding: 0, gap: 0 }} className="w-full flex flex-col">
+      <SheetContent side="right" showCloseButton={false} style={{ maxWidth: 520, padding: 0, gap: 0 }} className="w-full! flex flex-col">
         <div className="flex items-start justify-between gap-4 border-b px-5 py-4">
           <div className="space-y-0.5">
             <SheetTitle className="flex items-center gap-2">

@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { getInitials } from "@/lib/table-utils"
 import { formService } from "@/services/form.service"
+import { useIsMobile } from "@/hooks/use-mobile"
 import { FormAnswerDetail } from "./FormAnswerDetail"
 import type { FormAnswerRaw, FormRaw } from "@/types/form"
 
@@ -133,6 +134,10 @@ export function FormAnswersBoard({ viewToggle }: { viewToggle?: React.ReactNode 
   const [selectedId, setSelectedId] = React.useState<number | null>(null)
   const [forms, setForms]         = React.useState<FormRaw[]>([])
   const [formFilter, setFormFilter] = React.useState<number | null>(null)
+  const isMobile = useIsMobile()
+  // En mobile, Col 1 y Col 2 no caben lado a lado — se muestra una u otra, con
+  // navegación tipo lista→detalle (igual que un inbox de mail en el celular).
+  const [mobileShowDetail, setMobileShowDetail] = React.useState(false)
 
   // Lista de formularios para el filtro — se pide una sola vez, es independiente
   // de qué página de respuestas esté cargada.
@@ -155,6 +160,7 @@ export function FormAnswersBoard({ viewToggle }: { viewToggle?: React.ReactNode 
         setTotal(res.total)
         setNextCursor(res.nextCursor)
         setSelectedId(res.data[0]?.id ?? null)
+        setMobileShowDetail(false)
       })
       .catch(() => { if (!cancelled) setAnswers([]) })
       .finally(() => { if (!cancelled) setLoading(false) })
@@ -201,9 +207,10 @@ export function FormAnswersBoard({ viewToggle }: { viewToggle?: React.ReactNode 
         {viewToggle}
       </div>
 
-      {/* Row 2 — filters */}
-      <div className="flex shrink-0 items-center gap-2 border-b px-4 py-2">
-        <div className="relative w-44 shrink-0">
+      {/* Row 2 — filters. En mobile se apila en filas propias en vez de forzar scroll
+          horizontal; desde md hacia arriba queda igual que antes. */}
+      <div className="flex shrink-0 flex-col gap-2 border-b px-4 py-2 md:flex-row md:items-center">
+        <div className="relative w-full shrink-0 md:w-44">
           <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Buscar por nombre..."
@@ -212,15 +219,23 @@ export function FormAnswersBoard({ viewToggle }: { viewToggle?: React.ReactNode 
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <FormFilter forms={forms} selected={formFilter} onChange={setFormFilter} />
-        <span className="ml-auto shrink-0 text-xs text-muted-foreground">
-          {loading ? "…" : `${total} respuesta${total === 1 ? "" : "s"}`}
-        </span>
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-2 md:ml-auto">
+          <div className="[&_button]:w-full md:[&_button]:w-auto">
+            <FormFilter forms={forms} selected={formFilter} onChange={setFormFilter} />
+          </div>
+          <span className="w-full shrink-0 text-xs text-muted-foreground md:w-auto">
+            {loading ? "…" : `${total} respuesta${total === 1 ? "" : "s"}`}
+          </span>
+        </div>
       </div>
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
-        {/* Col 1 */}
-        <div className="flex w-96 shrink-0 flex-col overflow-hidden border-r">
+        {/* Col 1 — en mobile ocupa toda la pantalla y se oculta al abrir el detalle
+            de una respuesta (no caben las 2 columnas lado a lado en un celular). */}
+        <div className={cn(
+          "w-full shrink-0 flex-col overflow-hidden border-r md:flex md:w-96",
+          mobileShowDetail ? "hidden md:flex" : "flex"
+        )}>
           <div className="min-h-0 flex-1 overflow-y-auto scrollbar-hide [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {loading ? (
             <div className="flex justify-center py-10">
@@ -241,7 +256,7 @@ export function FormAnswersBoard({ viewToggle }: { viewToggle?: React.ReactNode 
                     <button
                       key={answer.id}
                       type="button"
-                      onClick={() => setSelectedId(answer.id)}
+                      onClick={() => { setSelectedId(answer.id); if (isMobile) setMobileShowDetail(true) }}
                       className={cn(
                         "flex w-full items-start gap-2.5 rounded-lg border px-3 py-2.5 text-left transition-colors",
                         isActive ? "bg-muted" : "hover:bg-muted/50"
@@ -293,10 +308,17 @@ export function FormAnswersBoard({ viewToggle }: { viewToggle?: React.ReactNode 
           </div>
         </div>
 
-        {/* Col 2 — vista previa */}
-        <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
+        {/* Col 2 — vista previa. En mobile solo se muestra tras tocar una respuesta. */}
+        <div className={cn(
+          "min-h-0 flex-1 flex-col overflow-hidden md:flex",
+          mobileShowDetail ? "flex" : "hidden md:flex"
+        )}>
           {selectedAnswer ? (
-            <FormAnswerDetail answer={selectedAnswer} onToggled={handleToggled} />
+            <FormAnswerDetail
+              answer={selectedAnswer}
+              onToggled={handleToggled}
+              onBack={isMobile ? () => setMobileShowDetail(false) : undefined}
+            />
           ) : (
             <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
               Selecciona una respuesta para ver el detalle

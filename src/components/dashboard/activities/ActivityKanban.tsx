@@ -57,7 +57,7 @@ import {
 import { KanbanBoard, KanbanColumn } from "@/components/ui/kanban"
 import { SingleSelectFilter, type SingleSelectOption } from "@/components/ui/single-select-filter"
 import { KanbanFacetedFilter } from "@/components/ui/faceted-filter"
-import { ActivitiesTable, COLUMN_LABELS, DEFAULT_COLUMN_VISIBILITY } from "./ActivitiesTable"
+import { ActivitiesTable, COLUMN_LABELS, DEFAULT_COLUMN_VISIBILITY, MOBILE_COLUMN_VISIBILITY } from "./ActivitiesTable"
 import { ActivityPreviewSheet } from "./ActivityPreviewSheet"
 import { CreateActivitySheet } from "./CreateActivitySheet"
 import { activityService } from "@/services/activity.service"
@@ -65,6 +65,7 @@ import { flowService } from "@/services/flow.service"
 import { toWorkspaceDateTimeParts } from "@/lib/activity-utils"
 import { useWorkspaceTimezone } from "@/hooks/useWorkspaceTimezone"
 import { useEntityRealtime } from "@/hooks/useEntityRealtime"
+import { useIsMobile } from "@/hooks/use-mobile"
 import type { ActivityRaw } from "@/types/activity"
 import type { Flow } from "@/types/flow"
 
@@ -476,6 +477,10 @@ export function ActivityKanban() {
   const [opps, setOpps]                           = React.useState<OppOption[]>([])
   const [loadingOpps, setLoadingOpps]             = React.useState(false)
   const [columnVisibility, setColumnVisibility]   = React.useState<VisibilityState>(DEFAULT_COLUMN_VISIBILITY)
+  const isMobile = useIsMobile()
+  React.useEffect(() => {
+    if (isMobile) setColumnVisibility(MOBILE_COLUMN_VISIBILITY)
+  }, [isMobile])
   const [listTotal, setListTotal]                 = React.useState(0)
   const [createOpen, setCreateOpen]               = React.useState(false)
 
@@ -822,111 +827,134 @@ export function ActivityKanban() {
         <Button size="sm" onClick={() => setCreateOpen(true)}>+ Crear Actividad</Button>
       </div>
 
-      {/* Row 2 — filters (compartida entre Lista y Board) */}
-      <div className="flex shrink-0 items-center gap-2 border-b px-4 py-2">
-        <div className="relative w-44 shrink-0">
-          <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar actividad..."
-            className="h-8 pl-8 text-xs"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+      {/* Row 2 — filters (compartida entre Lista y Board). En mobile se apila en
+          filas propias en vez de forzar scroll horizontal; desde md queda igual. */}
+      <div className="flex shrink-0 flex-col gap-2 border-b px-4 py-2 md:flex-row md:items-center">
+        <div className="flex flex-col gap-2 border-b pb-2 md:flex-row md:items-center md:border-b-0 md:pb-0">
+          <div className="relative w-full shrink-0 md:w-44">
+            <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Buscar actividad..."
+              className="h-8 pl-8 text-xs"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+
+          {/* Grid de 2 columnas — "Restablecer" es un ítem más del grid (no fila propia),
+              así que cuando el número de filtros sale impar, se empareja con él en vez
+              de quedar solo. Si no hay filtro activo, Restablecer no se muestra, pero en
+              ese caso el número de filtros base (Embudo+Estado, o los 4 de Board) es par. */}
+          <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:items-center">
+            <div className="[&_button]:w-full md:[&_button]:w-auto">
+              <FlowFilter flows={flows} selected={flowId} onChange={setFlowId} />
+            </div>
+
+            {flowId !== null && (loadingOpps || opps.length > 0) && (
+              <>
+                <Separator orientation="vertical" className="mx-0.5 hidden data-[orientation=vertical]:h-5 data-[orientation=vertical]:self-auto md:block" />
+                <div className="[&_button]:w-full md:[&_button]:w-auto">
+                  <KanbanFacetedFilter
+                    title="Oportunidad"
+                    options={opps.map((o) => ({ value: String(o.id), label: o.name }))}
+                    selected={opportunityId !== null ? [String(opportunityId)] : []}
+                    onChange={(vals) => setOpportunityId(vals.length > 0 ? Number(vals[0]) : null)}
+                    single
+                  />
+                </div>
+              </>
+            )}
+
+            {view === "lista" && (
+              <>
+                <Separator orientation="vertical" className="mx-0.5 hidden data-[orientation=vertical]:h-5 data-[orientation=vertical]:self-auto md:block" />
+                <div className="[&_button]:w-full md:[&_button]:w-auto">
+                  <SingleSelectFilter
+                    title="Estado"
+                    options={STATUS_OPTIONS}
+                    selected={status}
+                    onChange={setStatus}
+                  />
+                </div>
+              </>
+            )}
+
+            {view === "board" && (
+              <>
+                <Separator orientation="vertical" className="mx-0.5 hidden data-[orientation=vertical]:h-5 data-[orientation=vertical]:self-auto md:block" />
+                <div className="[&_button]:w-full md:[&_button]:w-auto">
+                  <KanbanFacetedFilter
+                    title="Tipo"
+                    options={BOARD_ACTIVITY_TYPES.map((t) => ({ value: t, label: t }))}
+                    selected={typeFilter}
+                    onChange={setTypeFilter}
+                  />
+                </div>
+                <Separator orientation="vertical" className="mx-0.5 hidden data-[orientation=vertical]:h-5 data-[orientation=vertical]:self-auto md:block" />
+                <div className="[&_button]:w-full md:[&_button]:w-auto">
+                  <KanbanFacetedFilter
+                    title="Prioridad"
+                    options={[
+                      { value: "alta",  label: "Alta"  },
+                      { value: "media", label: "Media" },
+                      { value: "baja",  label: "Baja"  },
+                    ]}
+                    selected={priorityFilter}
+                    onChange={setPriorityFilter}
+                  />
+                </div>
+                <Separator orientation="vertical" className="mx-0.5 hidden data-[orientation=vertical]:h-5 data-[orientation=vertical]:self-auto md:block" />
+                <div className="[&_button]:w-full md:[&_button]:w-auto">
+                  <KanbanFacetedFilter
+                    title="Responsable"
+                    options={responsibleOptions}
+                    selected={responsibleFilter}
+                    onChange={setResponsibleFilter}
+                  />
+                </div>
+              </>
+            )}
+
+            {hasActiveFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full h-8 px-2 text-xs md:w-auto"
+                onClick={resetFilters}
+              >
+                <XIcon className="size-3.5" />
+                Restablecer
+              </Button>
+            )}
+          </div>
         </div>
 
-        <FlowFilter flows={flows} selected={flowId} onChange={setFlowId} />
-
-        {flowId !== null && (loadingOpps || opps.length > 0) && (
-          <>
-            <Separator orientation="vertical" className="mx-0.5 data-[orientation=vertical]:h-5 data-[orientation=vertical]:self-auto" />
-            <KanbanFacetedFilter
-              title="Oportunidad"
-              options={opps.map((o) => ({ value: String(o.id), label: o.name }))}
-              selected={opportunityId !== null ? [String(opportunityId)] : []}
-              onChange={(vals) => setOpportunityId(vals.length > 0 ? Number(vals[0]) : null)}
-              single
-            />
-          </>
-        )}
-
         {view === "lista" && (
-          <>
-            <Separator orientation="vertical" className="mx-0.5 data-[orientation=vertical]:h-5 data-[orientation=vertical]:self-auto" />
-            <SingleSelectFilter
-              title="Estado"
-              options={STATUS_OPTIONS}
-              selected={status}
-              onChange={setStatus}
-            />
-          </>
-        )}
-
-        {view === "board" && (
-          <>
-            <Separator orientation="vertical" className="mx-0.5 data-[orientation=vertical]:h-5 data-[orientation=vertical]:self-auto" />
-            <KanbanFacetedFilter
-              title="Tipo"
-              options={BOARD_ACTIVITY_TYPES.map((t) => ({ value: t, label: t }))}
-              selected={typeFilter}
-              onChange={setTypeFilter}
-            />
-            <Separator orientation="vertical" className="mx-0.5 data-[orientation=vertical]:h-5 data-[orientation=vertical]:self-auto" />
-            <KanbanFacetedFilter
-              title="Prioridad"
-              options={[
-                { value: "alta",  label: "Alta"  },
-                { value: "media", label: "Media" },
-                { value: "baja",  label: "Baja"  },
-              ]}
-              selected={priorityFilter}
-              onChange={setPriorityFilter}
-            />
-            <Separator orientation="vertical" className="mx-0.5 data-[orientation=vertical]:h-5 data-[orientation=vertical]:self-auto" />
-            <KanbanFacetedFilter
-              title="Responsable"
-              options={responsibleOptions}
-              selected={responsibleFilter}
-              onChange={setResponsibleFilter}
-            />
-          </>
-        )}
-
-        {hasActiveFilters && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 px-2 text-xs"
-            onClick={resetFilters}
-          >
-            <XIcon className="size-3.5" />
-            Restablecer
-          </Button>
-        )}
-
-        {view === "lista" && (
-          <div className="ml-auto flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">{listTotal} actividades</span>
-            <DropdownMenu>
-              <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8" />}>
-                Columnas <ChevronDownIcon className="ml-1.5 size-3.5" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {Object.entries(COLUMN_LABELS).map(([id, label]) => (
-                  <DropdownMenuCheckboxItem
-                    key={id}
-                    checked={columnVisibility[id] !== false}
-                    onCheckedChange={(v) => setColumnVisibility((prev) => ({ ...prev, [id]: !!v }))}
-                  >
-                    {label}
-                  </DropdownMenuCheckboxItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-2 md:ml-auto">
+            <span className="w-full text-xs text-muted-foreground md:w-auto">{listTotal} actividades</span>
+            <div className="[&_button]:w-full md:[&_button]:w-auto">
+              <DropdownMenu>
+                <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8" />}>
+                  Columnas <ChevronDownIcon className="ml-1.5 size-3.5" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {Object.entries(COLUMN_LABELS).map(([id, label]) => (
+                    <DropdownMenuCheckboxItem
+                      key={id}
+                      checked={columnVisibility[id] !== false}
+                      onCheckedChange={(v) => setColumnVisibility((prev) => ({ ...prev, [id]: !!v }))}
+                    >
+                      {label}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         )}
 
         {view === "board" && (
-          <span className="ml-auto shrink-0 text-xs text-muted-foreground">
+          <span className="md:ml-auto shrink-0 text-xs text-muted-foreground">
             {loading ? "Cargando…" : `${displayTotal} actividades`}
             {!loading && displayOverdue > 0 && (
               <span className="text-amber-600">

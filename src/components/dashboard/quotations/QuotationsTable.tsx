@@ -64,6 +64,7 @@ import { notify } from "@/lib/notify"
 import { orgConfirm } from "@/lib/confirm"
 import { useEntityRealtime } from "@/hooks/useEntityRealtime"
 import { useCargoIntegration } from "@/hooks/useCargoIntegration"
+import { useIsMobile } from "@/hooks/use-mobile"
 import { downloadQuotationPdf, warmPdfCache, clearPdfCache } from "./shared/download-pdf"
 import { confirmAndSendToCargo, isAcceptedStatus } from "./shared/send-to-cargo"
 import type { QuotationRaw } from "@/types/quotation"
@@ -180,6 +181,19 @@ const DEFAULT_VISIBILITY: VisibilityState = {
   type:       false,
   validUntil: false,
   createdAt:  false,
+}
+
+// En mobile no hay espacio para columnas de más — solo Nombre queda visible por
+// defecto (Acciones y el checkbox de selección no dependen de esto, siempre se ven).
+const MOBILE_COLUMN_VISIBILITY: VisibilityState = {
+  id:              false,
+  status:          false,
+  amount:          false,
+  responsible:     false,
+  type:            false,
+  validUntil:      false,
+  createdAt:       false,
+  opportunityName: false,
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -487,6 +501,10 @@ export function QuotationsTable() {
   const [typeFilter, setTypeFilter]             = React.useState("all")
   const [responsibleFilter, setResponsibleFilter] = React.useState<string[]>([])
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>(DEFAULT_VISIBILITY)
+  const isMobile = useIsMobile()
+  React.useEffect(() => {
+    if (isMobile) setColumnVisibility(MOBILE_COLUMN_VISIBILITY)
+  }, [isMobile])
   const [rowSelection, setRowSelection]         = React.useState({})
   const [createOpen, setCreateOpen]     = React.useState(false)
   const [editEntity, setEditEntity]     = React.useState<QuotationRaw | null>(null)
@@ -688,72 +706,87 @@ export function QuotationsTable() {
         <Button size="sm" onClick={() => setCreateOpen(true)}>+ Crear Cotización</Button>
       </div>
 
-      {/* Row 2 — filters */}
-      <div className="flex items-center gap-2 border-b px-4 py-2">
-        <div className="relative w-44 shrink-0">
-          <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar cotizaciones..."
-            className="h-8 pl-8 text-xs"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-          />
+      {/* Row 2 — filters. En mobile se apila en filas propias en vez de forzar scroll
+          horizontal; desde md hacia arriba queda igual que antes. */}
+      <div className="flex flex-col gap-2 border-b px-4 py-2 md:flex-row md:items-center">
+        <div className="flex flex-col gap-2 border-b pb-2 md:flex-row md:items-center md:border-b-0 md:pb-0">
+          <div className="relative w-full shrink-0 md:w-44">
+            <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Buscar cotizaciones..."
+              className="h-8 pl-8 text-xs"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+            />
+          </div>
+
+          {/* Grid de 2 columnas — "Restablecer" es un ítem más del grid (no fila propia),
+              así que el filtro impar (son 3) se empareja con él en vez de quedar solo. */}
+          <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:items-center">
+            <div className="[&_button]:w-full md:[&_button]:w-auto">
+              <SingleSelectFilter
+                title="Estado"
+                options={STATUS_OPTIONS}
+                selected={statusFilter}
+                onChange={setStatusFilter}
+              />
+            </div>
+
+            <Separator orientation="vertical" className="mx-0.5 hidden data-[orientation=vertical]:h-5 data-[orientation=vertical]:self-auto md:block" />
+
+            <div className="[&_button]:w-full md:[&_button]:w-auto">
+              <SingleSelectFilter
+                title="Tipo"
+                options={TYPE_OPTIONS}
+                selected={typeFilter}
+                onChange={setTypeFilter}
+              />
+            </div>
+
+            <Separator orientation="vertical" className="mx-0.5 hidden data-[orientation=vertical]:h-5 data-[orientation=vertical]:self-auto md:block" />
+
+            <div className="[&_button]:w-full md:[&_button]:w-auto">
+              <KanbanFacetedFilter
+                title="Responsable"
+                options={responsibleOptions}
+                selected={responsibleFilter}
+                onChange={setResponsibleFilter}
+              />
+            </div>
+
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" className="w-full h-8 px-2 text-xs md:w-auto" onClick={resetFilters}>
+                <XIcon className="size-3.5" />
+                Restablecer
+              </Button>
+            )}
+          </div>
         </div>
 
-        <SingleSelectFilter
-          title="Estado"
-          options={STATUS_OPTIONS}
-          selected={statusFilter}
-          onChange={setStatusFilter}
-        />
-
-        <Separator orientation="vertical" className="mx-0.5 data-[orientation=vertical]:h-5 data-[orientation=vertical]:self-auto" />
-
-        <SingleSelectFilter
-          title="Tipo"
-          options={TYPE_OPTIONS}
-          selected={typeFilter}
-          onChange={setTypeFilter}
-        />
-
-        <Separator orientation="vertical" className="mx-0.5 data-[orientation=vertical]:h-5 data-[orientation=vertical]:self-auto" />
-
-        <KanbanFacetedFilter
-          title="Responsable"
-          options={responsibleOptions}
-          selected={responsibleFilter}
-          onChange={setResponsibleFilter}
-        />
-
-        {hasActiveFilters && (
-          <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={resetFilters}>
-            <XIcon className="size-3.5" />
-            Restablecer
-          </Button>
-        )}
-
-        <div className="ml-auto flex items-center gap-2">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-2 md:ml-auto">
           {!loading && (
-            <span className="text-xs text-muted-foreground">
+            <span className="w-full text-xs text-muted-foreground md:w-auto">
               {table.getFilteredRowModel().rows.length} cotizaciones
             </span>
           )}
-          <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8" />}>
-              Columnas <ChevronDown className="ml-1.5 size-3.5" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {table.getAllColumns().filter((col) => col.getCanHide()).map((col) => (
-                <DropdownMenuCheckboxItem
-                  key={col.id}
-                  checked={col.getIsVisible()}
-                  onCheckedChange={(v) => col.toggleVisibility(!!v)}
-                >
-                  {COLUMN_LABELS[col.id] ?? col.id}
-                </DropdownMenuCheckboxItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="[&_button]:w-full md:[&_button]:w-auto">
+            <DropdownMenu>
+              <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8" />}>
+                Columnas <ChevronDown className="ml-1.5 size-3.5" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {table.getAllColumns().filter((col) => col.getCanHide()).map((col) => (
+                  <DropdownMenuCheckboxItem
+                    key={col.id}
+                    checked={col.getIsVisible()}
+                    onCheckedChange={(v) => col.toggleVisibility(!!v)}
+                  >
+                    {COLUMN_LABELS[col.id] ?? col.id}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </div>
 

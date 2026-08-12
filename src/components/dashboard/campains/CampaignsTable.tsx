@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { SingleSelectFilter, type SingleSelectOption } from "@/components/ui/single-select-filter"
+import { useIsMobile } from "@/hooks/use-mobile"
 import {
   Table,
   TableBody,
@@ -132,6 +133,18 @@ const columnLabels: Record<string, string> = {
 const DEFAULT_COLUMN_VISIBILITY: VisibilityState = {
   deliveredCount: false,
   createdBy: false,
+}
+
+// En mobile no hay espacio para columnas de más — solo Nombre queda visible por
+// defecto (Acciones y el checkbox de selección no dependen de esto, siempre se ven).
+const MOBILE_COLUMN_VISIBILITY: VisibilityState = {
+  id:             false,
+  audienceFilter: false,
+  status:         false,
+  sentCount:      false,
+  deliveredCount: false,
+  createdBy:      false,
+  createdAt:      false,
 }
 
 // ─── QueryState ───────────────────────────────────────────────────────────────
@@ -406,6 +419,10 @@ export function CampaignsTable() {
   const [query, setQuery] = React.useState<QueryState>({ page: 1, pageSize: 10 })
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>(DEFAULT_COLUMN_VISIBILITY)
+  const isMobile = useIsMobile()
+  React.useEffect(() => {
+    if (isMobile) setColumnVisibility(MOBILE_COLUMN_VISIBILITY)
+  }, [isMobile])
   const [rowSelection, setRowSelection] = React.useState({})
   const [createOpen, setCreateOpen] = React.useState(false)
   const [resendForm, setResendForm] = React.useState<Partial<CampaignFormState> | null>(null)
@@ -526,68 +543,79 @@ export function CampaignsTable() {
         <Button size="sm" onClick={() => setCreateOpen(true)}>+ Crear Campaña</Button>
       </div>
 
-      {/* Row 2 — filters */}
-      <div className="flex items-center gap-2 border-b px-4 py-2">
-        <div className="relative w-44 shrink-0">
-          <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar campaña..."
-            className="h-8 pl-8 text-xs"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+      {/* Row 2 — filters. En mobile se apila en filas propias en vez de forzar scroll
+          horizontal; desde md hacia arriba queda igual que antes. */}
+      <div className="flex flex-col gap-2 border-b px-4 py-2 md:flex-row md:items-center">
+        <div className="flex flex-col gap-2 border-b pb-2 md:flex-row md:items-center md:border-b-0 md:pb-0">
+          <div className="relative w-full shrink-0 md:w-44">
+            <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Buscar campaña..."
+              className="h-8 pl-8 text-xs"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+
+          {/* Un solo filtro — ocupa todo el ancho en mobile en vez de quedar
+              apretado a la izquierda con espacio vacío al lado. */}
+          <div className="[&_button]:w-full md:[&_button]:w-auto">
+            <SingleSelectFilter
+              title="Audiencia"
+              options={AUDIENCE_OPTIONS}
+              selected={audienceFilter}
+              onChange={setAudienceFilter}
+            />
+          </div>
+
+          {hasActiveFilters && (
+            <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={resetFilters}>
+              <XIcon className="size-3.5" />
+              Restablecer
+            </Button>
+          )}
         </div>
 
-        <SingleSelectFilter
-          title="Audiencia"
-          options={AUDIENCE_OPTIONS}
-          selected={audienceFilter}
-          onChange={setAudienceFilter}
-        />
-
-        {hasActiveFilters && (
-          <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={resetFilters}>
-            <XIcon className="size-3.5" />
-            Restablecer
-          </Button>
-        )}
-
-        <div className="ml-auto flex items-center gap-2">
-          {dailyUsage && (
-            <span className={cn(
-              "text-xs tabular-nums px-2 py-1 rounded-md border",
-              dailyUsage.used >= dailyUsage.limit
-                ? "border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400"
-                : dailyUsage.used >= dailyUsage.limit * 0.8
-                ? "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
-                : "border-border bg-muted/50 text-muted-foreground"
-            )}>
-              {dailyUsage.used.toLocaleString()} / {dailyUsage.limit.toLocaleString()} hoy
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-2 md:ml-auto">
+          <div className="flex flex-wrap items-center gap-2">
+            {dailyUsage && (
+              <span className={cn(
+                "text-xs tabular-nums px-2 py-1 rounded-md border",
+                dailyUsage.used >= dailyUsage.limit
+                  ? "border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400"
+                  : dailyUsage.used >= dailyUsage.limit * 0.8
+                  ? "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                  : "border-border bg-muted/50 text-muted-foreground"
+              )}>
+                {dailyUsage.used.toLocaleString()} / {dailyUsage.limit.toLocaleString()} hoy
+              </span>
+            )}
+            <span className="text-xs text-muted-foreground">
+              {loading ? "…" : `${total} campañas`}
             </span>
-          )}
-          <span className="text-xs text-muted-foreground">
-            {loading ? "…" : `${total} campañas`}
-          </span>
-          <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8" />}>
-              Columnas <ChevronDown className="ml-1.5 size-3.5" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {table
-                .getAllColumns()
-                .filter((col) => col.getCanHide())
-                .map((col) => (
-                  <DropdownMenuCheckboxItem
-                    key={col.id}
-                    className="capitalize"
-                    checked={col.getIsVisible()}
-                    onCheckedChange={(v) => col.toggleVisibility(!!v)}
-                  >
-                    {columnLabels[col.id] ?? col.id}
-                  </DropdownMenuCheckboxItem>
-                ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          </div>
+          <div className="[&_button]:w-full md:[&_button]:w-auto">
+            <DropdownMenu>
+              <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8" />}>
+                Columnas <ChevronDown className="ml-1.5 size-3.5" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {table
+                  .getAllColumns()
+                  .filter((col) => col.getCanHide())
+                  .map((col) => (
+                    <DropdownMenuCheckboxItem
+                      key={col.id}
+                      className="capitalize"
+                      checked={col.getIsVisible()}
+                      onCheckedChange={(v) => col.toggleVisibility(!!v)}
+                    >
+                      {columnLabels[col.id] ?? col.id}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </div>
 

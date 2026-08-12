@@ -167,6 +167,19 @@ export const DEFAULT_COLUMN_VISIBILITY: VisibilityState = {
   createdAt: false,
 }
 
+// En mobile no hay espacio para columnas de más — solo Nombre queda visible por
+// defecto (Acciones y el checkbox de selección no dependen de esto, siempre se ven).
+export const MOBILE_COLUMN_VISIBILITY: VisibilityState = {
+  id:          false,
+  status:      false,
+  stageName:   false,
+  responsible: false,
+  flowName:    false,
+  closeDate:   false,
+  value:       false,
+  createdAt:   false,
+}
+
 // ─── QueryState ───────────────────────────────────────────────────────────────
 
 interface QueryState {

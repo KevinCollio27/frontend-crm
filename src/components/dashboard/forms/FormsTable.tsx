@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { SingleSelectFilter, type SingleSelectOption } from "@/components/ui/single-select-filter"
+import { useIsMobile } from "@/hooks/use-mobile"
 import {
   Table,
   TableBody,
@@ -92,6 +93,15 @@ const columnLabels: Record<string, string> = {
   flowName: "Pipeline",
   isActive: "Estado",
   createdAt: "Creado",
+}
+
+// En mobile no hay espacio para columnas de más — solo Nombre queda visible por
+// defecto (Acciones y el checkbox de selección no dependen de esto, siempre se ven).
+const MOBILE_COLUMN_VISIBILITY: VisibilityState = {
+  id:        false,
+  flowName:  false,
+  isActive:  false,
+  createdAt: false,
 }
 
 // ─── QueryState ───────────────────────────────────────────────────────────────
@@ -308,6 +318,10 @@ export function FormsTable({ viewToggle }: { viewToggle?: React.ReactNode } = {}
   })
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
+  const isMobile = useIsMobile()
+  React.useEffect(() => {
+    if (isMobile) setColumnVisibility(MOBILE_COLUMN_VISIBILITY)
+  }, [isMobile])
   const [rowSelection, setRowSelection] = React.useState({})
   const [sheetOpen, setSheetOpen] = React.useState(false)
   const [editForm, setEditForm] = React.useState<FormRaw | null>(null)
@@ -434,71 +448,82 @@ export function FormsTable({ viewToggle }: { viewToggle?: React.ReactNode } = {}
         <Button size="sm" onClick={() => { setEditForm(null); setSheetOpen(true) }}>+ Crear Formulario</Button>
       </div>
 
-      {/* Row 2 — filters */}
-      <div className="flex items-center gap-2 border-b px-4 py-2">
-        <div className="relative w-44 shrink-0">
-          <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar formularios..."
-            className="h-8 pl-8 text-xs"
-            value={query.search}
-            onChange={(e) =>
-              setQuery((q) => ({ ...q, search: e.target.value, page: 1 }))
-            }
-          />
+      {/* Row 2 — filters. En mobile se apila en filas propias en vez de forzar scroll
+          horizontal; desde md hacia arriba queda igual que antes. */}
+      <div className="flex flex-col gap-2 border-b px-4 py-2 md:flex-row md:items-center">
+        <div className="flex flex-col gap-2 border-b pb-2 md:flex-row md:items-center md:border-b-0 md:pb-0">
+          <div className="relative w-full shrink-0 md:w-44">
+            <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Buscar formularios..."
+              className="h-8 pl-8 text-xs"
+              value={query.search}
+              onChange={(e) =>
+                setQuery((q) => ({ ...q, search: e.target.value, page: 1 }))
+              }
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:items-center">
+            <div className="[&_button]:w-full md:[&_button]:w-auto">
+              <SingleSelectFilter
+                title="Estado"
+                options={STATUS_OPTIONS}
+                selected={activeFilterValue}
+                onChange={(v) =>
+                  setQuery((q) => ({
+                    ...q,
+                    page: 1,
+                    isActive: v === "true" ? true : v === "false" ? false : null,
+                  }))
+                }
+              />
+            </div>
+
+            <div className="[&_button]:w-full md:[&_button]:w-auto">
+              <SingleSelectFilter
+                title="Pipeline"
+                options={flowOptions}
+                selected={flowFilter}
+                onChange={setFlowFilter}
+              />
+            </div>
+
+            {hasFilters && (
+              <Button variant="ghost" size="sm" className="col-span-2 h-8 px-2 text-xs md:col-span-1 md:w-auto" onClick={resetFilters}>
+                <XIcon className="size-3.5" />
+                Restablecer
+              </Button>
+            )}
+          </div>
         </div>
 
-        <SingleSelectFilter
-          title="Estado"
-          options={STATUS_OPTIONS}
-          selected={activeFilterValue}
-          onChange={(v) =>
-            setQuery((q) => ({
-              ...q,
-              page: 1,
-              isActive: v === "true" ? true : v === "false" ? false : null,
-            }))
-          }
-        />
-
-        <SingleSelectFilter
-          title="Pipeline"
-          options={flowOptions}
-          selected={flowFilter}
-          onChange={setFlowFilter}
-        />
-
-        {hasFilters && (
-          <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={resetFilters}>
-            <XIcon className="size-3.5" />
-            Restablecer
-          </Button>
-        )}
-
-        <div className="ml-auto flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-2 md:ml-auto">
+          <span className="w-full text-xs text-muted-foreground md:w-auto">
             {loading ? "…" : `${total} formularios`}
           </span>
-          <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8" />}>
-              Columnas <ChevronDown className="ml-1.5 size-3.5" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {table
-                .getAllColumns()
-                .filter((col) => col.getCanHide())
-                .map((col) => (
-                  <DropdownMenuCheckboxItem
-                    key={col.id}
-                    className="capitalize"
-                    checked={col.getIsVisible()}
-                    onCheckedChange={(v) => col.toggleVisibility(!!v)}
-                  >
-                    {columnLabels[col.id] ?? col.id}
-                  </DropdownMenuCheckboxItem>
-                ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="[&_button]:w-full md:[&_button]:w-auto">
+            <DropdownMenu>
+              <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8" />}>
+                Columnas <ChevronDown className="ml-1.5 size-3.5" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {table
+                  .getAllColumns()
+                  .filter((col) => col.getCanHide())
+                  .map((col) => (
+                    <DropdownMenuCheckboxItem
+                      key={col.id}
+                      className="capitalize"
+                      checked={col.getIsVisible()}
+                      onCheckedChange={(v) => col.toggleVisibility(!!v)}
+                    >
+                      {columnLabels[col.id] ?? col.id}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </div>
 

@@ -151,7 +151,7 @@ export function CreateCampaignSheet({ open, onOpenChange, onSuccess, initialForm
         side="right"
         showCloseButton={false}
         style={{ maxWidth: 1400, padding: 0, gap: 0 }}
-        className="w-full"
+        className="w-full!"
       >
         {open && <CampaignWizard onClose={() => onOpenChange(false)} onSuccess={onSuccess} initialForm={initialForm} />}
       </SheetContent>

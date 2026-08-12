@@ -59,7 +59,7 @@ interface CampaignPreviewSheetProps {
 export function CampaignPreviewSheet({ campaignId, open, onOpenChange, onResend }: CampaignPreviewSheetProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" showCloseButton={false} style={{ maxWidth: 500, padding: 0, gap: 0 }} className="w-full">
+      <SheetContent side="right" showCloseButton={false} style={{ maxWidth: 500, padding: 0, gap: 0 }} className="w-full!">
         {open && campaignId != null && (
           <CampaignPreviewBody campaignId={campaignId} onClose={() => onOpenChange(false)} onResend={onResend} />
         )}

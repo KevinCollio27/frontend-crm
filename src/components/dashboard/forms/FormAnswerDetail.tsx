@@ -4,6 +4,7 @@ import * as React from "react"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import {
+  ArrowLeftIcon,
   BriefcaseIcon,
   BuildingIcon,
   CalendarIcon,
@@ -354,9 +355,13 @@ function getCustomFields(formId: number): Promise<PublicCustomField[]> {
 export function FormAnswerDetail({
   answer,
   onToggled,
+  onBack,
 }: {
   answer: FormAnswerRaw
   onToggled: (answerId: number, isActive: boolean) => void
+  // Solo se pasa en mobile — ahí Col 2 reemplaza a Col 1 en vez de convivir al
+  // lado, así que hace falta una forma de volver a la lista.
+  onBack?: () => void
 }) {
   const router = useRouter()
   const [customFields, setCustomFields] = React.useState<PublicCustomField[] | null>(null)
@@ -386,6 +391,16 @@ export function FormAnswerDetail({
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      {onBack && (
+        <button
+          type="button"
+          onClick={onBack}
+          className="flex shrink-0 items-center gap-1.5 border-b px-4 py-2.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ArrowLeftIcon className="size-3.5" />
+          Volver a respuestas
+        </button>
+      )}
       {/* Header */}
       <div className="flex shrink-0 items-start justify-between gap-3 border-b p-4">
         <div className="flex min-w-0 items-start gap-3">

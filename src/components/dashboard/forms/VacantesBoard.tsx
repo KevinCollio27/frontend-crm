@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { BriefcaseIcon, DownloadIcon, InboxIcon, Loader2Icon, SearchIcon, UsersIcon } from "lucide-react"
+import { ArrowLeftIcon, BriefcaseIcon, DownloadIcon, InboxIcon, Loader2Icon, SearchIcon, UsersIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getInitials } from "@/lib/table-utils"
 import { formService } from "@/services/form.service"
+import { useIsMobile } from "@/hooks/use-mobile"
 import { FormAnswerDetail } from "./FormAnswerDetail"
 import { VacantesExportSheet } from "./VacantesExportSheet"
 import { answerDisplayName, formatAnswerDate, formColor, truncateText } from "./FormAnswersBoard"
@@ -28,6 +29,11 @@ export function VacantesBoard({ viewToggle }: { viewToggle?: React.ReactNode } =
   const [selectedAnswerId, setSelectedAnswerId] = React.useState<number | null>(null)
 
   const [exportOpen, setExportOpen] = React.useState(false)
+
+  const isMobile = useIsMobile()
+  // 3 columnas no caben en un celular — en mobile se navega de a un nivel por
+  // vez: Vacantes → Postulantes → Detalle, con botón "Volver" en cada paso.
+  const [mobileStep, setMobileStep] = React.useState<"vacantes" | "postulantes" | "detalle">("vacantes")
 
   React.useEffect(() => {
     let cancelled = false
@@ -85,9 +91,11 @@ export function VacantesBoard({ viewToggle }: { viewToggle?: React.ReactNode } =
         {viewToggle}
       </div>
 
-      {/* Row 2 — filters */}
-      <div className="flex shrink-0 items-center gap-2 border-b px-4 py-2">
-        <div className="relative w-44 shrink-0">
+      {/* Row 2 — filters. Solo tiene sentido con la lista de vacantes visible —
+          en mobile se oculta en los pasos de Postulantes/Detalle. */}
+      {(!isMobile || mobileStep === "vacantes") && (
+      <div className="flex shrink-0 flex-col gap-2 border-b px-4 py-2 md:flex-row md:items-center">
+        <div className="relative w-full shrink-0 md:w-44">
           <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Buscar vacante..."
@@ -96,14 +104,17 @@ export function VacantesBoard({ viewToggle }: { viewToggle?: React.ReactNode } =
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <span className="shrink-0 text-xs text-muted-foreground">
-          {loading ? "…" : `${vacantes.length} vacante${vacantes.length === 1 ? "" : "s"}`}
-        </span>
-        <Button type="button" variant="outline" size="sm" className="ml-auto h-8 shrink-0" onClick={() => setExportOpen(true)} disabled={vacantes.length === 0}>
-          <DownloadIcon className="size-3.5" />
-          Exportar
-        </Button>
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-2 md:ml-auto">
+          <span className="w-full shrink-0 text-xs text-muted-foreground md:w-auto">
+            {loading ? "…" : `${vacantes.length} vacante${vacantes.length === 1 ? "" : "s"}`}
+          </span>
+          <Button type="button" variant="outline" size="sm" className="h-8 w-full shrink-0 md:w-auto" onClick={() => setExportOpen(true)} disabled={vacantes.length === 0}>
+            <DownloadIcon className="size-3.5" />
+            Exportar
+          </Button>
+        </div>
       </div>
+      )}
 
       {exportOpen && (
         <VacantesExportSheet
@@ -115,8 +126,11 @@ export function VacantesBoard({ viewToggle }: { viewToggle?: React.ReactNode } =
       )}
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
-        {/* Col 1 */}
-        <div className="flex w-72 shrink-0 flex-col overflow-hidden border-r">
+        {/* Col 1 — en mobile, pantalla completa y solo en el paso "vacantes" */}
+        <div className={cn(
+          "w-full shrink-0 flex-col overflow-hidden border-r md:flex md:w-72",
+          mobileStep === "vacantes" ? "flex" : "hidden md:flex"
+        )}>
           <div className="min-h-0 flex-1 overflow-y-auto scrollbar-hide [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {loading ? (
               <div className="flex justify-center py-10">
@@ -133,7 +147,7 @@ export function VacantesBoard({ viewToggle }: { viewToggle?: React.ReactNode } =
                   <button
                     key={vacante.id}
                     type="button"
-                    onClick={() => setSelectedVacanteId(vacante.id)}
+                    onClick={() => { setSelectedVacanteId(vacante.id); if (isMobile) setMobileStep("postulantes") }}
                     className={cn(
                       "flex w-full flex-col gap-1 rounded-lg border px-3 py-2.5 text-left transition-colors",
                       selectedVacanteId === vacante.id ? "bg-muted" : "hover:bg-muted/50"
@@ -161,8 +175,22 @@ export function VacantesBoard({ viewToggle }: { viewToggle?: React.ReactNode } =
           </div>
         </div>
 
-        {/* Col 2 — postulantes de la vacante seleccionada */}
-        <div className="flex w-96 shrink-0 flex-col overflow-hidden border-r">
+        {/* Col 2 — postulantes de la vacante seleccionada. En mobile, pantalla
+            completa y solo en el paso "postulantes". */}
+        <div className={cn(
+          "w-full shrink-0 flex-col overflow-hidden border-r md:flex md:w-96",
+          mobileStep === "postulantes" ? "flex" : "hidden md:flex"
+        )}>
+          {isMobile && (
+            <button
+              type="button"
+              onClick={() => setMobileStep("vacantes")}
+              className="flex shrink-0 items-center gap-1.5 border-b px-4 py-2.5 text-sm text-muted-foreground transition-colors hover:text-foreground md:hidden"
+            >
+              <ArrowLeftIcon className="size-3.5" />
+              Volver a vacantes
+            </button>
+          )}
           <div className="min-h-0 flex-1 overflow-y-auto scrollbar-hide [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {loadingPostulantes ? (
               <div className="flex justify-center py-10">
@@ -184,7 +212,7 @@ export function VacantesBoard({ viewToggle }: { viewToggle?: React.ReactNode } =
                     <button
                       key={answer.id}
                       type="button"
-                      onClick={() => setSelectedAnswerId(answer.id)}
+                      onClick={() => { setSelectedAnswerId(answer.id); if (isMobile) setMobileStep("detalle") }}
                       className={cn(
                         "flex w-full items-start gap-2.5 rounded-lg border px-3 py-2.5 text-left transition-colors",
                         isActive ? "bg-muted" : "hover:bg-muted/50"
@@ -226,10 +254,17 @@ export function VacantesBoard({ viewToggle }: { viewToggle?: React.ReactNode } =
           </div>
         </div>
 
-        {/* Col 3 — vista previa */}
-        <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
+        {/* Col 3 — vista previa. En mobile, pantalla completa y solo en el paso "detalle". */}
+        <div className={cn(
+          "min-h-0 flex-1 flex-col overflow-hidden md:flex",
+          mobileStep === "detalle" ? "flex" : "hidden md:flex"
+        )}>
           {selectedAnswer ? (
-            <FormAnswerDetail answer={selectedAnswer} onToggled={handleToggled} />
+            <FormAnswerDetail
+              answer={selectedAnswer}
+              onToggled={handleToggled}
+              onBack={isMobile ? () => setMobileStep("postulantes") : undefined}
+            />
           ) : (
             <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
               Selecciona un postulante para ver el detalle

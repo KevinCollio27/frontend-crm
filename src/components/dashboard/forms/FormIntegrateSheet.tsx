@@ -50,7 +50,7 @@ export function FormIntegrateSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" showCloseButton={false} style={{ maxWidth: 560, padding: 0, gap: 0 }} className="w-full">
+      <SheetContent side="right" showCloseButton={false} style={{ maxWidth: 560, padding: 0, gap: 0 }} className="w-full!">
         {/* Header */}
         <div className="flex items-start justify-between border-b p-5">
           <div className="space-y-0.5">
