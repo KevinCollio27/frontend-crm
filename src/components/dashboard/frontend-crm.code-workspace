@@ -11,6 +11,9 @@
 		},
 		{
 			"path": "../../../../goxt-website-principal"
+		},
+		{
+			"path": "../../../../SegIA-scanner"
 		}
 	]
 }

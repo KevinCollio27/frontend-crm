@@ -1,6 +1,7 @@
 import api from "@/lib/api"
-import type { EmbeddedSignupResult, MetaConfigRaw, MyWhatsAppNumberRaw } from "@/types/whatsapp"
+import type { EmbeddedSignupResult, MetaConfigRaw, MyWhatsAppNumberRaw, TemplateButtonPayload, WhatsappTemplateRaw } from "@/types/whatsapp"
 import type { WhatsAppConversationListParams, WhatsAppConversationRaw } from "@/types/whatsapp-conversation"
+import type { WhatsappCostAnalyticsRaw } from "@/types/whatsappCosts"
 
 export const whatsappService = {
   async getMetaConfig(): Promise<MetaConfigRaw | null> {
@@ -62,5 +63,61 @@ export const whatsappService = {
 
   async releaseConversation(id: number): Promise<void> {
     await api.patch(`whatsapp/conversations/${id}/release`, {})
+  },
+
+  async markConversationRead(id: number): Promise<void> {
+    await api.patch(`whatsapp/conversations/${id}/read`, {})
+  },
+
+  async getCachedTemplates(filters?: {
+    status?: string
+    language?: string
+    search?: string
+    limit?: number
+  }): Promise<{ templates: WhatsappTemplateRaw[]; total: number; lastSyncedAt: string | null }> {
+    const res = await api.get<never, { templates: WhatsappTemplateRaw[]; total: number; lastSyncedAt: string | null }>(
+      "whatsapp/templates/cached",
+      { params: filters },
+    )
+    return res
+  },
+
+  async syncTemplates(): Promise<{ syncedCount: number; countsByStatus: Record<string, number> }> {
+    return api.post("whatsapp/templates/sync")
+  },
+
+  async createTemplate(payload: {
+    name: string
+    language: string
+    category: string
+    bodyText: string
+    headerText?: string
+    headerImageUrl?: string
+    footerText?: string
+    buttons?: TemplateButtonPayload[]
+  }): Promise<WhatsappTemplateRaw> {
+    const res = await api.post<never, { template: WhatsappTemplateRaw }>("whatsapp/templates/create", payload)
+    return res.template
+  },
+
+  async uploadTemplateImage(fileName: string, base64File: string): Promise<{ url: string; key?: string }> {
+    const res = await api.post<never, { url: string }>("whatsapp/templates/upload-image", { fileName, base64File })
+    return { url: res.url }
+  },
+
+  async deleteTemplate(templateId: string): Promise<void> {
+    await api.delete(`whatsapp/templates/${templateId}`)
+  },
+
+  async sendTemplateMessage(to: string, templateName: string, languageCode: string, bodyVarValues?: string[]): Promise<void> {
+    await api.post("whatsapp/send-template", { to, templateName, languageCode, bodyVarValues })
+  },
+
+  async sendTemplateToConversation(conversationId: number, templateName: string, languageCode: string, bodyVarValues?: string[]): Promise<void> {
+    await api.post(`whatsapp/conversations/${conversationId}/send-template`, { templateName, languageCode, bodyVarValues })
+  },
+
+  async getCostAnalytics(params?: { from?: string; to?: string }): Promise<WhatsappCostAnalyticsRaw> {
+    return api.get<never, WhatsappCostAnalyticsRaw>("whatsapp/costs", { params })
   },
 }

@@ -13,6 +13,7 @@ import {
   LineChartIcon,
   PackageIcon,
   PlugIcon,
+  ReceiptIcon,
   ScrollTextIcon,
   TagIcon,
   UserIcon,
@@ -49,6 +50,7 @@ export const navGroups: NavGroup[] = [
       { label: "Perfil", href: "/settings/profile", icon: UserIcon },
       { label: "Workspace", href: "/settings/workspace", icon: Building2Icon },
       { label: "Billing", href: "/settings/billing", icon: CreditCardIcon },
+      { label: "Costos", href: "/settings/costs", icon: ReceiptIcon },
     ],
   },
   {

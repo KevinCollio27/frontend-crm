@@ -21,9 +21,19 @@ interface ImageUploadProps {
   value: string
   onChange: (url: string, key?: string) => void
   className?: string
+  uploadFn?: (fileName: string, base64File: string) => Promise<{ url: string; key?: string }>
+  accept?: string
+  allowedMimeTypes?: string[]
 }
 
-export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
+export function ImageUpload({
+  value,
+  onChange,
+  className,
+  uploadFn = formService.uploadImage,
+  accept = "image/*",
+  allowedMimeTypes,
+}: ImageUploadProps) {
   const [mode, setMode] = React.useState<"upload" | "url">(
     value && !value.startsWith("http") ? "upload" : value ? "url" : "upload"
   )
@@ -42,6 +52,10 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
       notify.error({ title: "Solo se permiten imágenes", description: "Sube un archivo PNG, JPG o WEBP." })
       return
     }
+    if (allowedMimeTypes && !allowedMimeTypes.includes(file.type)) {
+      notify.error({ title: "Formato no admitido", description: "Sube una imagen en formato JPG o PNG." })
+      return
+    }
     if (blobRef.current) URL.revokeObjectURL(blobRef.current)
     const blob = URL.createObjectURL(file)
     blobRef.current = blob
@@ -49,7 +63,7 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
     setUploading(true)
     try {
       const base64 = await fileToBase64(file)
-      const { url, key } = await formService.uploadImage(file.name, base64)
+      const { url, key } = await uploadFn(file.name, base64)
       onChange(url, key)
     } catch {
       notify.error({ title: "No se pudo subir la imagen", description: "Intenta de nuevo o usa una URL." })
@@ -143,7 +157,7 @@ export function ImageUpload({ value, onChange, className }: ImageUploadProps) {
           <input
             ref={inputRef}
             type="file"
-            accept="image/*"
+            accept={accept}
             className="hidden"
             onChange={(e) => {
               const f = e.target.files?.[0]

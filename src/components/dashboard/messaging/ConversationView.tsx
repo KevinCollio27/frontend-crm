@@ -4,6 +4,7 @@ import * as React from "react"
 import {
   ArrowLeftIcon,
   HandIcon,
+  LayoutTemplateIcon,
   Loader2Icon,
   MessageSquareTextIcon,
   MessagesSquareIcon,
@@ -27,6 +28,9 @@ import { instagramService } from "@/services/instagram.service"
 import { facebookService } from "@/services/facebook.service"
 import { type Conversation, type ConversationMessage } from "./data"
 import { ContactSheet } from "./ContactSheet"
+import { SendTemplateToConversationSheet } from "./SendTemplateToConversationSheet"
+import type { WhatsappTemplateRaw } from "@/types/whatsapp"
+import { WhatsAppTemplatePreview, parseTemplateForPreview } from "@/components/settings/whatsapp-templates/WhatsAppTemplatePreview"
 
 // Servicio a usar para enviar/tomar-control según el canal — WhatsApp, Instagram y Facebook
 // comparten el mismo contrato (sendMessageToConversation/takeoverConversation/releaseConversation).
@@ -132,6 +136,35 @@ function OutgoingBubble({
   )
 }
 
+function TemplateOutgoingBubble({
+  templateName,
+  preview,
+  time,
+}: {
+  templateName: string
+  preview: React.ComponentProps<typeof WhatsAppTemplatePreview>
+  time: string
+}) {
+  return (
+    <div className="flex flex-col items-end gap-0.5">
+      <div className="flex items-end justify-end gap-2">
+        <div className="max-w-[80%]">
+          <p className="mb-1 flex items-center justify-end gap-1 text-[10px] font-medium text-muted-foreground">
+            <LayoutTemplateIcon className="size-3" />
+            Plantilla · <span className="font-mono">{templateName}</span>
+          </p>
+          <WhatsAppTemplatePreview {...preview} />
+        </div>
+        <img src="/images/avatar-contact.svg" alt="Agente" className="size-6 shrink-0 rounded-full" />
+      </div>
+      <div className="mr-8 flex items-center justify-end gap-1 text-[10px] text-muted-foreground">
+        {time}
+        <span className="text-blue-500">✓✓</span>
+      </div>
+    </div>
+  )
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 interface ConversationViewProps {
@@ -139,11 +172,13 @@ interface ConversationViewProps {
   loadingMessages?: boolean
   onConversationChange?: (updated: Conversation) => void
   onBack?: () => void
+  templateIndex?: Map<string, WhatsappTemplateRaw>
 }
 
-export function ConversationView({ conversation, loadingMessages = false, onConversationChange, onBack }: ConversationViewProps) {
+export function ConversationView({ conversation, loadingMessages = false, onConversationChange, onBack, templateIndex }: ConversationViewProps) {
   const [message, setMessage]       = React.useState("")
   const [contactOpen, setContactOpen] = React.useState(false)
+  const [templateSheetOpen, setTemplateSheetOpen] = React.useState(false)
   const [sending, setSending]       = React.useState(false)
   const [takeoverLoading, setTakeoverLoading] = React.useState(false)
   const messagesEndRef               = React.useRef<HTMLDivElement>(null)
@@ -383,6 +418,24 @@ export function ConversationView({ conversation, loadingMessages = false, onConv
               />
             )
           }
+          if (msg.role === "agent" && msg.template) {
+            const tpl = templateIndex?.get(`${msg.template.name}__${msg.template.language}`)
+            if (tpl) {
+              const parsed = parseTemplateForPreview(tpl)
+              const vars = msg.template.vars
+              return (
+                <TemplateOutgoingBubble
+                  key={msg.id}
+                  templateName={msg.template.name}
+                  time={msg.createdAt}
+                  preview={{
+                    ...parsed,
+                    bodyText: parsed.bodyText.replace(/\{\{(\d+)\}\}/g, (_, n) => vars[parseInt(n) - 1] || `{{${n}}}`),
+                  }}
+                />
+              )
+            }
+          }
           if (msg.role === "agent") {
             return (
               <OutgoingBubble
@@ -442,7 +495,9 @@ export function ConversationView({ conversation, loadingMessages = false, onConv
               sending
                 ? "Enviando..."
                 : windowClosed
-                ? "Ventana de 24h cerrada — solo puedes reabrir con un template"
+                ? isWsp
+                  ? "Ventana de 24h cerrada — reabre con una plantilla"
+                  : "Ventana de 24h cerrada — espera a que el contacto vuelva a escribir"
                 : `Escribe un mensaje por ${channelLabel}...`
             }
             rows={2}
@@ -453,9 +508,21 @@ export function ConversationView({ conversation, loadingMessages = false, onConv
         {/* Footer tools */}
         <div className="flex items-center justify-between px-4 pb-3">
           <div className="flex items-center gap-0.5">
-            <Button variant="ghost" size="icon" className="size-7 text-muted-foreground">
-              <PlusIcon className="size-3.5" />
-            </Button>
+            {isWsp ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7 text-muted-foreground hover:text-[#25D366]"
+                title="Enviar plantilla"
+                onClick={() => setTemplateSheetOpen(true)}
+              >
+                <LayoutTemplateIcon className="size-3.5" />
+              </Button>
+            ) : (
+              <Button variant="ghost" size="icon" className="size-7 text-muted-foreground">
+                <PlusIcon className="size-3.5" />
+              </Button>
+            )}
             <Button variant="ghost" size="icon" className="size-7 text-muted-foreground">
               <SmileIcon className="size-3.5" />
             </Button>
@@ -490,6 +557,30 @@ export function ConversationView({ conversation, loadingMessages = false, onConv
           </Button>
         </div>
       </div>
+
+      {isWsp && (
+        <SendTemplateToConversationSheet
+          open={templateSheetOpen}
+          onOpenChange={setTemplateSheetOpen}
+          conversationId={Number(conversation.id)}
+          templates={templateIndex ? Array.from(templateIndex.values()) : []}
+          onSent={(content, template) => {
+            const sentMessage: ConversationMessage = {
+              id: `local-${Date.now()}`,
+              role: "agent",
+              content,
+              createdAt: "ahora",
+              template,
+            }
+            onConversationChange?.({
+              ...conversation,
+              messages: [...conversation.messages, sentMessage],
+              lastMessage: content,
+              windowOpen: true,
+            })
+          }}
+        />
+      )}
 
       <ContactSheet
         open={contactOpen}

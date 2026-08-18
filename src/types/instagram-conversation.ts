@@ -20,6 +20,7 @@ export interface InstagramConversationRaw {
   visitor_name: string | null
   visitor_username: string | null
   visitor_avatar_url: string | null
+  unread_count: number
 }
 
 export interface InstagramConversationListParams {

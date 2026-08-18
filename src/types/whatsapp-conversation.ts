@@ -25,6 +25,7 @@ export interface WhatsAppConversationRaw {
   created_at: string
   updated_at: string
   visitor_name: string | null
+  unread_count: number
 }
 
 export interface WhatsAppConversationListParams {

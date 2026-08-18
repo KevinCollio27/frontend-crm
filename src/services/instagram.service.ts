@@ -54,4 +54,8 @@ export const instagramService = {
   async releaseConversation(id: number): Promise<void> {
     await api.patch(`instagram/conversations/${id}/release`, {})
   },
+
+  async markConversationRead(id: number): Promise<void> {
+    await api.patch(`instagram/conversations/${id}/read`, {})
+  },
 }

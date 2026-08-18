@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { formatDistanceToNow } from "date-fns"
 import { es } from "date-fns/locale"
 import { InboxIcon, MessagesSquareIcon, MessageSquareTextIcon } from "lucide-react"
@@ -21,6 +22,7 @@ import { facebookService } from "@/services/facebook.service"
 import type { WidgetConversationRaw, WidgetMessageRaw } from "@/types/widget-conversation"
 import type { WidgetAIRaw } from "@/types/widget-ai"
 import type { WhatsAppConversationMessageRaw, WhatsAppConversationRaw } from "@/types/whatsapp-conversation"
+import type { WhatsappTemplateRaw } from "@/types/whatsapp"
 import type { InstagramConversationMessageRaw, InstagramConversationRaw } from "@/types/instagram-conversation"
 import type { FacebookConversationMessageRaw, FacebookConversationRaw } from "@/types/facebook-conversation"
 import { useSidebar } from "@/components/ui/sidebar"
@@ -80,20 +82,30 @@ function mapWhatsAppMessages(raws: WhatsAppConversationMessageRaw[]): Conversati
     role: m.role === "assistant" ? assistantMessageRole(m.author) : ("user" as const),
     content: m.content,
     createdAt: formatDistanceToNow(new Date(m.created_at), { addSuffix: true, locale: es }),
+    template: m.template,
   }))
+}
+
+// `updated_at` de la conversación se pisa con cualquier escritura a la fila (ej. el
+// refresh de avatar de IG/FB en cada vista de la bandeja), no solo con mensajes nuevos —
+// para "hace X" y para ordenar la lista, lo que importa es el último mensaje real.
+function lastActivityAt(updatedAt: string, lastMessageCreatedAt?: string): string {
+  return lastMessageCreatedAt ?? updatedAt
 }
 
 function mapWhatsAppConversation(raw: WhatsAppConversationRaw): Conversation {
   const lastMessage = raw.messages[raw.messages.length - 1]
+  const lastActivity = lastActivityAt(raw.updated_at, lastMessage?.created_at)
   return {
     id: String(raw.id),
     channel: "whatsapp",
     status: "open",
-    isRead: false,
+    isRead: (raw.unread_count ?? 0) === 0,
+    unreadCount: raw.unread_count ?? 0,
     isAiActive: raw.status !== "human_takeover",
-    lastMessageAt: formatDistanceToNow(new Date(raw.updated_at), { addSuffix: true, locale: es }),
-    lastMessageAtRaw: raw.updated_at,
-    dateGroup: getDateGroup(raw.updated_at),
+    lastMessageAt: formatDistanceToNow(new Date(lastActivity), { addSuffix: true, locale: es }),
+    lastMessageAtRaw: lastActivity,
+    dateGroup: getDateGroup(lastActivity),
     visitorName: raw.visitor_name,
     visitorPhone: raw.from_number,
     visitorInitials: raw.visitor_name ? getNameInitials(raw.visitor_name) : getPhoneInitials(raw.from_number),
@@ -120,15 +132,17 @@ function getNameInitials(name: string): string {
 
 function mapInstagramConversation(raw: InstagramConversationRaw): Conversation {
   const lastMessage = raw.messages[raw.messages.length - 1]
+  const lastActivity = lastActivityAt(raw.updated_at, lastMessage?.created_at)
   return {
     id: String(raw.id),
     channel: "instagram",
     status: "open",
-    isRead: false,
+    isRead: (raw.unread_count ?? 0) === 0,
+    unreadCount: raw.unread_count ?? 0,
     isAiActive: raw.status !== "human_takeover",
-    lastMessageAt: formatDistanceToNow(new Date(raw.updated_at), { addSuffix: true, locale: es }),
-    lastMessageAtRaw: raw.updated_at,
-    dateGroup: getDateGroup(raw.updated_at),
+    lastMessageAt: formatDistanceToNow(new Date(lastActivity), { addSuffix: true, locale: es }),
+    lastMessageAtRaw: lastActivity,
+    dateGroup: getDateGroup(lastActivity),
     visitorName: raw.visitor_name,
     visitorUsername: raw.visitor_username ?? undefined,
     visitorAvatarUrl: raw.visitor_avatar_url ?? undefined,
@@ -150,15 +164,17 @@ function mapFacebookMessages(raws: FacebookConversationMessageRaw[]): Conversati
 
 function mapFacebookConversation(raw: FacebookConversationRaw): Conversation {
   const lastMessage = raw.messages[raw.messages.length - 1]
+  const lastActivity = lastActivityAt(raw.updated_at, lastMessage?.created_at)
   return {
     id: String(raw.id),
     channel: "facebook",
     status: "open",
-    isRead: false,
+    isRead: (raw.unread_count ?? 0) === 0,
+    unreadCount: raw.unread_count ?? 0,
     isAiActive: raw.status !== "human_takeover",
-    lastMessageAt: formatDistanceToNow(new Date(raw.updated_at), { addSuffix: true, locale: es }),
-    lastMessageAtRaw: raw.updated_at,
-    dateGroup: getDateGroup(raw.updated_at),
+    lastMessageAt: formatDistanceToNow(new Date(lastActivity), { addSuffix: true, locale: es }),
+    lastMessageAtRaw: lastActivity,
+    dateGroup: getDateGroup(lastActivity),
     visitorName: raw.visitor_name,
     visitorAvatarUrl: raw.visitor_avatar_url ?? undefined,
     visitorInitials: raw.visitor_name ? getNameInitials(raw.visitor_name) : "FB",
@@ -174,6 +190,7 @@ function mapWidgetConversation(raw: WidgetConversationRaw, widget: WidgetAIRaw):
     channel: "widget",
     status: "open",
     isRead: false,
+    unreadCount: 0,
     isAiActive: true,
     lastMessageAt: formatDistanceToNow(new Date(raw.last_message_at), { addSuffix: true, locale: es }),
     lastMessageAtRaw: raw.last_message_at,
@@ -211,6 +228,8 @@ function mergeAndSort(items: Conversation[]): Conversation[] {
 
 export default function MessagingPage() {
   const { setOpen } = useSidebar()
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const workspaceId = useSessionStore((s) => s.workspaceId)
   const [activeView, setActiveView] = React.useState<MessagingView>("my_inbox")
   const [selectedId, setSelectedId] = React.useState<string | null>(null)
@@ -223,6 +242,18 @@ export default function MessagingPage() {
   const [hasMoreFacebook, setHasMoreFacebook] = React.useState(false)
   const [selectedConversation, setSelectedConversation] = React.useState<Conversation | undefined>(undefined)
   const [loadingMessages, setLoadingMessages] = React.useState(false)
+  // Índice de plantillas WhatsApp (nombre__idioma -> template completo) — para poder
+  // renderizar el header/body/footer/botones reales cuando un mensaje saliente fue una
+  // plantilla, en vez de mostrar el "[Template: nombre]" crudo que se guarda como content.
+  const [templateIndex, setTemplateIndex] = React.useState<Map<string, WhatsappTemplateRaw>>(new Map())
+
+  React.useEffect(() => {
+    whatsappService.getCachedTemplates({ limit: 200 })
+      .then((res) => {
+        setTemplateIndex(new Map(res.templates.map((t) => [`${t.name}__${t.language}`, t])))
+      })
+      .catch(() => {})
+  }, [])
 
   const isMobile = useIsMobile()
   // Lista ⇄ Chat en mobile — arranca en la lista (no en un paso de "elegir canal"),
@@ -374,12 +405,29 @@ export default function MessagingPage() {
     setLoading(true)
 
     loadConversations()
-      .then((merged) => { if (!cancelled) setConversations(merged) })
+      .then((merged) => {
+        if (cancelled) return
+        setConversations(merged)
+
+        // Deep-link desde la campanita (?channel=whatsapp&id=123[&widgetId=5]) —
+        // selecciona la conversación indicada y limpia la URL para no reabrirla en
+        // cada refresh de la página.
+        const channel = searchParams.get("channel")
+        const id = searchParams.get("id")
+        const widgetId = searchParams.get("widgetId")
+        if (channel && id) {
+          const key = widgetId ? `${widgetId}-${id}` : `${channel}-${id}`
+          if (merged.some((c) => conversationKey(c) === key)) {
+            setSelectedId(key)
+          }
+          router.replace("/crm/messaging")
+        }
+      })
       .catch(() => { /* keep empty on error */ })
       .finally(() => { if (!cancelled) setLoading(false) })
 
     return () => { cancelled = true }
-  }, [workspaceId, loadConversations])
+  }, [workspaceId, loadConversations]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const [refreshing, setRefreshing] = React.useState(false)
   function handleRefresh() {
@@ -529,6 +577,27 @@ export default function MessagingPage() {
     }
   }, [activeView, selectedId, conversations])
 
+  // Marca como leída la conversación abierta — al seleccionarla, y también si le llega
+  // un mensaje nuevo mientras sigue abierta (el operador ya la está viendo). El guard de
+  // unreadCount === 0 evita loops: tras la primera llamada, el estado local ya queda en
+  // 0 y este efecto deja de reintentar hasta que llegue un mensaje nuevo de verdad.
+  React.useEffect(() => {
+    if (!selectedId) return
+    const conv = conversations.find((c) => conversationKey(c) === selectedId)
+    if (!conv || conv.unreadCount === 0) return
+
+    const service = conv.channel === "whatsapp" ? whatsappService
+      : conv.channel === "instagram" ? instagramService
+      : conv.channel === "facebook" ? facebookService
+      : null
+    if (!service) return
+
+    service.markConversationRead(Number(conv.id)).catch(() => {})
+    setConversations((prev) => prev.map((c) =>
+      conversationKey(c) === selectedId ? { ...c, unreadCount: 0, isRead: true } : c
+    ))
+  }, [selectedId, conversations])
+
   // Lazy-load messages when a widget conversation is selected — WhatsApp ya trae sus
   // mensajes completos desde el fetch inicial (mapWhatsAppConversation), así que este
   // efecto no aplica a esas conversaciones (conv.widgetId queda undefined para WhatsApp).
@@ -650,6 +719,7 @@ export default function MessagingPage() {
           <ConversationView
             conversation={selectedConversation}
             loadingMessages={loadingMessages}
+            templateIndex={templateIndex}
             onBack={isMobile ? () => setMobileShowChat(false) : undefined}
             onConversationChange={(updated) =>
               setConversations((prev) => prev.map((c) => (conversationKey(c) === conversationKey(updated) ? updated : c)))

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ChannelBadge } from "./ChannelBadge"
+import { ChannelBadge, CHANNEL_COLORS } from "./ChannelBadge"
 import {
   type Conversation,
   type MessagingView,
@@ -15,11 +15,6 @@ import {
 } from "./data"
 
 type FilterTab = "all" | "unread"
-
-// El backend todavía no tiene un campo real de "leído/no leído" — el toggle se
-// muestra (misma armonía visual que correo) pero "No leídos" queda deshabilitado
-// hasta que exista tracking real, en vez de filtrar con datos poco confiables.
-const SHOW_READ_FILTER = false
 
 interface ConversationListProps {
   activeView: MessagingView
@@ -95,9 +90,7 @@ export function ConversationList({
         <Tabs value={tab} onValueChange={(v) => setTab(v as FilterTab)}>
           <TabsList>
             <TabsTrigger value="all">Todos</TabsTrigger>
-            <TabsTrigger value="unread" disabled={!SHOW_READ_FILTER} title="Próximamente">
-              No leídos
-            </TabsTrigger>
+            <TabsTrigger value="unread">No leídos</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
@@ -164,7 +157,7 @@ export function ConversationList({
                     <div className="flex items-center justify-between gap-1 mb-0.5">
                       <span className={cn(
                         "truncate text-sm text-foreground",
-                        SHOW_READ_FILTER && !conv.isRead ? "font-semibold" : "font-medium"
+                        !conv.isRead ? "font-semibold" : "font-medium"
                       )}>
                         {conv.visitorName ?? "Visitante"}
                       </span>
@@ -190,16 +183,21 @@ export function ConversationList({
                       </div>
                     )}
 
-                    {/* Línea 3: último mensaje — hace de "contenido", chico y gris */}
-                    <p className="truncate text-xs text-muted-foreground">
-                      {conv.lastMessage}
-                    </p>
+                    {/* Línea 3: último mensaje + contador de no leídos, estilo WhatsApp */}
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="truncate text-xs text-muted-foreground">
+                        {conv.lastMessage}
+                      </p>
+                      {conv.unreadCount > 0 && (
+                        <span
+                          className="flex size-4.5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-white"
+                          style={{ backgroundColor: CHANNEL_COLORS[conv.channel] }}
+                        >
+                          {conv.unreadCount > 9 ? "9+" : conv.unreadCount}
+                        </span>
+                      )}
+                    </div>
                   </div>
-
-                  {/* Unread dot */}
-                  {SHOW_READ_FILTER && !conv.isRead && (
-                    <span className="absolute right-2.5 top-3.5 size-2 rounded-full bg-blue-500" />
-                  )}
                 </button>
               )
             })}

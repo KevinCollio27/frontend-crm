@@ -279,6 +279,21 @@ export const pdfTemplateConfirm = {
     }),
 };
 
+// Helpers específicos para CRUD de plantillas WhatsApp
+export const whatsappTemplateConfirm = {
+  delete: (name?: string) =>
+    confirmDialog({
+      title: "¿Seguro de que quieres eliminar este template?",
+      description: [
+        name ? `Vas a eliminar "${name}" de Meta y del cache local.` : "Esta acción es irreversible.",
+        "El nombre quedará bloqueado por 30 días antes de poder reutilizarlo.",
+      ].filter(Boolean).join(" "),
+      confirmText: "Sí, eliminar",
+      cancelText: "Cancelar",
+      tone: "danger",
+    }),
+};
+
 const toneConfig: Record<Tone, { icon: LucideIcon; iconWrap: string; confirmBtn: string }> = {
   danger: {
     icon: AlertTriangle,

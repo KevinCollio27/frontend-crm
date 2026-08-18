@@ -37,4 +37,8 @@ export const facebookService = {
   async releaseConversation(id: number): Promise<void> {
     await api.patch(`facebook/conversations/${id}/release`, {})
   },
+
+  async markConversationRead(id: number): Promise<void> {
+    await api.patch(`facebook/conversations/${id}/read`, {})
+  },
 }

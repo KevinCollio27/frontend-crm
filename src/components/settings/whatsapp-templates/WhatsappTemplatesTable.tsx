@@ -11,12 +11,11 @@ import {
   useReactTable,
   type VisibilityState,
 } from "@tanstack/react-table"
-import { EyeIcon, MoreHorizontalIcon, PencilIcon, PlusIcon, SearchIcon, Settings2Icon, StarIcon, StarOffIcon, Trash2Icon } from "lucide-react"
+import { CopyIcon, EyeIcon, MoreHorizontalIcon, PlusIcon, RefreshCwIcon, SearchIcon, SendIcon, Settings2Icon, Trash2Icon } from "lucide-react"
 import { getSortIcon } from "@/lib/table-utils"
-import { EntityAccentBar } from "@/components/ui/entity-accent-bar"
 import { useIsWorkspaceAdmin } from "@/hooks/useIsWorkspaceAdmin"
 import { useIsMobile } from "@/hooks/use-mobile"
-import { pdfTemplateConfirm } from "@/lib/confirm"
+import { whatsappTemplateConfirm } from "@/lib/confirm"
 import { notify } from "@/lib/notify"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -40,85 +39,81 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { pdfTemplateService } from "@/services/pdfTemplate.service"
-import type { PdfTemplate } from "@/types/pdfTemplate"
-import { CreatePdfTemplateSheet } from "./CreatePdfTemplateSheet"
-import { PdfTemplatePreviewSheet } from "./PdfTemplatePreviewSheet"
+import { whatsappService } from "@/services/whatsapp.service"
+import type { WhatsappTemplateRaw } from "@/types/whatsapp"
+import { CreateWhatsappTemplateSheet, type TemplatePrefill } from "./CreateWhatsappTemplateSheet"
+import { PreviewWhatsappTemplateSheet } from "./PreviewWhatsappTemplateSheet"
+import { SendWhatsappTemplateSheet } from "./SendWhatsappTemplateSheet"
+import { parseTemplateForPreview } from "./WhatsAppTemplatePreview"
 
 // ─── Entity ───────────────────────────────────────────────────────────────────
 
 interface Row {
-  id:        number
-  name:      string
-  isDefault: boolean
-  before:    number
-  after:     number
-  createdAt: string
-  raw:       PdfTemplate
+  name:     string
+  language: string
+  category: string
+  status:   string
+  bodyText: string
+  raw:      WhatsappTemplateRaw
 }
 
-function mapTemplate(t: PdfTemplate): Row {
-  const blocks = t.blocks ?? []
+function bodyTextOf(t: WhatsappTemplateRaw): string {
+  if (t.body_text) return t.body_text
+  return t.components?.find((c) => c.type === "BODY")?.text ?? ""
+}
+
+function mapTemplate(t: WhatsappTemplateRaw): Row {
   return {
-    id:        t.id,
-    name:      t.name,
-    isDefault: t.is_default,
-    before:    blocks.filter((b) => b.position === "before").length,
-    after:     blocks.filter((b) => b.position === "after").length,
-    createdAt: new Date(t.created_at).toLocaleDateString("es-CL", {
-      day: "numeric", month: "short", year: "numeric",
-    }),
-    raw: t,
+    name:     t.name,
+    language: t.language,
+    category: t.category ?? "—",
+    status:   t.status,
+    bodyText: bodyTextOf(t),
+    raw:      t,
   }
 }
 
 const COLUMN_LABELS: Record<string, string> = {
-  id:        "ID",
-  name:      "Nombre",
-  isDefault: "Predeterminada",
-  blocks:    "Bloques",
-  createdAt: "Creada",
+  name:     "Nombre",
+  language: "Idioma",
+  category: "Categoría",
+  status:   "Estado",
+  bodyText: "Mensaje",
 }
 
 const MOBILE_COLUMN_VISIBILITY: VisibilityState = {
-  id:        false,
-  isDefault: false,
-  blocks:    false,
-  createdAt: false,
+  language: false,
+  category: false,
+  bodyText: false,
+}
+
+const STATUS_BADGE: Record<string, string> = {
+  APPROVED: "bg-green-600",
+  PENDING:  "bg-amber-500",
+  REJECTED: "bg-red-500",
 }
 
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
 
 const skeletonCell: Record<string, React.ReactNode> = {
-  id:        <div className="h-3 w-8 animate-pulse rounded bg-muted" />,
-  name:      <div className="h-4 w-40 animate-pulse rounded bg-muted" />,
-  isDefault: <div className="h-5 w-24 animate-pulse rounded-full bg-muted" />,
-  blocks:    <div className="h-4 w-24 animate-pulse rounded bg-muted" />,
-  createdAt: <div className="h-4 w-20 animate-pulse rounded bg-muted" />,
-  actions:   <div className="ml-auto size-8 animate-pulse rounded bg-muted" />,
+  name:     <div className="h-4 w-40 animate-pulse rounded bg-muted" />,
+  language: <div className="h-5 w-12 animate-pulse rounded-full bg-muted" />,
+  category: <div className="h-5 w-20 animate-pulse rounded-full bg-muted" />,
+  status:   <div className="h-5 w-20 animate-pulse rounded-full bg-muted" />,
+  bodyText: <div className="h-4 w-48 animate-pulse rounded bg-muted" />,
+  actions:  <div className="ml-auto size-8 animate-pulse rounded bg-muted" />,
 }
 
 // ─── Columns ──────────────────────────────────────────────────────────────────
 
 function getColumns(
-  onPreview:    (row: Row) => void,
-  onEdit:       (row: Row) => void,
-  onSetDefault: (row: Row) => void,
-  onDelete:     (row: Row) => void,
-  isAdmin:      boolean,
+  onPreview:   (row: Row) => void,
+  onSend:      (row: Row) => void,
+  onDuplicate: (row: Row) => void,
+  onDelete:    (row: Row) => void,
+  isAdmin:     boolean,
 ): ColumnDef<Row>[] {
   return [
-    {
-      accessorKey: "id",
-      header: ({ column }) => (
-        <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
-          ID {getSortIcon(column.getIsSorted())}
-        </Button>
-      ),
-      cell: ({ row }) => (
-        <span className="text-xs text-muted-foreground tabular-nums">{row.getValue("id")}</span>
-      ),
-    },
     {
       accessorKey: "name",
       header: ({ column }) => (
@@ -126,43 +121,32 @@ function getColumns(
           Nombre {getSortIcon(column.getIsSorted())}
         </Button>
       ),
-      cell: ({ row }) => (
-        <div className="flex items-stretch gap-2.5">
-          <EntityAccentBar seed={row.original.id} />
-          <span className="text-sm font-medium self-center">{row.getValue("name")}</span>
-        </div>
-      ),
+      cell: ({ row }) => <span className="font-mono text-sm">{row.getValue("name")}</span>,
     },
     {
-      accessorKey: "isDefault",
-      header: "Predeterminada",
-      cell: ({ row }) =>
-        row.getValue("isDefault") ? (
-          <Badge variant="secondary" className="gap-1">
-            <StarIcon className="size-3 fill-current" /> Predeterminada
-          </Badge>
-        ) : (
-          <span className="text-sm text-muted-foreground">—</span>
-        ),
+      accessorKey: "language",
+      header: "Idioma",
+      cell: ({ row }) => <Badge variant="secondary" className="text-xs">{row.getValue("language")}</Badge>,
     },
     {
-      id: "blocks",
-      header: "Bloques",
-      cell: ({ row }) => (
-        <span className="text-sm text-muted-foreground">
-          {row.original.before} antes · {row.original.after} después
-        </span>
-      ),
+      accessorKey: "category",
+      header: "Categoría",
+      cell: ({ row }) => <Badge variant="outline" className="text-xs">{row.getValue("category")}</Badge>,
     },
     {
-      accessorKey: "createdAt",
-      header: ({ column }) => (
-        <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
-          Creada {getSortIcon(column.getIsSorted())}
-        </Button>
-      ),
+      accessorKey: "status",
+      header: "Estado",
+      cell: ({ row }) => {
+        const status = row.getValue("status") as string
+        return <Badge className={`text-xs ${STATUS_BADGE[status] ?? "bg-slate-400"}`}>{status}</Badge>
+      },
+    },
+    {
+      accessorKey: "bodyText",
+      header: "Mensaje",
+      enableSorting: false,
       cell: ({ row }) => (
-        <span className="text-sm text-muted-foreground">{row.getValue("createdAt")}</span>
+        <span className="block max-w-xs truncate text-xs text-muted-foreground">{row.getValue("bodyText")}</span>
       ),
     },
     {
@@ -184,16 +168,14 @@ function getColumns(
                     <EyeIcon />
                     Vista previa
                   </DropdownMenuItem>
+                  <DropdownMenuItem disabled={template.status !== "APPROVED"} onClick={() => onSend(template)}>
+                    <SendIcon />
+                    Enviar mensaje
+                  </DropdownMenuItem>
                   {isAdmin && (
-                    <DropdownMenuItem onClick={() => onEdit(template)}>
-                      <PencilIcon />
-                      Editar plantilla
-                    </DropdownMenuItem>
-                  )}
-                  {isAdmin && !template.isDefault && (
-                    <DropdownMenuItem onClick={() => onSetDefault(template)}>
-                      <StarOffIcon />
-                      Marcar como predeterminada
+                    <DropdownMenuItem onClick={() => onDuplicate(template)}>
+                      <CopyIcon />
+                      Duplicar
                     </DropdownMenuItem>
                   )}
                 </DropdownMenuGroup>
@@ -202,7 +184,7 @@ function getColumns(
                     <DropdownMenuSeparator />
                     <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => onDelete(template)}>
                       <Trash2Icon />
-                      Eliminar plantilla
+                      Eliminar template
                     </DropdownMenuItem>
                   </>
                 )}
@@ -217,17 +199,19 @@ function getColumns(
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function PdfTemplatesTable() {
+export function WhatsappTemplatesTable() {
   const isAdmin = useIsWorkspaceAdmin()
   const [data, setData]       = React.useState<Row[]>([])
   const [loading, setLoading] = React.useState(true)
+  const [syncing, setSyncing] = React.useState(false)
   const [filter, setFilter]   = React.useState("")
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
   const [refreshKey, setRefreshKey] = React.useState(0)
   const [createOpen, setCreateOpen] = React.useState(false)
-  const [editingTemplate, setEditingTemplate] = React.useState<PdfTemplate | undefined>(undefined)
-  const [previewTemplate, setPreviewTemplate] = React.useState<PdfTemplate | null>(null)
+  const [duplicatePrefill, setDuplicatePrefill] = React.useState<TemplatePrefill | null>(null)
+  const [sendTarget, setSendTarget] = React.useState<WhatsappTemplateRaw | null>(null)
+  const [previewTarget, setPreviewTarget] = React.useState<WhatsappTemplateRaw | null>(null)
 
   const isMobile = useIsMobile()
   React.useEffect(() => {
@@ -237,45 +221,61 @@ export function PdfTemplatesTable() {
   React.useEffect(() => {
     let cancelled = false
     setLoading(true)
-    pdfTemplateService.getAll()
-      .then((res) => { if (!cancelled) setData(res.map(mapTemplate)) })
+    whatsappService.getCachedTemplates({ limit: 200 })
+      .then((res) => { if (!cancelled) setData(res.templates.map(mapTemplate)) })
       .catch(() => { if (!cancelled) setData([]) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [refreshKey])
 
-  async function handleSetDefault(row: Row) {
-    const previous = data
-    setData((prev) => prev.map((r) => ({ ...r, isDefault: r.id === row.id })))
+  async function handleSync() {
+    setSyncing(true)
     try {
-      await pdfTemplateService.setDefault(row.id)
-      notify.success({ title: "Plantilla predeterminada", description: `"${row.name}" es ahora la plantilla por defecto.` })
+      const res = await whatsappService.syncTemplates()
+      notify.success({ title: "Templates sincronizados", description: `${res.syncedCount ?? 0} templates` })
+      setRefreshKey((k) => k + 1)
     } catch (error) {
-      setData(previous)
-      notify.error({ title: "No se pudo actualizar", description: (error as { message?: string })?.message ?? "Intenta de nuevo." })
+      notify.error({ title: "No se pudo sincronizar", description: (error as { message?: string })?.message ?? "Intenta de nuevo." })
+    } finally {
+      setSyncing(false)
     }
   }
 
   async function handleDelete(row: Row) {
-    const confirmed = await pdfTemplateConfirm.delete(row.name, row.isDefault)
+    if (!row.raw.template_id) return
+    const confirmed = await whatsappTemplateConfirm.delete(row.name)
     if (!confirmed) return
     try {
-      await pdfTemplateService.remove(row.id)
-      notify.success({ title: "Plantilla eliminada", description: `"${row.name}" fue eliminada.` })
+      await whatsappService.deleteTemplate(row.raw.template_id)
+      notify.success({ title: "Template eliminado", description: `"${row.name}" fue eliminado.` })
       setRefreshKey((k) => k + 1)
     } catch (error) {
-      notify.error({ title: "No se pudo eliminar", description: (error as { message?: string })?.message ?? "Intenta de nuevo." })
+      notify.error({
+        title: "No se pudo eliminar",
+        description: (error as { message?: string; extraMessage?: string })?.extraMessage
+          ?? (error as { message?: string })?.message
+          ?? "Intenta de nuevo.",
+      })
     }
   }
 
+  function handleDuplicate(row: Row) {
+    const parsed = parseTemplateForPreview(row.raw)
+    setDuplicatePrefill({
+      language: row.raw.language,
+      category: row.raw.category ?? "UTILITY",
+      headerMode: parsed.headerMode,
+      headerText: parsed.headerText,
+      headerImageUrl: parsed.headerImageUrl,
+      bodyText: parsed.bodyText,
+      footerText: parsed.footerText,
+      buttons: parsed.buttons.map((b) => ({ text: b.text, url: b.url ?? "" })),
+    })
+    setCreateOpen(true)
+  }
+
   const columns = React.useMemo(
-    () => getColumns(
-      (row) => setPreviewTemplate(row.raw),
-      (row) => { setEditingTemplate(row.raw); setCreateOpen(true) },
-      handleSetDefault,
-      handleDelete,
-      isAdmin,
-    ),
+    () => getColumns((row) => setPreviewTarget(row.raw), (row) => setSendTarget(row.raw), handleDuplicate, handleDelete, isAdmin),
     [isAdmin],
   )
 
@@ -298,8 +298,7 @@ export function PdfTemplatesTable() {
 
   return (
     <div className="w-full space-y-4">
-      {/* Toolbar. En mobile se apila en filas propias en vez de forzar scroll
-          horizontal; desde md hacia arriba queda igual que antes. */}
+      {/* Toolbar */}
       <div className="flex flex-col gap-2 md:flex-row md:items-center">
         <div className="relative w-full shrink-0 md:w-44">
           <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -313,7 +312,7 @@ export function PdfTemplatesTable() {
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-2 md:ml-auto">
           {!loading && (
             <span className="w-full text-sm text-muted-foreground md:w-auto">
-              {table.getFilteredRowModel().rows.length} plantilla{table.getFilteredRowModel().rows.length !== 1 ? "s" : ""}
+              {table.getFilteredRowModel().rows.length} template{table.getFilteredRowModel().rows.length !== 1 ? "s" : ""}
             </span>
           )}
           <div className="[&_button]:w-full md:[&_button]:w-auto">
@@ -336,13 +335,15 @@ export function PdfTemplatesTable() {
             </DropdownMenu>
           </div>
           {isAdmin && (
-            <Button
-              size="sm"
-              className="w-full md:w-auto"
-              onClick={() => { setEditingTemplate(undefined); setCreateOpen(true) }}
-            >
+            <Button variant="outline" size="sm" className="w-full md:w-auto gap-1.5" onClick={handleSync} disabled={syncing}>
+              <RefreshCwIcon className={`size-4 ${syncing ? "animate-spin" : ""}`} />
+              Sincronizar
+            </Button>
+          )}
+          {isAdmin && (
+            <Button size="sm" className="w-full md:w-auto" onClick={() => { setDuplicatePrefill(null); setCreateOpen(true) }}>
               <PlusIcon className="size-4" />
-              Plantilla
+              Template
             </Button>
           )}
         </div>
@@ -386,7 +387,7 @@ export function PdfTemplatesTable() {
             ) : (
               <TableRow>
                 <TableCell className="h-24 text-center" colSpan={columns.length}>
-                  Sin plantillas creadas todavía.
+                  Sin templates sincronizados todavía.
                 </TableCell>
               </TableRow>
             )}
@@ -397,18 +398,28 @@ export function PdfTemplatesTable() {
       {/* Pagination */}
       {!loading && <DataTablePagination table={table} />}
 
-      <CreatePdfTemplateSheet
+      <CreateWhatsappTemplateSheet
         open={createOpen}
-        onOpenChange={setCreateOpen}
-        entity={editingTemplate}
+        onOpenChange={(open) => { setCreateOpen(open); if (!open) setDuplicatePrefill(null) }}
         onSuccess={() => setRefreshKey((k) => k + 1)}
+        prefill={duplicatePrefill ?? undefined}
       />
 
-      <PdfTemplatePreviewSheet
-        open={previewTemplate !== null}
-        onOpenChange={(open) => { if (!open) setPreviewTemplate(null) }}
-        template={previewTemplate}
-      />
+      {sendTarget && (
+        <SendWhatsappTemplateSheet
+          open={sendTarget !== null}
+          onOpenChange={(open) => { if (!open) setSendTarget(null) }}
+          template={sendTarget}
+        />
+      )}
+
+      {previewTarget && (
+        <PreviewWhatsappTemplateSheet
+          open={previewTarget !== null}
+          onOpenChange={(open) => { if (!open) setPreviewTarget(null) }}
+          template={previewTarget}
+        />
+      )}
     </div>
   )
 }

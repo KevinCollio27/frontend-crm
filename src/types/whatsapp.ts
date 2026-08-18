@@ -43,3 +43,33 @@ export interface EmbeddedSignupResult {
   requires_phone_setup?: boolean
   phone_numbers: EmbeddedSignupPhoneRaw[]
 }
+
+export interface WhatsappTemplateComponentButtonRaw {
+  type: string
+  text: string
+  url?: string
+}
+
+export interface WhatsappTemplateComponentRaw {
+  type: string
+  format?: string
+  text?: string
+  url?: string
+  buttons?: WhatsappTemplateComponentButtonRaw[]
+  example?: { header_handle?: string[]; body_text?: string[][] }
+}
+
+export interface WhatsappTemplateRaw {
+  id?: number
+  template_id?: string
+  name: string
+  status: string
+  language: string
+  category?: string | null
+  body_text?: string | null
+  components: WhatsappTemplateComponentRaw[]
+}
+
+export type TemplateButtonPayload =
+  | { type: "QUICK_REPLY"; text: string }
+  | { type: "URL"; text: string; url: string }

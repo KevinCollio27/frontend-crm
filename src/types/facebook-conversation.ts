@@ -19,6 +19,7 @@ export interface FacebookConversationRaw {
   updated_at: string
   visitor_name: string | null
   visitor_avatar_url: string | null
+  unread_count: number
 }
 
 export interface FacebookConversationListParams {

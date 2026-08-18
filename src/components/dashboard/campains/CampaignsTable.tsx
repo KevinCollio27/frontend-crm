@@ -12,7 +12,8 @@ import {
 import {
   ChevronDown,
   EyeIcon,
-  ListIcon,
+  MailIcon,
+  MessageCircleIcon,
   MoreHorizontal,
   RefreshCwIcon,
   SearchIcon,
@@ -53,6 +54,7 @@ import { EntityAccentBar } from "@/components/ui/entity-accent-bar"
 import { campaignService } from "@/services/campaign.service"
 import type { CampaignRaw } from "@/types/campaign"
 import type { CampaignFormState } from "./shared/form-state"
+import { WhatsappCampaignsTable } from "./whatsapp/WhatsappCampaignsTable"
 import { CreateCampaignSheet } from "./CreateCampaignSheet"
 import { CampaignPreviewSheet } from "./CampaignPreviewSheet"
 
@@ -409,7 +411,10 @@ function audienceFilterToForm(c: CampaignRaw): Partial<CampaignFormState> {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
+type Channel = "email" | "whatsapp"
+
 export function CampaignsTable() {
+  const [channel, setChannel] = React.useState<Channel>("email")
   const [data, setData] = React.useState<Campaign[]>([])
   const [total, setTotal] = React.useState(0)
   const [dailyUsage, setDailyUsage] = React.useState<{ used: number; limit: number } | null>(null)
@@ -532,17 +537,41 @@ export function CampaignsTable() {
 
   return (
     <div className="w-full">
-      {/* Row 1 — view toggle + create */}
+      {/* Row 1 — channel toggle + create */}
       <div className="flex items-center justify-between border-b px-4 py-2">
         <div className="flex items-center gap-0.5 rounded-lg border bg-muted/40 p-0.5">
-          <span className="flex items-center gap-1.5 rounded-md bg-background px-2.5 py-1 text-xs font-medium shadow-sm">
-            <ListIcon className="size-3.5" />
-            Lista
-          </span>
+          <button
+            type="button"
+            onClick={() => setChannel("email")}
+            className={cn(
+              "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+              channel === "email" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <MailIcon className="size-3.5" />
+            Email
+          </button>
+          <button
+            type="button"
+            onClick={() => setChannel("whatsapp")}
+            className={cn(
+              "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+              channel === "whatsapp" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <MessageCircleIcon className="size-3.5" />
+            WhatsApp
+          </button>
         </div>
-        <Button size="sm" onClick={() => setCreateOpen(true)}>+ Crear Campaña</Button>
+        {channel === "email" && (
+          <Button size="sm" onClick={() => setCreateOpen(true)}>+ Crear Campaña</Button>
+        )}
       </div>
 
+      {channel === "whatsapp" && <WhatsappCampaignsTable />}
+
+      {channel === "email" && (
+      <>
       {/* Row 2 — filters. En mobile se apila en filas propias en vez de forzar scroll
           horizontal; desde md hacia arriba queda igual que antes. */}
       <div className="flex flex-col gap-2 border-b px-4 py-2 md:flex-row md:items-center">
@@ -686,6 +715,8 @@ export function CampaignsTable() {
       <div className="px-4 py-3">
         <DataTablePagination table={table} />
       </div>
+      </>
+      )}
     </div>
   )
 }

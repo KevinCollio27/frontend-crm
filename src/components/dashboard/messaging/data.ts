@@ -11,6 +11,10 @@ export interface ConversationMessage {
   role: "user" | "agent" | "bot"
   content: string
   createdAt: string
+  // Presente cuando el mensaje saliente fue una plantilla de WhatsApp (no texto libre) —
+  // `vars` son los valores reales usados, no placeholders, para poder renderizarla tal
+  // cual la vio el destinatario.
+  template?: { name: string; language: string; vars: string[] }
 }
 
 export interface Conversation {
@@ -18,6 +22,7 @@ export interface Conversation {
   channel: ConversationChannel
   status: ConversationStatus
   isRead: boolean
+  unreadCount: number
   isAiActive: boolean
   lastMessageAt: string
   lastMessageAtRaw?: string // ISO — solo widget, para reordenar al cargar más
