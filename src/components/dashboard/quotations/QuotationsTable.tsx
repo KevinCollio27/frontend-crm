@@ -674,9 +674,16 @@ export function QuotationsTable() {
     getPaginationRowModel:    getPaginationRowModel(),
     getSortedRowModel:        getSortedRowModel(),
     state: { sorting, columnVisibility, rowSelection },
-    globalFilterFn: (row, _id, value: string) =>
-      row.original.name.toLowerCase().includes(value.toLowerCase()) ||
-      (row.original.opportunityName?.toLowerCase().includes(value.toLowerCase()) ?? false),
+    globalFilterFn: (row, _id, value: string) => {
+      // Filtro puramente numérico (con o sin "#" adelante) matchea por ID exacto —
+      // así un equipo puede compartir "#123" y encontrar la cotización al tiro.
+      const idMatch = value.trim().match(/^#?(\d+)$/)
+      return (
+        row.original.name.toLowerCase().includes(value.toLowerCase()) ||
+        (row.original.opportunityName?.toLowerCase().includes(value.toLowerCase()) ?? false) ||
+        (idMatch !== null && row.original.id === Number(idMatch[1]))
+      )
+    },
   })
 
   React.useEffect(() => {

@@ -1,5 +1,5 @@
 import api from "@/lib/api"
-import type { EmbeddedSignupResult, MetaConfigRaw, MyWhatsAppNumberRaw, TemplateButtonPayload, WhatsappTemplateRaw } from "@/types/whatsapp"
+import type { EmbeddedSignupResult, MetaConfigRaw, MyWhatsAppNumberRaw, TemplateButtonPayload, WhatsappTemplateRaw, WhatsAppBusinessProfileRaw, WhatsAppBusinessProfilePayload } from "@/types/whatsapp"
 import type { WhatsAppConversationListParams, WhatsAppConversationRaw } from "@/types/whatsapp-conversation"
 import type { WhatsappCostAnalyticsRaw } from "@/types/whatsappCosts"
 
@@ -119,5 +119,19 @@ export const whatsappService = {
 
   async getCostAnalytics(params?: { from?: string; to?: string }): Promise<WhatsappCostAnalyticsRaw> {
     return api.get<never, WhatsappCostAnalyticsRaw>("whatsapp/costs", { params })
+  },
+
+  async getBusinessProfile(): Promise<WhatsAppBusinessProfileRaw> {
+    const res = await api.get<never, { profile: WhatsAppBusinessProfileRaw }>("whatsapp/business-profile")
+    return res.profile
+  },
+
+  async uploadBusinessProfilePhoto(fileName: string, base64File: string): Promise<string> {
+    const res = await api.post<never, { url: string }>("whatsapp/business-profile/upload-photo", { fileName, base64File })
+    return res.url
+  },
+
+  async updateBusinessProfile(payload: WhatsAppBusinessProfilePayload): Promise<void> {
+    await api.put("whatsapp/business-profile", payload)
   },
 }

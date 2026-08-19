@@ -154,6 +154,7 @@ const MOBILE_COLUMN_VISIBILITY: VisibilityState = {
 type QueryState = {
   page: number
   pageSize: number
+  search: string
 }
 
 // ─── Skeleton ────────────────────────────────────────────────────────────────
@@ -421,7 +422,7 @@ export function CampaignsTable() {
   const [loading, setLoading] = React.useState(true)
   const [search, setSearch] = React.useState("")
   const [audienceFilter, setAudienceFilter] = React.useState("any")
-  const [query, setQuery] = React.useState<QueryState>({ page: 1, pageSize: 10 })
+  const [query, setQuery] = React.useState<QueryState>({ page: 1, pageSize: 10, search: "" })
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>(DEFAULT_COLUMN_VISIBILITY)
   const isMobile = useIsMobile()
@@ -470,11 +471,24 @@ export function CampaignsTable() {
     [handlePreview, handleResend, handleDelete],
   )
 
+  // Debounce: espera 400ms sin tipear antes de pegarle al backend, y resetea a
+  // la página 1 — mismo patrón que ContactsTable.
+  React.useEffect(() => {
+    const t = setTimeout(
+      () => setQuery((q) => {
+        if (q.search === search) return q
+        return { ...q, page: 1, search }
+      }),
+      400
+    )
+    return () => clearTimeout(t)
+  }, [search])
+
   React.useEffect(() => {
     let cancelled = false
     setLoading(true)
     campaignService
-      .list({ page: query.page, limit: query.pageSize })
+      .list({ page: query.page, limit: query.pageSize, filter: query.search || undefined })
       .then((res) => {
         if (cancelled) return
         setData(res.data.map(mapCampaign))
@@ -488,18 +502,12 @@ export function CampaignsTable() {
     return () => { cancelled = true }
   }, [query])
 
-  // Client-side sobre la página cargada — el backend todavía no tiene params
-  // de búsqueda ni de audiencia (solo page/limit).
+  // Audiencia queda client-side sobre la página cargada — el backend todavía
+  // no tiene ese filtro (la búsqueda por texto/ID sí es server-side ahora).
   const visibleData = React.useMemo(() => {
-    return data.filter((c) => {
-      if (audienceFilter !== "any" && c.audienceFilter !== audienceFilter) return false
-      if (search) {
-        const q = search.toLowerCase()
-        return c.name.toLowerCase().includes(q) || c.subject.toLowerCase().includes(q)
-      }
-      return true
-    })
-  }, [data, search, audienceFilter])
+    if (audienceFilter === "any") return data
+    return data.filter((c) => c.audienceFilter === audienceFilter)
+  }, [data, audienceFilter])
 
   const table = useReactTable({
     data: visibleData,

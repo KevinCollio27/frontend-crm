@@ -8,6 +8,22 @@ export interface SearchableSelectOption {
   value: string;
   label: string;
   flag?: string; // ISO 3166-1 alpha-2 code for flagcdn.com
+  logo?: string | null; // URL de logo propio — si falta, cae a un ícono con la inicial
+}
+
+function OptionLogo({ label, logo }: { label: string; logo?: string | null }) {
+  if (logo) {
+    return (
+      <div className="flex h-5 w-6 shrink-0 items-center justify-center rounded bg-white">
+        <img src={logo} alt="" className="size-full object-contain" />
+      </div>
+    );
+  }
+  return (
+    <div className="flex size-5 shrink-0 items-center justify-center rounded bg-muted text-[0.6rem] font-medium text-muted-foreground">
+      {label.charAt(0).toUpperCase()}
+    </div>
+  );
 }
 
 interface SearchableSelectProps {
@@ -91,6 +107,7 @@ export function SearchableSelect({
               height={15}
             />
           )}
+          {selected && selected.logo !== undefined && <OptionLogo label={selected.label} logo={selected.logo} />}
           <span className="truncate" title={selected?.label}>
             {selected?.label ?? placeholder}
           </span>
@@ -153,6 +170,7 @@ export function SearchableSelect({
                       height={15}
                     />
                   )}
+                  {opt.logo !== undefined && <OptionLogo label={opt.label} logo={opt.logo} />}
                   <span className="truncate">{opt.label}</span>
                 </button>
               ))

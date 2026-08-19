@@ -1,3 +1,5 @@
+import type { MoveWorkspaceContactPreview } from "./contact"
+
 export interface OrganizationDetail {
   id: number
   label_id: number | null
@@ -106,6 +108,32 @@ export interface MergeOrganizationsResult {
     contacts: number
     challenges: number
   }
+}
+
+// ─── Mover de espacio de trabajo ───────────────────────────────────────────────
+// Reusa las formas de contacto: el back devuelve exactamente el mismo shape de
+// MoveWorkspaceContactPreview por cada contacto de la organización.
+
+export interface MoveWorkspaceOrganizationContacts {
+  id: number
+  name: string
+  contacts: MoveWorkspaceContactPreview[]
+}
+
+export interface MoveOrganizationsWorkspacePreview {
+  targetWorkspaceId: number
+  organizations: MoveWorkspaceOrganizationContacts[]
+}
+
+export interface MoveOrganizationsWorkspacePayload {
+  organizationIds: number[]
+  targetWorkspaceId: number
+}
+
+export interface MoveOrganizationsWorkspaceResult {
+  organizationsMoved: number
+  contactsMoved: number
+  skipped: { id: number; name: string; reason: string }[]
 }
 
 export interface OrgDetailData {

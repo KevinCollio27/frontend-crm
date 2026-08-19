@@ -10,6 +10,7 @@ import {
   LockIcon,
   SmartphoneIcon,
   SparklesIcon,
+  UserRoundIcon,
   XIcon,
   ZapIcon,
 } from "lucide-react"
@@ -25,11 +26,13 @@ import {
 } from "@/components/ui/sheet"
 import { integrationConfirm } from "@/lib/confirm"
 import { integrationNotify, notify } from "@/lib/notify"
+import { hasWhatsAppBlockingIssue, isWhatsAppOperational } from "@/lib/whatsapp-status"
 import { whatsappService } from "@/services/whatsapp.service"
 import { widgetAIService } from "@/services/widget-ai.service"
 import type { EmbeddedSignupPhoneRaw, MetaConfigRaw } from "@/types/whatsapp"
 import type { WidgetAIRaw } from "@/types/widget-ai"
 import { AgentPickerSheet } from "./AgentPickerSheet"
+import { WhatsAppBusinessProfileSheet } from "./WhatsAppBusinessProfileSheet"
 
 const META_APP_ID = process.env.NEXT_PUBLIC_META_APP_ID ?? ""
 const META_CONFIG_ID = process.env.NEXT_PUBLIC_META_EMBEDDED_SIGNUP_CONFIG_ID ?? ""
@@ -88,24 +91,20 @@ function deriveMetaState(c: MetaConfigRaw): MetaState {
   const nameStatus = (c.name_status || "").toUpperCase()
 
   const reasons: string[] = []
-  let hasBlockingIssue = false
 
   if (status && status !== "CONNECTED") {
     reasons.push(`Estado del número en Meta: ${STATUS_LABELS[status] || status}.`)
-    if (["DISCONNECTED", "MIGRATED", "BANNED", "RESTRICTED"].includes(status)) hasBlockingIssue = true
   }
   if (verification && verification !== "VERIFIED") {
     reasons.push("El número no está verificado (falta completar el registro / PIN en Meta).")
-    hasBlockingIssue = true
   }
   if (mode === "SANDBOX") reasons.push("Número de prueba (Sandbox): solo conversa con destinatarios autorizados en Meta.")
   if (nameStatus === "PENDING_REVIEW") reasons.push("El nombre para mostrar está en revisión por Meta.")
   if (nameStatus === "DECLINED") reasons.push("El nombre para mostrar fue rechazado por Meta.")
 
-  const connectedOk = status === "CONNECTED" || (!status && verification === "VERIFIED")
-  if (connectedOk && !hasBlockingIssue) return { label: "Operativo", tone: "ok", reasons }
+  if (isWhatsAppOperational(c)) return { label: "Operativo", tone: "ok", reasons }
   if (reasons.length === 0) return { label: "Conectado", tone: "unknown", reasons }
-  return { label: "No operativo", tone: hasBlockingIssue ? "error" : "warn", reasons }
+  return { label: "No operativo", tone: hasWhatsAppBlockingIssue(c) ? "error" : "warn", reasons }
 }
 
 // Badge compacto para la lista de selección de número — misma lógica de estado que
@@ -162,6 +161,7 @@ function WhatsAppForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
   const [agentWidget, setAgentWidget] = React.useState<WidgetAIRaw | null>(null)
   const [loadingAgent, setLoadingAgent] = React.useState(false)
   const [pickerOpen, setPickerOpen] = React.useState(false)
+  const [businessProfileOpen, setBusinessProfileOpen] = React.useState(false)
 
   const load = React.useCallback(async () => {
     setLoading(true)
@@ -435,6 +435,22 @@ function WhatsAppForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
               </div>
             )}
 
+            {config && (
+              <div className="space-y-2">
+                <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Perfil de WhatsApp Business</p>
+                <div className="flex items-start gap-3 rounded-lg border p-3">
+                  <UserRoundIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium">Foto, descripción, dirección y más</p>
+                    <p className="text-xs text-muted-foreground">Lo que ven tus clientes al abrir la conversación.</p>
+                  </div>
+                  <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={() => setBusinessProfileOpen(true)}>
+                    Editar perfil
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {phoneNumbers.length > 0 && (
               <div className="space-y-3 rounded-lg border p-4">
                 <p className="text-sm font-medium">Tu cuenta tiene múltiples números. Elige el que usará este workspace:</p>
@@ -569,6 +585,11 @@ function WhatsAppForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
         title="¿Qué agente responde por WhatsApp?"
         currentAgentId={config?.agent_id ?? null}
         onConfirm={handleSelectAgent}
+      />
+
+      <WhatsAppBusinessProfileSheet
+        open={businessProfileOpen}
+        onOpenChange={setBusinessProfileOpen}
       />
     </>
   )

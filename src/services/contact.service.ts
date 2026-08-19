@@ -6,6 +6,9 @@ import type {
   PersonDuplicateCandidate,
   MergeContactsPayload,
   MergeContactsResult,
+  MoveWorkspacePreview,
+  MoveWorkspacePayload,
+  MoveWorkspaceResult,
 } from "@/types/contact"
 
 export interface ContactListParams {
@@ -202,6 +205,14 @@ export const contactService = {
 
   async previewImport(base64String: string): Promise<{ rows: ImportPreviewRow[]; errors: ImportPreviewError[] }> {
     return api.post<never, { rows: ImportPreviewRow[]; errors: ImportPreviewError[] }>("person/import-preview", { base64String })
+  },
+
+  async previewMoveWorkspace(personIds: number[], targetWorkspaceId: number): Promise<MoveWorkspacePreview> {
+    return api.post<never, MoveWorkspacePreview>("person/move-workspace/preview", { personIds, targetWorkspaceId })
+  },
+
+  async moveWorkspace(payload: MoveWorkspacePayload): Promise<MoveWorkspaceResult> {
+    return api.post<never, MoveWorkspaceResult>("person/move-workspace", payload)
   },
 
   async countryCounts(): Promise<CountryCount[]> {

@@ -76,9 +76,11 @@ const legalSchema = z.object({
   fiscalAddress: z.string().optional(),
 })
 
+const AI_FIELD_MAX_LENGTH = 4000
+
 const aiSchema = z.object({
-  objective: z.string().optional(),
-  description: z.string().optional(),
+  objective: z.string().max(AI_FIELD_MAX_LENGTH, `Máximo ${AI_FIELD_MAX_LENGTH} caracteres.`).optional(),
+  description: z.string().max(AI_FIELD_MAX_LENGTH, `Máximo ${AI_FIELD_MAX_LENGTH} caracteres.`).optional(),
 })
 
 type IdentityValues = z.infer<typeof identitySchema>
@@ -626,24 +628,58 @@ export function WorkspaceForm() {
           <CardContent className="pt-5">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <Label htmlFor="objective">Objetivo del negocio</Label>
+                <Label
+                  htmlFor="objective"
+                  className={aiForm.formState.errors.objective ? "text-destructive" : ""}
+                >
+                  Objetivo del negocio
+                </Label>
                 <Textarea
                   id="objective"
                   rows={4}
                   disabled={!editingAi}
+                  maxLength={AI_FIELD_MAX_LENGTH}
                   placeholder="Ej: Aumentar ventas en el segmento de transporte de carga, fidelizar clientes actuales y expandir a nuevas regiones."
+                  className={aiForm.formState.errors.objective ? "border-destructive" : ""}
                   {...aiForm.register("objective")}
                 />
+                <div className="flex items-center justify-between gap-2">
+                  {aiForm.formState.errors.objective ? (
+                    <p className="text-[0.8rem] text-destructive">
+                      {aiForm.formState.errors.objective.message}
+                    </p>
+                  ) : <span />}
+                  <span className={`text-xs shrink-0 ${(aiForm.watch("objective")?.length ?? 0) >= AI_FIELD_MAX_LENGTH * 0.9 ? "text-amber-600" : "text-muted-foreground"}`}>
+                    {aiForm.watch("objective")?.length ?? 0}/{AI_FIELD_MAX_LENGTH} caracteres
+                  </span>
+                </div>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="description">Descripción del negocio</Label>
+                <Label
+                  htmlFor="description"
+                  className={aiForm.formState.errors.description ? "text-destructive" : ""}
+                >
+                  Descripción del negocio
+                </Label>
                 <Textarea
                   id="description"
                   rows={4}
                   disabled={!editingAi}
+                  maxLength={AI_FIELD_MAX_LENGTH}
                   placeholder="Ej: Empresa de logística especializada en transporte de carga pesada a nivel nacional, con más de 10 años de experiencia."
+                  className={aiForm.formState.errors.description ? "border-destructive" : ""}
                   {...aiForm.register("description")}
                 />
+                <div className="flex items-center justify-between gap-2">
+                  {aiForm.formState.errors.description ? (
+                    <p className="text-[0.8rem] text-destructive">
+                      {aiForm.formState.errors.description.message}
+                    </p>
+                  ) : <span />}
+                  <span className={`text-xs shrink-0 ${(aiForm.watch("description")?.length ?? 0) >= AI_FIELD_MAX_LENGTH * 0.9 ? "text-amber-600" : "text-muted-foreground"}`}>
+                    {aiForm.watch("description")?.length ?? 0}/{AI_FIELD_MAX_LENGTH} caracteres
+                  </span>
+                </div>
               </div>
             </div>
           </CardContent>

@@ -73,3 +73,23 @@ export interface WhatsappTemplateRaw {
 export type TemplateButtonPayload =
   | { type: "QUICK_REPLY"; text: string }
   | { type: "URL"; text: string; url: string }
+
+export interface WhatsAppBusinessProfileRaw {
+  about: string | null
+  description: string | null
+  address: string | null
+  email: string | null
+  profilePictureUrl: string | null
+  websites: string[]
+  vertical: string | null
+}
+
+export interface WhatsAppBusinessProfilePayload {
+  about?: string | null
+  description?: string | null
+  address?: string | null
+  email?: string | null
+  websites?: string[]
+  vertical?: string | null
+  photoUrl?: string | null
+}

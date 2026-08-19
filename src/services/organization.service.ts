@@ -7,6 +7,9 @@ import type {
   OrganizationDuplicateCandidate,
   MergeOrganizationsPayload,
   MergeOrganizationsResult,
+  MoveOrganizationsWorkspacePreview,
+  MoveOrganizationsWorkspacePayload,
+  MoveOrganizationsWorkspaceResult,
 } from "@/types/organization"
 
 export interface OrganizationListParams {
@@ -102,5 +105,13 @@ export const organizationService = {
 
   async checkDuplicates(names: string[], documentNumbers: string[]): Promise<{ existingNames: string[]; existingDocumentNumbers: string[] }> {
     return api.post<never, { existingNames: string[]; existingDocumentNumbers: string[] }>("organization/check-duplicates", { names, documentNumbers })
+  },
+
+  async previewMoveWorkspace(organizationIds: number[], targetWorkspaceId: number): Promise<MoveOrganizationsWorkspacePreview> {
+    return api.post<never, MoveOrganizationsWorkspacePreview>("organization/move-workspace/preview", { organizationIds, targetWorkspaceId })
+  },
+
+  async moveWorkspace(payload: MoveOrganizationsWorkspacePayload): Promise<MoveOrganizationsWorkspaceResult> {
+    return api.post<never, MoveOrganizationsWorkspaceResult>("organization/move-workspace", payload)
   },
 }

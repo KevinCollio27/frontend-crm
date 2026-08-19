@@ -288,8 +288,15 @@ export function PdfTemplatesTable() {
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
     state: { sorting, columnVisibility },
-    globalFilterFn: (row, _id, value: string) =>
-      row.original.name.toLowerCase().includes(value.toLowerCase()),
+    globalFilterFn: (row, _id, value: string) => {
+      // Filtro puramente numérico (con o sin "#" adelante) matchea por ID exacto —
+      // así un equipo puede compartir "#123" y encontrar la plantilla al tiro.
+      const idMatch = value.trim().match(/^#?(\d+)$/)
+      return (
+        row.original.name.toLowerCase().includes(value.toLowerCase()) ||
+        (idMatch !== null && row.original.id === Number(idMatch[1]))
+      )
+    },
   })
 
   React.useEffect(() => {

@@ -98,6 +98,54 @@ export interface PersonFullRaw extends Omit<Person, "organization"> {
   organization: OrganizationFull | null
 }
 
+// ─── Mover de espacio de trabajo ───────────────────────────────────────────────
+
+export interface MoveWorkspaceOpportunity {
+  id: number
+  name: string
+  autoMovable: boolean
+  blockReason: string | null
+}
+
+export interface MoveWorkspaceOrganization {
+  id: number
+  name: string
+  // Contactos que quedarían en esta organización, en el workspace de origen,
+  // si NO se mueve junto con los contactos seleccionados.
+  otherContactsInSource: number
+}
+
+export interface MoveWorkspaceContactPreview {
+  id: number
+  name: string
+  email: string | null
+  organization: MoveWorkspaceOrganization | null
+  notesCount: number
+  interestsCount: number
+  opportunities: MoveWorkspaceOpportunity[]
+  blocked: boolean
+}
+
+export interface MoveWorkspacePreview {
+  targetWorkspaceId: number
+  contacts: MoveWorkspaceContactPreview[]
+}
+
+export type OrganizationMoveChoice = "detach" | "moveFull"
+
+export interface MoveWorkspacePayload {
+  personIds: number[]
+  targetWorkspaceId: number
+  // Solo para organizaciones compartidas (con otros contactos que se quedan) —
+  // el back resuelve solo el resto (1:1, sin organización, etc.)
+  organizationChoices: Record<number, OrganizationMoveChoice>
+}
+
+export interface MoveWorkspaceResult {
+  moved: number
+  skipped: { id: number; name: string; reason: string }[]
+}
+
 export interface ContactDetailData {
   id: number
   name: string

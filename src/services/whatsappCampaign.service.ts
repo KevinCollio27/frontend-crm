@@ -2,8 +2,10 @@ import api from "@/lib/api"
 import type { DispatchWhatsappCampaignPayload, WhatsappCampaignRaw } from "@/types/whatsappCampaign"
 
 export const whatsappCampaignService = {
-  async list(): Promise<WhatsappCampaignRaw[]> {
-    const res = await api.get<never, { campaigns: WhatsappCampaignRaw[] }>("whatsapp/campaigns")
+  async list(filter?: string): Promise<WhatsappCampaignRaw[]> {
+    const res = await api.get<never, { campaigns: WhatsappCampaignRaw[] }>("whatsapp/campaigns", {
+      params: filter ? { filter } : undefined,
+    })
     return res.campaigns
   },
 

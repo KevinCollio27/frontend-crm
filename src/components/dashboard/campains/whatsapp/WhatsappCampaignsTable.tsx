@@ -1,9 +1,10 @@
 "use client"
 
 import * as React from "react"
-import { EyeIcon, Loader2Icon, PlusIcon } from "lucide-react"
+import { EyeIcon, Loader2Icon, PlusIcon, SearchIcon } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { whatsappCampaignService } from "@/services/whatsappCampaign.service"
 import type { WhatsappCampaignRaw } from "@/types/whatsappCampaign"
@@ -28,23 +29,46 @@ export function WhatsappCampaignsTable() {
   const [createOpen, setCreateOpen] = React.useState(false)
   const [detailId, setDetailId] = React.useState<number | null>(null)
   const [refreshKey, setRefreshKey] = React.useState(0)
+  const [search, setSearch] = React.useState("")
+  const [debouncedSearch, setDebouncedSearch] = React.useState("")
+
+  // Debounce: espera 400ms sin tipear antes de pegarle al backend — mismo
+  // patrón que ContactsTable/CampaignsTable.
+  React.useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 400)
+    return () => clearTimeout(t)
+  }, [search])
 
   React.useEffect(() => {
     let cancelled = false
     setLoading(true)
-    whatsappCampaignService.list()
+    whatsappCampaignService.list(debouncedSearch || undefined)
       .then((res) => { if (!cancelled) setData(res) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [refreshKey])
+  }, [refreshKey, debouncedSearch])
 
   return (
     <div className="w-full">
-      <div className="flex items-center justify-between border-b px-4 py-2">
-        <span className="text-xs text-muted-foreground">{loading ? "…" : `${data.length} campañas`}</span>
-        <Button size="sm" onClick={() => setCreateOpen(true)}>
-          <PlusIcon className="size-4" /> Crear Campaña
-        </Button>
+      {/* Row — búsqueda a la izquierda, contador + Crear Campaña a la derecha.
+          Mismo patrón de una sola fila que la vista de Email. */}
+      <div className="flex flex-col gap-2 border-b px-4 py-2 md:flex-row md:items-center">
+        <div className="relative w-full shrink-0 md:w-44">
+          <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Buscar campaña..."
+            className="h-8 pl-8 text-xs"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+
+        <div className="flex items-center gap-2 md:ml-auto">
+          <span className="text-xs text-muted-foreground">{loading ? "…" : `${data.length} campañas`}</span>
+          <Button size="sm" onClick={() => setCreateOpen(true)}>
+            <PlusIcon className="size-4" /> Crear Campaña
+          </Button>
+        </div>
       </div>
 
       <div className="mx-4 mt-3 rounded-md border">
@@ -70,7 +94,10 @@ export function WhatsappCampaignsTable() {
             ) : data.length ? (
               data.map((c) => (
                 <TableRow key={c.id}>
-                  <TableCell className="font-medium">{c.name}</TableCell>
+                  <TableCell className="font-medium">
+                    {c.name}
+                    <span className="ml-1.5 font-normal text-xs text-muted-foreground">#{c.id}</span>
+                  </TableCell>
                   <TableCell><span className="font-mono text-xs">{c.template_name}</span></TableCell>
                   <TableCell>{c.total_count}</TableCell>
                   <TableCell>
@@ -95,7 +122,7 @@ export function WhatsappCampaignsTable() {
             ) : (
               <TableRow>
                 <TableCell colSpan={7} className="h-24 text-center text-sm text-muted-foreground">
-                  Sin campañas de WhatsApp todavía.
+                  {debouncedSearch ? "Sin resultados para tu búsqueda." : "Sin campañas de WhatsApp todavía."}
                 </TableCell>
               </TableRow>
             )}

@@ -14,12 +14,14 @@ import {
 } from "@tanstack/react-table"
 import {
   ArrowDownUpIcon,
+  ArrowRightLeftIcon,
   ChevronDown,
   ExternalLinkIcon,
   GitMergeIcon,
   ListIcon,
   Loader2Icon,
   MailIcon,
+  MessageSquareTextIcon,
   MoreHorizontal,
   PencilIcon,
   PhoneIcon,
@@ -66,13 +68,18 @@ import { CreateContactSheet } from "./CreateContactSheet"
 import { ImportGoogleContactsSheet } from "./ImportGoogleContactsSheet"
 import { DuplicateContactsSheet } from "./DuplicateContactsSheet"
 import { ContactsImportExportSheet } from "./ContactsImportExportSheet"
+import { MoveContactsSheet } from "./MoveContactsSheet"
+import { SendTemplateSheet } from "./SendTemplateSheet"
 import { contactService, type CountryCount } from "@/services/contact.service"
 import { organizationService, type OrganizationOption } from "@/services/organization.service"
+import { whatsappService } from "@/services/whatsapp.service"
 import { contactConfirm } from "@/lib/confirm"
 import { notify } from "@/lib/notify"
 import { useIntegrations } from "@/hooks/useIntegrations"
 import { useIsMobile } from "@/hooks/use-mobile"
+import { isWhatsAppOperational } from "@/lib/whatsapp-status"
 import type { Person } from "@/types/contact"
+import type { WhatsappTemplateRaw } from "@/types/whatsapp"
 import { getFlag, getSortIcon, getInitials } from "@/lib/table-utils"
 import { cn } from "@/lib/utils"
 
@@ -154,7 +161,9 @@ function getColumns(
   onPreview: (contact: Contact) => void,
   onDetail: (contact: Contact) => void,
   onEdit: (contact: Contact) => void,
-  onDelete: (contact: Contact) => void
+  onDelete: (contact: Contact) => void,
+  onMove: (contact: Contact) => void,
+  onSendTemplate: ((contact: Contact) => void) | null
 ): ColumnDef<Contact>[] {
   return [
     {
@@ -321,6 +330,20 @@ function getColumns(
                   <PencilIcon />
                   Editar
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onMove(contact)}>
+                  <ArrowRightLeftIcon />
+                  Mover de espacio
+                </DropdownMenuItem>
+                {onSendTemplate && (
+                  <DropdownMenuItem
+                    disabled={!contact.phone}
+                    title={!contact.phone ? "Este contacto no tiene teléfono" : undefined}
+                    onClick={() => onSendTemplate(contact)}
+                  >
+                    <MessageSquareTextIcon />
+                    Enviar Plantilla
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuGroup>
               {(contact.email || contact.phone) && (
                 <>
@@ -593,9 +616,25 @@ export function ContactsTable() {
   const [importOpen, setImportOpen] = React.useState(false)
   const [mergeOpen, setMergeOpen] = React.useState(false)
   const [importExportOpen, setImportExportOpen] = React.useState(false)
+  const [moveOpen, setMoveOpen] = React.useState(false)
+  const [moveInitialIds, setMoveInitialIds] = React.useState<number[]>([])
+  const [sendTemplateContact, setSendTemplateContact] = React.useState<Contact | null>(null)
+  const [approvedTemplates, setApprovedTemplates] = React.useState<WhatsappTemplateRaw[]>([])
   const { connections: integrationConnections } = useIntegrations()
   const googleContactsIntegration = integrationConnections.find((c) => c.provider_key === "google-contacts")
   const [countryCounts, setCountryCounts] = React.useState<CountryCount[]>([])
+
+  // "Enviar Plantilla" solo aparece si WhatsApp está operativo Y hay al menos una
+  // plantilla aprobada — se chequea una vez al cargar, no por cada fila.
+  React.useEffect(() => {
+    Promise.all([
+      whatsappService.getMetaConfig().catch(() => null),
+      whatsappService.getCachedTemplates({ status: "APPROVED" }).catch(() => ({ templates: [], total: 0, lastSyncedAt: null })),
+    ]).then(([config, templatesRes]) => {
+      setApprovedTemplates(isWhatsAppOperational(config) ? templatesRes.templates : [])
+    })
+  }, [])
+  const canSendTemplate = approvedTemplates.length > 0
 
   // Tiempo real: si otra sesión crea/edita/elimina un contacto en este
   // workspace, refresca la tabla sin esperar a un F5 manual. El evento real
@@ -727,9 +766,13 @@ export function ContactsTable() {
           setEditOpen(true)
         },
         handleDeleteClick,
+        (contact) => {
+          setMoveInitialIds([contact.id])
+          setMoveOpen(true)
+        },
+        canSendTemplate ? (contact) => setSendTemplateContact(contact) : null,
       ),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [router]
+    [router, canSendTemplate]
   )
 
   const handleSorting = (updater: SortingState | ((prev: SortingState) => SortingState)) => {
@@ -760,6 +803,13 @@ export function ContactsTable() {
     onRowSelectionChange: setRowSelection,
     state: { sorting, columnFilters, columnVisibility, rowSelection, pagination },
   })
+
+  const selectedRowIds = table.getSelectedRowModel().rows.map((r) => r.original.id)
+
+  function handleOpenMove() {
+    setMoveInitialIds(selectedRowIds)
+    setMoveOpen(true)
+  }
 
   return (
     <div className="w-full">
@@ -853,6 +903,10 @@ export function ContactsTable() {
                 <GitMergeIcon className="size-3.5" />
                 Fusionar duplicados
               </Button>
+              <Button variant="outline" size="sm" className="h-8" onClick={handleOpenMove}>
+                <ArrowRightLeftIcon className="size-3.5" />
+                Mover de espacio{selectedRowIds.length > 0 ? ` (${selectedRowIds.length})` : ""}
+              </Button>
               <Button variant="outline" size="sm" className="h-8" onClick={() => setImportExportOpen(true)}>
                 <ArrowDownUpIcon className="size-3.5" />
                 Importar / Exportar
@@ -877,6 +931,10 @@ export function ContactsTable() {
                     <DropdownMenuItem onClick={() => setMergeOpen(true)}>
                       <GitMergeIcon className="size-3.5" />
                       Fusionar duplicados
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleOpenMove}>
+                      <ArrowRightLeftIcon className="size-3.5" />
+                      Mover de espacio{selectedRowIds.length > 0 ? ` (${selectedRowIds.length})` : ""}
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setImportExportOpen(true)}>
                       <ArrowDownUpIcon className="size-3.5" />
@@ -986,6 +1044,26 @@ export function ContactsTable() {
           onOpenChange={(o) => { if (!o) setImportExportOpen(false) }}
           totalContacts={total}
           onImported={() => setRefreshKey((k) => k + 1)}
+        />
+      )}
+
+      {moveOpen && (
+        <MoveContactsSheet
+          open
+          onOpenChange={(o) => { if (!o) setMoveOpen(false) }}
+          initialSelectedIds={moveInitialIds}
+          onMoved={() => { setRowSelection({}); setRefreshKey((k) => k + 1) }}
+        />
+      )}
+
+      {sendTemplateContact && (
+        <SendTemplateSheet
+          open
+          onOpenChange={(o) => { if (!o) setSendTemplateContact(null) }}
+          contactName={sendTemplateContact.name}
+          phone={sendTemplateContact.phone}
+          country={sendTemplateContact.country}
+          templates={approvedTemplates}
         />
       )}
     </div>

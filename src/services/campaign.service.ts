@@ -17,6 +17,7 @@ interface BackendResponse {
 export interface CampaignListParams {
   page?: number
   limit?: number
+  filter?: string
 }
 
 export interface CampaignDispatchPayload {

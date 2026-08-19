@@ -136,6 +136,16 @@ export const orgConfirm = {
       tone: "block",
       blocking: true,
     }),
+  moveWorkspace: (count: number, targetName?: string) =>
+    confirmDialog({
+      title: count > 1 ? `¿Mover ${count} organizaciones de espacio?` : "¿Mover organización de espacio?",
+      description: targetName
+        ? `${count > 1 ? "Se moverán" : "Se moverá"} a "${targetName}" junto con todos sus contactos. Esta acción no se puede deshacer desde la interfaz.`
+        : "Esta acción no se puede deshacer desde la interfaz.",
+      confirmText: "Sí, mover",
+      cancelText: "Cancelar",
+      tone: "warning",
+    }),
   merge: (count: number, survivorName?: string) =>
     confirmDialog({
       title: "¿Fusionar organizaciones?",
@@ -177,6 +187,16 @@ export const contactConfirm = {
         ? `Vas a fusionar ${count} contactos en "${survivorName}". Los demás quedarán archivados (no se borran) y esto no se puede deshacer desde la interfaz.`
         : `Vas a fusionar ${count} contactos. Los demás quedarán archivados (no se borran) y esto no se puede deshacer desde la interfaz.`,
       confirmText: "Sí, fusionar",
+      cancelText: "Cancelar",
+      tone: "warning",
+    }),
+  moveWorkspace: (count: number, targetName?: string) =>
+    confirmDialog({
+      title: count > 1 ? `¿Mover ${count} contactos de espacio?` : "¿Mover contacto de espacio?",
+      description: targetName
+        ? `${count > 1 ? "Se moverán" : "Se moverá"} a "${targetName}" junto con su organización, notas e intereses cuando corresponda. Esta acción no se puede deshacer desde la interfaz.`
+        : "Esta acción no se puede deshacer desde la interfaz.",
+      confirmText: count > 1 ? "Sí, mover" : "Sí, mover",
       cancelText: "Cancelar",
       tone: "warning",
     }),

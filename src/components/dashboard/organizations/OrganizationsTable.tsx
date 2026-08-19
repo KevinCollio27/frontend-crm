@@ -14,6 +14,7 @@ import {
 } from "@tanstack/react-table"
 import {
   ArrowDownUpIcon,
+  ArrowRightLeftIcon,
   ChevronDown,
   ExternalLinkIcon,
   GitMergeIcon,
@@ -59,6 +60,7 @@ import { OrganizationPreviewSheet } from "./OrganizationPreviewSheet"
 import { CreateOrganizationSheet } from "./CreateOrganizationSheet"
 import { DuplicateOrganizationsSheet } from "./DuplicateOrganizationsSheet"
 import { OrganizationsImportExportSheet } from "./OrganizationsImportExportSheet"
+import { MoveOrganizationsSheet } from "./MoveOrganizationsSheet"
 import { organizationService } from "@/services/organization.service"
 import { orgConfirm } from "@/lib/confirm"
 import { orgNotify } from "@/lib/notify"
@@ -130,6 +132,7 @@ function getColumns(
   onDetail: (org: Organization) => void,
   onEdit: (org: Organization) => void,
   onDelete: (org: Organization) => void,
+  onMove: (org: Organization) => void,
 ): ColumnDef<Organization>[] {
   return [
     {
@@ -295,6 +298,10 @@ function getColumns(
                   <PencilIcon />
                   Editar
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onMove(org)}>
+                  <ArrowRightLeftIcon />
+                  Mover de espacio
+                </DropdownMenuItem>
               </DropdownMenuGroup>
               <DropdownMenuSeparator />
               <DropdownMenuItem
@@ -385,6 +392,8 @@ export function OrganizationsTable() {
   const [createOpen, setCreateOpen] = React.useState(false)
   const [mergeOpen, setMergeOpen] = React.useState(false)
   const [importExportOpen, setImportExportOpen] = React.useState(false)
+  const [moveOpen, setMoveOpen] = React.useState(false)
+  const [moveInitialIds, setMoveInitialIds] = React.useState<number[]>([])
   const [editId, setEditId] = React.useState<number | null>(null)
   const [refreshKey, setRefreshKey] = React.useState(0)
 
@@ -470,6 +479,10 @@ export function OrganizationsTable() {
         (org) => router.push(`/crm/organizations/${org.id}`),
         (org) => setEditId(org.id),
         handleDeleteClick,
+        (org) => {
+          setMoveInitialIds([org.id])
+          setMoveOpen(true)
+        },
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [router]
@@ -509,6 +522,13 @@ export function OrganizationsTable() {
     onRowSelectionChange: setRowSelection,
     state: { sorting, columnVisibility, rowSelection, pagination },
   })
+
+  const selectedRowIds = table.getSelectedRowModel().rows.map((r) => r.original.id)
+
+  function handleOpenMove() {
+    setMoveInitialIds(selectedRowIds)
+    setMoveOpen(true)
+  }
 
   return (
     <div className="w-full">
@@ -590,6 +610,10 @@ export function OrganizationsTable() {
                 <GitMergeIcon className="size-3.5" />
                 Fusionar duplicados
               </Button>
+              <Button variant="outline" size="sm" className="h-8" onClick={handleOpenMove}>
+                <ArrowRightLeftIcon className="size-3.5" />
+                Mover de espacio{selectedRowIds.length > 0 ? ` (${selectedRowIds.length})` : ""}
+              </Button>
               <Button variant="outline" size="sm" className="h-8" onClick={() => setImportExportOpen(true)}>
                 <ArrowDownUpIcon className="size-3.5" />
                 Importar / Exportar
@@ -608,6 +632,10 @@ export function OrganizationsTable() {
                     <DropdownMenuItem onClick={() => setMergeOpen(true)}>
                       <GitMergeIcon className="size-3.5" />
                       Fusionar duplicados
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleOpenMove}>
+                      <ArrowRightLeftIcon className="size-3.5" />
+                      Mover de espacio{selectedRowIds.length > 0 ? ` (${selectedRowIds.length})` : ""}
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setImportExportOpen(true)}>
                       <ArrowDownUpIcon className="size-3.5" />
@@ -710,6 +738,15 @@ export function OrganizationsTable() {
           onOpenChange={(o) => { if (!o) setEditId(null) }}
           organizationId={editId}
           onSuccess={() => setRefreshKey((k) => k + 1)}
+        />
+      )}
+
+      {moveOpen && (
+        <MoveOrganizationsSheet
+          open
+          onOpenChange={(o) => { if (!o) setMoveOpen(false) }}
+          initialSelectedIds={moveInitialIds}
+          onMoved={() => { setRowSelection({}); setRefreshKey((k) => k + 1) }}
         />
       )}
     </div>
