@@ -22,18 +22,25 @@ interface Props {
   phone: string
   country: string
   templates: WhatsappTemplateRaw[]
+  // Si viene de una oportunidad o de un contacto, el backend registra el envío
+  // (mismo criterio que "Enviar Correo"). Sin ninguno de los dos, se manda igual
+  // pero sin dejar rastro en el log — no hay contexto donde colgarlo.
+  personId?: number
+  opportunityId?: number
 }
 
-export function SendTemplateSheet({ open, onOpenChange, contactName, phone, country, templates }: Props) {
+export function SendTemplateSheet({ open, onOpenChange, contactName, phone, country, templates, personId, opportunityId }: Props) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" showCloseButton={false} className="w-full! sm:max-w-md" style={{ padding: 0, gap: 0 }}>
+      <SheetContent side="right" showCloseButton={false} className="w-full!" style={{ maxWidth: 480, padding: 0, gap: 0 }}>
         {open && (
           <Form
             contactName={contactName}
             phone={phone}
             country={country}
             templates={templates}
+            personId={personId}
+            opportunityId={opportunityId}
             onClose={() => onOpenChange(false)}
           />
         )}
@@ -47,12 +54,16 @@ function Form({
   phone,
   country,
   templates,
+  personId,
+  opportunityId,
   onClose,
 }: {
   contactName: string
   phone: string
   country: string
   templates: WhatsappTemplateRaw[]
+  personId?: number
+  opportunityId?: number
   onClose: () => void
 }) {
   const recipient = React.useMemo(() => normalizeWhatsAppRecipient(phone, country), [phone, country])
@@ -74,7 +85,7 @@ function Form({
     setSending(true)
     try {
       const bodyVarValues = varCount > 0 ? Array.from({ length: varCount }, (_, i) => vars[i + 1] || "") : undefined
-      await whatsappService.sendTemplateMessage(recipient, template.name, template.language, bodyVarValues)
+      await whatsappService.sendTemplateMessage(recipient, template.name, template.language, bodyVarValues, { personId, opportunityId })
       notify.success({ title: "Plantilla enviada", description: `"${template.name}" enviada a ${contactName}.` })
       onClose()
     } catch (error) {

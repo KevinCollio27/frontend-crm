@@ -22,7 +22,6 @@ import {
   ListIcon,
   Loader2Icon,
   MailIcon,
-  MessageSquareTextIcon,
   MoreHorizontal,
   PencilIcon,
   PhoneIcon,
@@ -37,6 +36,7 @@ import * as React from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { FcGoogle } from "react-icons/fc"
+import { SiWhatsapp } from "react-icons/si"
 import { useEntityRealtime } from "@/hooks/useEntityRealtime"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -72,16 +72,15 @@ import { DuplicateContactsSheet } from "./DuplicateContactsSheet"
 import { ContactsImportExportSheet } from "./ContactsImportExportSheet"
 import { MoveContactsSheet } from "./MoveContactsSheet"
 import { SendTemplateSheet } from "./SendTemplateSheet"
+import { SendEmailSheet } from "./SendEmailSheet"
 import { contactService, type CountryCount } from "@/services/contact.service"
 import { organizationService, type OrganizationOption } from "@/services/organization.service"
-import { whatsappService } from "@/services/whatsapp.service"
 import { contactConfirm } from "@/lib/confirm"
 import { notify } from "@/lib/notify"
 import { useIntegrations } from "@/hooks/useIntegrations"
+import { useSendActions } from "@/hooks/useSendActions"
 import { useIsMobile } from "@/hooks/use-mobile"
-import { isWhatsAppOperational } from "@/lib/whatsapp-status"
 import type { Person } from "@/types/contact"
-import type { WhatsappTemplateRaw } from "@/types/whatsapp"
 import { getFlag, getSortIcon, getInitials } from "@/lib/table-utils"
 import { cn } from "@/lib/utils"
 
@@ -91,6 +90,7 @@ export interface Contact {
   org: string
   orgId: number | null
   email: string
+  emails: string[]
   phone: string
   country: string
   source: string
@@ -99,7 +99,9 @@ export interface Contact {
 }
 
 function mapPerson(p: Person): Contact {
-  const email = p.person_detail?.find((d) => d.label?.key === "email")?.value ?? ""
+  // Un contacto puede tener más de un correo cargado — se guardan todos para que
+  // "Enviar Correo" los ofrezca todos como destinatario, no solo el primero.
+  const emails = p.person_detail?.filter((d) => d.label?.key === "email").map((d) => d.value) ?? []
   const phone =
     p.person_detail?.find((d) => d.label?.key === "phone" || d.label?.key === "telefono")?.value ?? ""
   return {
@@ -107,7 +109,8 @@ function mapPerson(p: Person): Contact {
     name: p.name,
     org: p.organization?.name ?? "Sin organización",
     orgId: p.organization_id ?? null,
-    email,
+    email: emails[0] ?? "",
+    emails,
     phone,
     country: p.pais_origen ?? "CL",
     source: p.contact_source ?? p.origin ?? "CRM",
@@ -165,7 +168,8 @@ function getColumns(
   onEdit: (contact: Contact) => void,
   onDelete: (contact: Contact) => void,
   onMove: (contact: Contact) => void,
-  onSendTemplate: ((contact: Contact) => void) | null
+  onSendTemplate: ((contact: Contact) => void) | null,
+  onSendEmail: ((contact: Contact) => void) | null
 ): ColumnDef<Contact>[] {
   return [
     {
@@ -342,8 +346,18 @@ function getColumns(
                     title={!contact.phone ? "Este contacto no tiene teléfono" : undefined}
                     onClick={() => onSendTemplate(contact)}
                   >
-                    <MessageSquareTextIcon />
+                    <SiWhatsapp className="size-3.5 text-[#25D366]" />
                     Enviar Plantilla
+                  </DropdownMenuItem>
+                )}
+                {onSendEmail && (
+                  <DropdownMenuItem
+                    disabled={contact.emails.length === 0}
+                    title={contact.emails.length === 0 ? "Este contacto no tiene correo" : undefined}
+                    onClick={() => onSendEmail(contact)}
+                  >
+                    <FcGoogle className="size-3.5" />
+                    Enviar Correo
                   </DropdownMenuItem>
                 )}
               </DropdownMenuGroup>
@@ -625,22 +639,11 @@ export function ContactsTable() {
   const [moveOpen, setMoveOpen] = React.useState(false)
   const [moveInitialIds, setMoveInitialIds] = React.useState<number[]>([])
   const [sendTemplateContact, setSendTemplateContact] = React.useState<Contact | null>(null)
-  const [approvedTemplates, setApprovedTemplates] = React.useState<WhatsappTemplateRaw[]>([])
   const { connections: integrationConnections } = useIntegrations()
   const googleContactsIntegration = integrationConnections.find((c) => c.provider_key === "google-contacts")
   const [countryCounts, setCountryCounts] = React.useState<CountryCount[]>([])
-
-  // "Enviar Plantilla" solo aparece si WhatsApp está operativo Y hay al menos una
-  // plantilla aprobada — se chequea una vez al cargar, no por cada fila.
-  React.useEffect(() => {
-    Promise.all([
-      whatsappService.getMetaConfig().catch(() => null),
-      whatsappService.getCachedTemplates({ status: "APPROVED" }).catch(() => ({ templates: [], total: 0, lastSyncedAt: null })),
-    ]).then(([config, templatesRes]) => {
-      setApprovedTemplates(isWhatsAppOperational(config) ? templatesRes.templates : [])
-    })
-  }, [])
-  const canSendTemplate = approvedTemplates.length > 0
+  const [sendEmailContact, setSendEmailContact] = React.useState<Contact | null>(null)
+  const { canSendTemplate, approvedTemplates, gmailConnection } = useSendActions()
 
   // Tiempo real: si otra sesión crea/edita/elimina un contacto en este
   // workspace, refresca la tabla sin esperar a un F5 manual. El evento real
@@ -811,8 +814,9 @@ export function ContactsTable() {
           setMoveOpen(true)
         },
         canSendTemplate ? (contact) => setSendTemplateContact(contact) : null,
+        gmailConnection ? (contact) => setSendEmailContact(contact) : null,
       ),
-    [router, canSendTemplate]
+    [router, canSendTemplate, gmailConnection]
   )
 
   const handleSorting = (updater: SortingState | ((prev: SortingState) => SortingState)) => {
@@ -1122,6 +1126,18 @@ export function ContactsTable() {
           phone={sendTemplateContact.phone}
           country={sendTemplateContact.country}
           templates={approvedTemplates}
+          personId={sendTemplateContact.id}
+        />
+      )}
+
+      {sendEmailContact && gmailConnection && (
+        <SendEmailSheet
+          open
+          onOpenChange={(o) => { if (!o) setSendEmailContact(null) }}
+          connectionId={gmailConnection.id}
+          userEmail={gmailConnection.account_email ?? ""}
+          contactEmails={sendEmailContact.emails}
+          contactName={sendEmailContact.name}
         />
       )}
     </div>

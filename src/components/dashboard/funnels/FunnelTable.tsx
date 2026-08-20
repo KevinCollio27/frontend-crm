@@ -22,8 +22,11 @@ import {
   TrophyIcon,
   XCircleIcon,
 } from "lucide-react"
+import { FcGoogle } from "react-icons/fc"
+import { SiWhatsapp } from "react-icons/si"
 import { cn } from "@/lib/utils"
 import { getSortIcon, getInitials } from "@/lib/table-utils"
+import { useSendActions } from "@/hooks/useSendActions"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -51,6 +54,8 @@ import type { OpportunityRaw } from "@/types/opportunity"
 import { FunnelPreviewSheet } from "./FunnelPreviewSheet"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { EntityAccentBar } from "@/components/ui/entity-accent-bar"
+import { SendTemplateSheet } from "../contacts/SendTemplateSheet"
+import { SendEmailSheet } from "../contacts/SendEmailSheet"
 
 // ─── Entity ──────────────────────────────────────────────────────────────────
 
@@ -63,6 +68,10 @@ export interface Opportunity {
   flowName: string
   company: string
   contact: string
+  contactId: number | null
+  contactEmails: string[]
+  contactPhone: string
+  contactCountry: string
   responsible: { name: string; initials: string; avatarUrl: string | null }
   value: number
   currency: string
@@ -88,6 +97,10 @@ export function mapOpportunity(d: OpportunityRaw): Opportunity {
 
   const originalSale = d.opportunity_net_sales.find((s) => s.is_original) ?? d.opportunity_net_sales[0]
 
+  const personDetail = d.person?.person_detail ?? []
+  const contactEmails = personDetail.filter((det) => det.label?.key === "email").map((det) => det.value)
+  const contactPhone = personDetail.find((det) => det.label?.key === "phone" || det.label?.key === "telefono")?.value ?? ""
+
   return {
     id:        d.id,
     name:      d.name,
@@ -97,6 +110,10 @@ export function mapOpportunity(d: OpportunityRaw): Opportunity {
     flowName:  d.flow?.name ?? "—",
     company:   d.organization?.name ?? "—",
     contact:   d.person?.name ?? "—",
+    contactId: d.person?.id ?? null,
+    contactEmails,
+    contactPhone,
+    contactCountry: d.person?.pais_origen ?? "CL",
     responsible: { name: respName, initials: getInitials(respName), avatarUrl: mainResp?.users?.avatar_url ?? null },
     value:     originalSale?.value ?? 0,
     currency:  originalSale?.currency?.symbol ?? "$",
@@ -196,6 +213,8 @@ function getColumns(
   onEdit:         (opp: Opportunity) => void,
   onDelete:       (opp: Opportunity) => void,
   onStatusChange: (opp: Opportunity, status: "ganada" | "perdida" | "en_progreso") => void,
+  onSendTemplate: ((opp: Opportunity) => void) | null,
+  onSendEmail:    ((opp: Opportunity) => void) | null,
 ): ColumnDef<Opportunity>[] {
   return [
     {
@@ -380,6 +399,26 @@ function getColumns(
                   <PencilIcon />
                   Editar
                 </DropdownMenuItem>
+                {onSendTemplate && (
+                  <DropdownMenuItem
+                    disabled={!opp.contactPhone}
+                    title={!opp.contactPhone ? "El contacto no tiene teléfono" : undefined}
+                    onClick={() => onSendTemplate(opp)}
+                  >
+                    <SiWhatsapp className="size-3.5 text-[#25D366]" />
+                    Enviar Plantilla
+                  </DropdownMenuItem>
+                )}
+                {onSendEmail && (
+                  <DropdownMenuItem
+                    disabled={opp.contactEmails.length === 0}
+                    title={opp.contactEmails.length === 0 ? "El contacto no tiene correo" : undefined}
+                    onClick={() => onSendEmail(opp)}
+                  >
+                    <FcGoogle className="size-3.5" />
+                    Enviar Correo
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuGroup>
               <DropdownMenuSeparator />
               <DropdownMenuGroup>
@@ -485,6 +524,9 @@ export function FunnelTable({
   const [rowSelection, setRowSelection] = React.useState({})
   const [selectedOpp, setSelectedOpp]   = React.useState<Opportunity | null>(null)
   const [sheetOpen, setSheetOpen]       = React.useState(false)
+  const [sendTemplateOpp, setSendTemplateOpp] = React.useState<Opportunity | null>(null)
+  const [sendEmailOpp, setSendEmailOpp]       = React.useState<Opportunity | null>(null)
+  const { canSendTemplate, approvedTemplates, gmailConnection } = useSendActions()
 
   // Sync search prop → query with debounce
   React.useEffect(() => {
@@ -525,8 +567,10 @@ export function FunnelTable({
       (opp) => onEdit?.(opp),
       (opp) => onDelete?.(opp),
       handleStatusChange,
+      canSendTemplate ? (opp) => setSendTemplateOpp(opp) : null,
+      gmailConnection ? (opp) => setSendEmailOpp(opp) : null,
     ),
-    [router, onEdit, onDelete, handleStatusChange],
+    [router, onEdit, onDelete, handleStatusChange, canSendTemplate, gmailConnection],
   )
 
   const table = useReactTable({
@@ -611,6 +655,30 @@ export function FunnelTable({
         open={sheetOpen}
         onOpenChange={setSheetOpen}
       />
+
+      {sendTemplateOpp && (
+        <SendTemplateSheet
+          open
+          onOpenChange={(o) => { if (!o) setSendTemplateOpp(null) }}
+          contactName={sendTemplateOpp.contact}
+          phone={sendTemplateOpp.contactPhone}
+          country={sendTemplateOpp.contactCountry}
+          templates={approvedTemplates}
+          opportunityId={sendTemplateOpp.id}
+        />
+      )}
+
+      {sendEmailOpp && gmailConnection && (
+        <SendEmailSheet
+          open
+          onOpenChange={(o) => { if (!o) setSendEmailOpp(null) }}
+          connectionId={gmailConnection.id}
+          userEmail={gmailConnection.account_email ?? ""}
+          contactEmails={sendEmailOpp.contactEmails}
+          contactName={sendEmailOpp.contact}
+          opportunityId={sendEmailOpp.id}
+        />
+      )}
     </div>
   )
 }

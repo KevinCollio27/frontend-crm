@@ -34,7 +34,12 @@ export interface OpportunityRaw {
   is_reopened: boolean
   planned_clousure_date: string | null
   created_at: string
-  person: { id: number; name: string } | null
+  person: {
+    id: number
+    name: string
+    pais_origen: string | null
+    person_detail?: { value: string; label: { key: string } | null }[]
+  } | null
   organization: { id: number; name: string } | null
   flow: { id: number; name: string } | null
   flow_stage: { id: number; name: string } | null

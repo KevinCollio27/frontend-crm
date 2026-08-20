@@ -109,8 +109,14 @@ export const whatsappService = {
     await api.delete(`whatsapp/templates/${templateId}`)
   },
 
-  async sendTemplateMessage(to: string, templateName: string, languageCode: string, bodyVarValues?: string[]): Promise<void> {
-    await api.post("whatsapp/send-template", { to, templateName, languageCode, bodyVarValues })
+  async sendTemplateMessage(
+    to: string,
+    templateName: string,
+    languageCode: string,
+    bodyVarValues?: string[],
+    context?: { personId?: number; opportunityId?: number },
+  ): Promise<void> {
+    await api.post("whatsapp/send-template", { to, templateName, languageCode, bodyVarValues, ...context })
   },
 
   async sendTemplateToConversation(conversationId: number, templateName: string, languageCode: string, bodyVarValues?: string[]): Promise<void> {

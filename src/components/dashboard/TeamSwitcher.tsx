@@ -2,20 +2,12 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import { ChevronsUpDownIcon, PlusIcon, ShieldIcon } from "lucide-react"
+import { ChevronsUpDownIcon, PlusIcon, SearchIcon, ShieldIcon } from "lucide-react"
 import { useSessionStore } from "@/store/session.store"
 import { saveLastWorkspace } from "@/lib/workspace-pref"
 import { flowService } from "@/services/flow.service"
 import { workspaceService, type PlatformAdminWorkspaceOverview } from "@/services/workspace.service"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import {
   SidebarMenu,
   SidebarMenuButton,
@@ -24,7 +16,11 @@ import {
 } from "@/components/ui/sidebar"
 import type { UserWorkspace } from "@/types/auth"
 import { WorkspaceLogo } from "@/components/shared/WorkspaceLogo"
+import { cn } from "@/lib/utils"
 
+// Panel flotante propio (no DropdownMenu) — mismo patrón que SearchableSelect/OrgFilter,
+// porque mezclar un input de búsqueda + Tabs dentro de un DropdownMenu choca con su
+// navegación por teclado pensada para ítems de menú, no para escribir texto.
 export function TeamSwitcher() {
   const { isMobile } = useSidebar()
   const router = useRouter()
@@ -37,17 +33,48 @@ export function TeamSwitcher() {
   const [allWorkspaces, setAllWorkspaces] = React.useState<PlatformAdminWorkspaceOverview[] | null>(null)
   const [enteringId, setEnteringId] = React.useState<number | null>(null)
 
+  const [open, setOpen] = React.useState(false)
+  const [search, setSearch] = React.useState("")
+  const [tab, setTab] = React.useState<"mine" | "admin">("mine")
+  const [panelStyle, setPanelStyle] = React.useState<React.CSSProperties>({})
+  const containerRef = React.useRef<HTMLDivElement>(null)
+
   const workspaces: UserWorkspace[] = user?.user_workspace ?? []
   const ownWorkspaceIds = new Set(workspaces.map((w) => w.workspace_id))
   const active = workspaces.find((w) => w.workspace_id === workspaceId) ?? workspaces[0]
 
+  function closePanel() {
+    setOpen(false)
+    setSearch("")
+    setTab("mine")
+  }
+
   // Solo se pide una vez que se abre el menú, y solo si es admin de plataforma —
   // un usuario normal nunca dispara este request.
-  function handleOpenChange(open: boolean) {
-    if (open && isPlatformAdmin && allWorkspaces === null) {
-      workspaceService.getPlatformAdminOverview().then(setAllWorkspaces).catch(() => setAllWorkspaces([]))
+  function handleOpen() {
+    if (!open && containerRef.current) {
+      const r = containerRef.current.getBoundingClientRect()
+      setPanelStyle(
+        isMobile
+          ? { top: r.bottom + 6, left: r.left, width: Math.max(r.width, 260) }
+          : { top: r.top, left: r.right + 8, width: 260 }
+      )
+      if (isPlatformAdmin && allWorkspaces === null) {
+        workspaceService.getPlatformAdminOverview().then(setAllWorkspaces).catch(() => setAllWorkspaces([]))
+      }
     }
+    setOpen((o) => !o)
   }
+
+  React.useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        closePanel()
+      }
+    }
+    document.addEventListener("mousedown", handler)
+    return () => document.removeEventListener("mousedown", handler)
+  }, [])
 
   if (isLoading || (!active && !platformAdminViewing)) {
     return (
@@ -66,6 +93,7 @@ export function TeamSwitcher() {
   }
 
   const handleSwitch = async (ws: UserWorkspace) => {
+    closePanel()
     if (ws.workspace_id === workspaceId) return
     await fetch("/api/auth/session", {
       method: "PATCH",
@@ -78,7 +106,7 @@ export function TeamSwitcher() {
   }
 
   const handleEnterForeign = async (ws: PlatformAdminWorkspaceOverview) => {
-    if (ws.id === workspaceId) return
+    if (ws.id === workspaceId) { closePanel(); return }
     setEnteringId(ws.id)
     await fetch("/api/auth/session", {
       method: "PATCH",
@@ -88,23 +116,44 @@ export function TeamSwitcher() {
     flowService.invalidateCache()
     useSessionStore.getState().enterAsPlatformAdmin({ id: ws.id, name: ws.name })
     setEnteringId(null)
+    closePanel()
   }
 
   const activeName = platformAdminViewing?.name ?? active?.workspace?.name ?? "Workspace"
   const activeLogo = platformAdminViewing ? undefined : active?.workspace?.logo
   const foreignWorkspaces = (allWorkspaces ?? []).filter((w) => !ownWorkspaceIds.has(w.id))
 
+  const q = search.trim().toLowerCase()
+  const filteredMine = q
+    ? workspaces.filter((ws) => (ws.workspace?.name ?? "").toLowerCase().includes(q))
+    : workspaces
+  const filteredForeign = q
+    ? foreignWorkspaces.filter((ws) => ws.name.toLowerCase().includes(q))
+    : foreignWorkspaces
+
+  const searchBox = (
+    <div className="border-b p-1.5">
+      <div className="relative">
+        <SearchIcon className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+        <input
+          autoFocus
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar workspace..."
+          className="w-full bg-transparent py-1.5 pl-7 pr-2 text-sm outline-none placeholder:text-muted-foreground"
+        />
+      </div>
+    </div>
+  )
+
   return (
     <SidebarMenu>
       <SidebarMenuItem>
-        <DropdownMenu onOpenChange={handleOpenChange}>
-          <DropdownMenuTrigger
-            render={
-              <SidebarMenuButton
-                size="lg"
-                className="data-open:bg-sidebar-accent data-open:text-sidebar-accent-foreground"
-              />
-            }
+        <div ref={containerRef} className="relative">
+          <SidebarMenuButton
+            size="lg"
+            onClick={handleOpen}
+            className={cn(open && "bg-sidebar-accent text-sidebar-accent-foreground")}
           >
             <WorkspaceLogo name={activeName} logo={activeLogo} />
             <div className="grid flex-1 text-left text-sm leading-tight">
@@ -114,89 +163,118 @@ export function TeamSwitcher() {
               </span>
             </div>
             <ChevronsUpDownIcon className="ml-auto" />
-          </DropdownMenuTrigger>
+          </SidebarMenuButton>
 
-          <DropdownMenuContent
-            className="min-w-56 rounded-lg"
-            align="start"
-            side={isMobile ? "bottom" : "right"}
-            sideOffset={4}
-          >
-            <DropdownMenuGroup>
-              <DropdownMenuLabel className="text-xs text-muted-foreground">
-                Espacios de Trabajo
-              </DropdownMenuLabel>
-              <div className="max-h-64 overflow-y-auto">
-                {workspaces.map((ws) => {
-                  const wsName = ws.workspace?.name ?? `Workspace ${ws.workspace_id}`
-                  const isActive = ws.workspace_id === workspaceId && !platformAdminViewing
-                  return (
-                    <DropdownMenuItem
-                      key={ws.workspace_id}
-                      onClick={() => handleSwitch(ws)}
-                      className="gap-2 p-2"
-                    >
-                      <WorkspaceLogo name={wsName} logo={ws.workspace?.logo} size="sm" />
-                      <span className={isActive ? "font-medium" : ""}>{wsName}</span>
-                      {isActive && (
-                        <span className="ml-auto size-1.5 rounded-full bg-foreground" />
-                      )}
-                    </DropdownMenuItem>
-                  )
-                })}
-              </div>
-            </DropdownMenuGroup>
+          {open && (
+            <div
+              className="fixed z-50 flex max-h-100 flex-col overflow-hidden rounded-lg border bg-popover text-popover-foreground shadow-md"
+              style={panelStyle}
+            >
+              {isPlatformAdmin ? (
+                <Tabs value={tab} onValueChange={(v) => { setTab(v as "mine" | "admin"); setSearch("") }} className="min-h-0 flex-1 gap-0">
+                  <TabsList className="m-1.5 mb-0">
+                    <TabsTrigger value="mine">Mis workspaces</TabsTrigger>
+                    <TabsTrigger value="admin" className="gap-1.5">
+                      <ShieldIcon className="size-3" />
+                      Modo Admin
+                    </TabsTrigger>
+                  </TabsList>
 
-            {isPlatformAdmin && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuGroup>
-                  <DropdownMenuLabel className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <ShieldIcon className="size-3" />
-                    Todos los workspaces (admin)
-                  </DropdownMenuLabel>
-                  <div className="max-h-64 overflow-y-auto">
+                  {searchBox}
+
+                  <TabsContent value="mine" className="m-0 min-h-0 overflow-y-auto p-1">
+                    <WorkspaceList items={filteredMine} activeId={!platformAdminViewing ? workspaceId : null} onSelect={handleSwitch} />
+                  </TabsContent>
+
+                  <TabsContent value="admin" className="m-0 min-h-0 overflow-y-auto p-1">
                     {allWorkspaces === null ? (
-                      <div className="px-2 py-1.5 text-xs text-muted-foreground">Cargando...</div>
-                    ) : foreignWorkspaces.length === 0 ? (
-                      <div className="px-2 py-1.5 text-xs text-muted-foreground">No hay otros workspaces.</div>
+                      <div className="px-2 py-3 text-center text-xs text-muted-foreground">Cargando...</div>
+                    ) : filteredForeign.length === 0 ? (
+                      <div className="px-2 py-3 text-center text-xs text-muted-foreground">
+                        {q ? "Sin resultados." : "No hay otros workspaces."}
+                      </div>
                     ) : (
-                      foreignWorkspaces.map((ws) => {
+                      filteredForeign.map((ws) => {
                         const isActive = ws.id === workspaceId && !!platformAdminViewing
                         return (
-                          <DropdownMenuItem
+                          <button
                             key={ws.id}
+                            type="button"
                             onClick={() => handleEnterForeign(ws)}
                             disabled={enteringId !== null}
-                            className="gap-2 p-2"
+                            className="flex w-full items-center gap-2 rounded-md p-2 text-left text-sm hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
                           >
-                            <WorkspaceLogo name={ws.name} size="sm" />
+                            <WorkspaceLogo name={ws.name} size="md" />
                             <span className={isActive ? "font-medium" : ""}>{ws.name}</span>
                             {enteringId === ws.id && (
                               <span className="ml-auto text-xs text-muted-foreground">Entrando...</span>
                             )}
-                            {isActive && (
-                              <span className="ml-auto size-1.5 rounded-full bg-foreground" />
-                            )}
-                          </DropdownMenuItem>
+                            {isActive && <span className="ml-auto size-1.5 shrink-0 rounded-full bg-foreground" />}
+                          </button>
                         )
                       })
                     )}
+                  </TabsContent>
+                </Tabs>
+              ) : (
+                <div className="flex min-h-0 flex-1 flex-col">
+                  {searchBox}
+                  <div className="min-h-0 overflow-y-auto p-1">
+                    <WorkspaceList items={filteredMine} activeId={workspaceId} onSelect={handleSwitch} />
                   </div>
-                </DropdownMenuGroup>
-              </>
-            )}
+                </div>
+              )}
 
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="gap-2 p-2" onClick={() => router.push("/create-workspace")}>
-              <div className="flex size-6 items-center justify-center rounded-md border bg-muted">
-                <PlusIcon className="size-3.5" />
+              <div className="border-t p-1">
+                <button
+                  type="button"
+                  onClick={() => { closePanel(); router.push("/create-workspace") }}
+                  className="flex w-full items-center gap-2 rounded-md p-2 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                >
+                  <div className="flex size-6 items-center justify-center rounded-md border bg-muted">
+                    <PlusIcon className="size-3.5" />
+                  </div>
+                  <span className="text-muted-foreground">Crear workspace</span>
+                </button>
               </div>
-              <span className="text-muted-foreground">Crear workspace</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+            </div>
+          )}
+        </div>
       </SidebarMenuItem>
     </SidebarMenu>
+  )
+}
+
+function WorkspaceList({
+  items,
+  activeId,
+  onSelect,
+}: {
+  items: UserWorkspace[]
+  activeId: number | null | undefined
+  onSelect: (ws: UserWorkspace) => void
+}) {
+  if (items.length === 0) {
+    return <div className="px-2 py-3 text-center text-xs text-muted-foreground">Sin resultados.</div>
+  }
+  return (
+    <>
+      {items.map((ws) => {
+        const wsName = ws.workspace?.name ?? `Workspace ${ws.workspace_id}`
+        const isActive = ws.workspace_id === activeId
+        return (
+          <button
+            key={ws.workspace_id}
+            type="button"
+            onClick={() => onSelect(ws)}
+            className="flex w-full items-center gap-2 rounded-md p-2 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+          >
+            <WorkspaceLogo name={wsName} logo={ws.workspace?.logo} size="md" />
+            <span className={isActive ? "font-medium" : ""}>{wsName}</span>
+            {isActive && <span className="ml-auto size-1.5 shrink-0 rounded-full bg-foreground" />}
+          </button>
+        )
+      })}
+    </>
   )
 }

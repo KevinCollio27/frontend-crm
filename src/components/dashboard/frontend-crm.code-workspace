@@ -14,6 +14,9 @@
 		},
 		{
 			"path": "../../../../SegIA-scanner"
+		},
+		{
+			"path": "../../../../goxt-prohabla"
 		}
 	]
 }
