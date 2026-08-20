@@ -27,6 +27,7 @@ import { notify } from "@/lib/notify"
 import { catalogService, activeOptions } from "@/services/catalog.service"
 import { contactService, type PersonPayload } from "@/services/contact.service"
 import { integrationService } from "@/services/integration.service"
+import { organizationService } from "@/services/organization.service"
 import type { GoogleContactRaw } from "@/types/google-contacts"
 
 interface ImportGoogleContactsSheetProps {
@@ -92,6 +93,10 @@ function ImportBody({
   const [phoneLabelId, setPhoneLabelId] = React.useState<number | null>(null)
   const [emailOption, setEmailOption] = React.useState<{ id: number | null; value: string } | null>(null)
   const [phoneOption, setPhoneOption] = React.useState<{ id: number | null; value: string } | null>(null)
+  // Match por nombre exacto (case-insensitive) contra organizaciones ya existentes en el
+  // workspace — mismo criterio que usa el import por Excel (person.service.ts). No se
+  // auto-crea ninguna organización nueva: texto libre de Google generaría duplicados.
+  const [orgMap, setOrgMap] = React.useState<Map<string, number>>(new Map())
 
   const [search, setSearch] = React.useState("")
   const [visibleCount, setVisibleCount] = React.useState(RENDER_PAGE_SIZE)
@@ -106,8 +111,9 @@ function ImportBody({
     Promise.all([
       integrationService.getGoogleContactsList(integrationId),
       catalogService.getLabelOptions(["email", "phone"]),
+      organizationService.allNoPaginate().catch(() => []),
     ])
-      .then(async ([googleContacts, labels]) => {
+      .then(async ([googleContacts, labels, organizations]) => {
         if (cancelled) return
 
         const emailLabel = labels.find((l) => l.key === "email")
@@ -120,6 +126,10 @@ function ImportBody({
         setPhoneOption(phoneOpts[0] ? { id: phoneOpts[0].id, value: phoneOpts[0].value } : null)
 
         setContacts(googleContacts)
+
+        const map = new Map<string, number>()
+        organizations.forEach((org) => map.set(org.name.toLowerCase().trim(), org.id))
+        setOrgMap(map)
 
         const emails = googleContacts.filter((c) => c.email).map((c) => c.email as string)
         const phones = googleContacts.filter((c) => c.phone).map((c) => stripCountryCode(c.phone as string))
@@ -199,11 +209,11 @@ function ImportBody({
     function importOne(contact: GoogleContactRaw) {
       const payload: PersonPayload = {
         name: contact.name,
-        organization_id: null,
+        organization_id: contact.company ? orgMap.get(contact.company.toLowerCase().trim()) ?? null : null,
         pais_origen: "CL",
         contact_source: "google_contacts",
-        internal_position: null,
-        birth_date: null,
+        internal_position: contact.charge,
+        birth_date: contact.birth_date,
         linkedin_url: null,
         instagram_url: null,
         twitter_url: null,
