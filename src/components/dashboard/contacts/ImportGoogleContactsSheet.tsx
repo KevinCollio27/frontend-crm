@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
+import { Progress } from "@/components/ui/progress"
 import {
   Sheet,
   SheetContent,
@@ -64,6 +65,15 @@ function errorMessage(error: unknown, fallback: string): string {
   return (error as { message?: string })?.message ?? fallback
 }
 
+// Cuentas con muchos contactos (3000+) traban el modal si se renderizan todas las filas
+// de una — se pagina el render igual que "Cargar más" en MoveContactsSheet, pero acá es
+// solo del lado del cliente porque los 3000 ya vienen enteros en una sola respuesta de Google.
+const RENDER_PAGE_SIZE = 50
+
+// Disparar 3000 POST en paralelo satura el backend de golpe — se importa en tandas chicas,
+// lo que además da pie a una barra de progreso real en vez de un salto de 0% a 100%.
+const IMPORT_BATCH_SIZE = 10
+
 function ImportBody({
   integrationId,
   onClose,
@@ -84,8 +94,10 @@ function ImportBody({
   const [phoneOption, setPhoneOption] = React.useState<{ id: number | null; value: string } | null>(null)
 
   const [search, setSearch] = React.useState("")
+  const [visibleCount, setVisibleCount] = React.useState(RENDER_PAGE_SIZE)
   const [selected, setSelected] = React.useState<Set<number>>(new Set())
   const [importing, setImporting] = React.useState(false)
+  const [importProgress, setImportProgress] = React.useState<{ current: number; total: number } | null>(null)
 
   React.useEffect(() => {
     let cancelled = false
@@ -148,6 +160,15 @@ function ImportBody({
   )
   const allSelected = selectableFiltered.length > 0 && selectableFiltered.every((i) => selected.has(i))
 
+  // Búsqueda/seleccionar-todos siguen operando sobre filteredIndices completo — solo el
+  // render de filas se corta, para no montar miles de <TableRow> de una.
+  const visibleIndices = filteredIndices.slice(0, visibleCount)
+  const hasMoreToShow = visibleCount < filteredIndices.length
+
+  React.useEffect(() => {
+    setVisibleCount(RENDER_PAGE_SIZE)
+  }, [search])
+
   function toggleOne(index: number) {
     setSelected((prev) => {
       const next = new Set(prev)
@@ -171,33 +192,46 @@ function ImportBody({
     setImporting(true)
 
     const toImport = Array.from(selected).map((i) => contacts[i])
-    const results = await Promise.allSettled(
-      toImport.map((contact) => {
-        const payload: PersonPayload = {
-          name: contact.name,
-          organization_id: null,
-          pais_origen: "CL",
-          contact_source: "google_contacts",
-          internal_position: null,
-          birth_date: null,
-          linkedin_url: null,
-          instagram_url: null,
-          twitter_url: null,
-          facebook_url: null,
-          email: contact.email && emailLabelId
-            ? [{ id: emailOption?.id ?? null, label_id: emailLabelId, option: emailOption?.value ?? "", value: contact.email }]
-            : [],
-          phone: contact.phone && phoneLabelId
-            ? [{ id: phoneOption?.id ?? null, label_id: phoneLabelId, option: phoneOption?.value ?? "", value: stripCountryCode(contact.phone) }]
-            : [],
-          charge: [],
-          tag: [],
-        }
-        return contactService.create(payload)
+    const total = toImport.length
+    setImportProgress({ current: 0, total })
+    let completed = 0
+
+    function importOne(contact: GoogleContactRaw) {
+      const payload: PersonPayload = {
+        name: contact.name,
+        organization_id: null,
+        pais_origen: "CL",
+        contact_source: "google_contacts",
+        internal_position: null,
+        birth_date: null,
+        linkedin_url: null,
+        instagram_url: null,
+        twitter_url: null,
+        facebook_url: null,
+        email: contact.email && emailLabelId
+          ? [{ id: emailOption?.id ?? null, label_id: emailLabelId, option: emailOption?.value ?? "", value: contact.email }]
+          : [],
+        phone: contact.phone && phoneLabelId
+          ? [{ id: phoneOption?.id ?? null, label_id: phoneLabelId, option: phoneOption?.value ?? "", value: stripCountryCode(contact.phone) }]
+          : [],
+        charge: [],
+        tag: [],
+      }
+      return contactService.create(payload).finally(() => {
+        completed += 1
+        setImportProgress({ current: completed, total })
       })
-    )
+    }
+
+    const results: PromiseSettledResult<unknown>[] = []
+    for (let i = 0; i < toImport.length; i += IMPORT_BATCH_SIZE) {
+      const batch = toImport.slice(i, i + IMPORT_BATCH_SIZE)
+      const batchResults = await Promise.allSettled(batch.map(importOne))
+      results.push(...batchResults)
+    }
 
     setImporting(false)
+    setImportProgress(null)
     const okCount = results.filter((r) => r.status === "fulfilled").length
     const failCount = results.length - okCount
 
@@ -222,7 +256,7 @@ function ImportBody({
           <SheetTitle>Importar contactos</SheetTitle>
           <SheetDescription>Google Contacts — selecciona los contactos que quieres traer al CRM.</SheetDescription>
         </div>
-        <Button type="button" variant="ghost" size="icon-sm" className="shrink-0" onClick={onClose} aria-label="Cerrar">
+        <Button type="button" variant="ghost" size="icon-sm" className="shrink-0" onClick={onClose} disabled={importing} aria-label="Cerrar">
           <XIcon />
         </Button>
       </div>
@@ -271,7 +305,7 @@ function ImportBody({
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredIndices.map((i) => {
+                    visibleIndices.map((i) => {
                       const contact = contacts[i]
                       const duplicate = isDuplicate(contact)
                       return (
@@ -313,6 +347,18 @@ function ImportBody({
                   )}
                 </TableBody>
               </Table>
+              {hasMoreToShow && (
+                <div className="border-t p-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="w-full"
+                    onClick={() => setVisibleCount((c) => c + RENDER_PAGE_SIZE)}
+                  >
+                    Cargar más ({filteredIndices.length - visibleCount} restantes)
+                  </Button>
+                </div>
+              )}
             </div>
           </>
         )}
@@ -320,11 +366,20 @@ function ImportBody({
 
       {/* Footer */}
       <div className="flex items-center justify-between gap-2 border-t p-4">
-        <span className="text-xs text-muted-foreground">
-          {selected.size} seleccionado{selected.size !== 1 ? "s" : ""}
-        </span>
-        <div className="flex gap-2">
-          <Button type="button" variant="outline" onClick={onClose}>
+        {importProgress ? (
+          <div className="flex flex-1 items-center gap-2">
+            <Progress value={(importProgress.current / importProgress.total) * 100} className="flex-1" />
+            <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+              {importProgress.current} de {importProgress.total}
+            </span>
+          </div>
+        ) : (
+          <span className="text-xs text-muted-foreground">
+            {selected.size} seleccionado{selected.size !== 1 ? "s" : ""}
+          </span>
+        )}
+        <div className="flex shrink-0 gap-2">
+          <Button type="button" variant="outline" onClick={onClose} disabled={importing}>
             Cancelar
           </Button>
           <Button type="button" disabled={selected.size === 0 || importing} onClick={handleImport}>
