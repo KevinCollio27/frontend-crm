@@ -11,7 +11,8 @@ import {
   useReactTable,
   type VisibilityState,
 } from "@tanstack/react-table"
-import { CopyIcon, EyeIcon, MoreHorizontalIcon, PlusIcon, RefreshCwIcon, SearchIcon, SendIcon, Settings2Icon, Trash2Icon } from "lucide-react"
+import { ChevronDown, CopyIcon, EyeIcon, MoreHorizontalIcon, PlusIcon, RefreshCwIcon, SearchIcon, SendIcon, Settings2Icon, Trash2Icon } from "lucide-react"
+import { cn } from "@/lib/utils"
 import { getSortIcon } from "@/lib/table-utils"
 import { useIsWorkspaceAdmin } from "@/hooks/useIsWorkspaceAdmin"
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -212,6 +213,7 @@ export function WhatsappTemplatesTable() {
   const [duplicatePrefill, setDuplicatePrefill] = React.useState<TemplatePrefill | null>(null)
   const [sendTarget, setSendTarget] = React.useState<WhatsappTemplateRaw | null>(null)
   const [previewTarget, setPreviewTarget] = React.useState<WhatsappTemplateRaw | null>(null)
+  const [visualizacionOpen, setVisualizacionOpen] = React.useState(false)
 
   const isMobile = useIsMobile()
   React.useEffect(() => {
@@ -316,10 +318,11 @@ export function WhatsappTemplatesTable() {
             </span>
           )}
           <div className="[&_button]:w-full md:[&_button]:w-auto">
-            <DropdownMenu>
-              <DropdownMenuTrigger render={<Button variant="outline" size="sm" />}>
+            <DropdownMenu open={visualizacionOpen} onOpenChange={setVisualizacionOpen}>
+              <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="gap-1.5" />}>
                 <Settings2Icon className="size-4" />
                 Visualización
+                <ChevronDown className={cn("size-4 transition-transform", visualizacionOpen && "rotate-180")} />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="min-w-40">
                 {table.getAllColumns().filter((col) => col.getCanHide()).map((col) => (

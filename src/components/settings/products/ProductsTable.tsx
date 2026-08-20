@@ -11,6 +11,7 @@ import {
   type VisibilityState,
 } from "@tanstack/react-table"
 import {
+  ChevronDown,
   CopyIcon,
   MoreHorizontalIcon,
   PencilIcon,
@@ -19,6 +20,7 @@ import {
   Settings2Icon,
   Trash2Icon,
 } from "lucide-react"
+import { cn } from "@/lib/utils"
 import { getSortIcon } from "@/lib/table-utils"
 import { useIsWorkspaceAdmin } from "@/hooks/useIsWorkspaceAdmin"
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -253,6 +255,7 @@ export function ProductsTable() {
   const [refreshKey, setRefreshKey] = React.useState(0)
   const [createOpen, setCreateOpen] = React.useState(false)
   const [editingProduct, setEditingProduct] = React.useState<ProductFormState | undefined>(undefined)
+  const [visualizacionOpen, setVisualizacionOpen] = React.useState(false)
 
   const isMobile = useIsMobile()
   React.useEffect(() => {
@@ -375,10 +378,11 @@ export function ProductsTable() {
             {total} producto{total !== 1 ? "s" : ""}
           </span>
           <div className="[&_button]:w-full md:[&_button]:w-auto">
-            <DropdownMenu>
-              <DropdownMenuTrigger render={<Button variant="outline" size="sm" />}>
+            <DropdownMenu open={visualizacionOpen} onOpenChange={setVisualizacionOpen}>
+              <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="gap-1.5" />}>
                 <Settings2Icon className="size-4" />
                 Visualización
+                <ChevronDown className={cn("size-4 transition-transform", visualizacionOpen && "rotate-180")} />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="min-w-40">
                 {table.getAllColumns().filter((col) => col.getCanHide()).map((col) => (

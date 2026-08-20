@@ -11,7 +11,8 @@ import {
   useReactTable,
   type VisibilityState,
 } from "@tanstack/react-table"
-import { EyeIcon, MoreHorizontalIcon, PencilIcon, PlusIcon, SearchIcon, Settings2Icon, StarIcon, StarOffIcon, Trash2Icon } from "lucide-react"
+import { ChevronDown, EyeIcon, MoreHorizontalIcon, PencilIcon, PlusIcon, SearchIcon, Settings2Icon, StarIcon, StarOffIcon, Trash2Icon } from "lucide-react"
+import { cn } from "@/lib/utils"
 import { getSortIcon } from "@/lib/table-utils"
 import { EntityAccentBar } from "@/components/ui/entity-accent-bar"
 import { useIsWorkspaceAdmin } from "@/hooks/useIsWorkspaceAdmin"
@@ -228,6 +229,7 @@ export function PdfTemplatesTable() {
   const [createOpen, setCreateOpen] = React.useState(false)
   const [editingTemplate, setEditingTemplate] = React.useState<PdfTemplate | undefined>(undefined)
   const [previewTemplate, setPreviewTemplate] = React.useState<PdfTemplate | null>(null)
+  const [visualizacionOpen, setVisualizacionOpen] = React.useState(false)
 
   const isMobile = useIsMobile()
   React.useEffect(() => {
@@ -324,10 +326,11 @@ export function PdfTemplatesTable() {
             </span>
           )}
           <div className="[&_button]:w-full md:[&_button]:w-auto">
-            <DropdownMenu>
-              <DropdownMenuTrigger render={<Button variant="outline" size="sm" />}>
+            <DropdownMenu open={visualizacionOpen} onOpenChange={setVisualizacionOpen}>
+              <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="gap-1.5" />}>
                 <Settings2Icon className="size-4" />
                 Visualización
+                <ChevronDown className={cn("size-4 transition-transform", visualizacionOpen && "rotate-180")} />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="min-w-40">
                 {table.getAllColumns().filter((col) => col.getCanHide()).map((col) => (

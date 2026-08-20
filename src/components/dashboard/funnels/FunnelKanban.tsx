@@ -26,6 +26,7 @@ import {
   ArrowUpRightIcon,
   CalendarIcon,
   ChevronDownIcon,
+  Columns3Icon,
   EyeIcon,
   FileTextIcon,
   KanbanSquareIcon,
@@ -37,6 +38,7 @@ import {
   PlusCircleIcon,
   RotateCcwIcon,
   SearchIcon,
+  SlidersHorizontalIcon,
   Trash2Icon,
   TrophyIcon,
   XCircleIcon,
@@ -464,8 +466,10 @@ export function FunnelKanban() {
     () => (searchParams.get("view") as FunnelView) ?? "lista"
   )
 
+  // Board y Sugerencias necesitan todo el ancho disponible — solo Lista deja el
+  // sidebar abierto.
   React.useEffect(() => {
-    setOpen(view !== "board")
+    setOpen(view === "lista")
   }, [view]) // eslint-disable-line react-hooks/exhaustive-deps
 
   React.useEffect(() => {
@@ -490,6 +494,8 @@ export function FunnelKanban() {
     if (isMobile) setColumnVisibility(MOBILE_COLUMN_VISIBILITY)
   }, [isMobile])
   const [oppTotal, setOppTotal]                 = React.useState(0)
+  const [filtersOpen, setFiltersOpen]           = React.useState(false)
+  const [columnsOpen, setColumnsOpen]           = React.useState(false)
 
   // ── Board state ─────────────────────────────────────────────────────────────
   const [kanbanOpps, setKanbanOpps]         = React.useState<Opportunity[]>([])
@@ -627,7 +633,21 @@ export function FunnelKanban() {
 
   // Con un filtro activo, el número de columna debe reflejar lo filtrado (lo que
   // ya hacía antes) — el conteo real de backend solo aplica a la vista sin filtrar.
+  // Ojo: no incluye flowId a propósito — cambiar de Pipeline ya recarga los datos
+  // del board desde el backend (no es un filtro client-side como los demás), así
+  // que el conteo real por etapa sigue siendo válido aunque haya un Pipeline elegido.
   const hasActiveFilters = !!search || statusFilter !== "all" || responsibleFilter.length > 0
+
+  // Para el botón "Restablecer" del toolbar sí cuenta el Pipeline — acá el usuario
+  // quiere limpiar todo lo que haya tocado, a diferencia del caso de arriba.
+  const hasFilterActive = hasActiveFilters || !!flowId
+
+  function resetFilters() {
+    setSearch("")
+    setFlowId(null)
+    setStatusFilter("all")
+    setResponsibleFilter([])
+  }
 
   // ── Board filtering ──────────────────────────────────────────────────────────
   const filtered = React.useMemo(() => {
@@ -892,8 +912,8 @@ export function FunnelKanban() {
         <Button size="sm" onClick={() => setCreateOpen(true)}>+ Crear Oportunidad</Button>
       </div>
 
-      {/* Row 2 — filters. En mobile se apila en filas propias en vez de forzar scroll
-          horizontal; desde md hacia arriba queda igual que antes. */}
+      {/* Row 2 — búsqueda + toggle de filtros. En mobile se apila en filas propias
+          en vez de forzar scroll horizontal; desde md hacia arriba queda igual que antes. */}
       {view !== "sugerencias" && (
       <div className="flex shrink-0 flex-col gap-2 border-b px-4 py-2 md:flex-row md:items-center">
         <div className="flex flex-col gap-2 border-b pb-2 md:flex-row md:items-center md:border-b-0 md:pb-0">
@@ -907,9 +927,71 @@ export function FunnelKanban() {
             />
           </div>
 
-          {/* Grid de 2 columnas — Restablecer (Board) es un ítem más del grid, no
-              fila propia, así que si el total de filtros sale impar se empareja
-              con él en vez de quedar solo (ver RESPONSIVIDAD.md). */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Columnas solo aplica a la vista Lista — Board no tiene columnas configurables */}
+            {view === "lista" && (
+              <div className="[&_button]:w-full md:[&_button]:w-auto">
+                <DropdownMenu open={columnsOpen} onOpenChange={setColumnsOpen}>
+                  <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8 gap-1.5" />}>
+                    <Columns3Icon className="size-3.5" />
+                    Columnas
+                    <ChevronDownIcon className={cn("size-3.5 transition-transform", columnsOpen && "rotate-180")} />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {Object.entries(COLUMN_LABELS).map(([id, label]) => (
+                      <DropdownMenuCheckboxItem
+                        key={id}
+                        checked={columnVisibility[id] !== false}
+                        onCheckedChange={(v) => setColumnVisibility((prev) => ({ ...prev, [id]: !!v }))}
+                      >
+                        {label}
+                      </DropdownMenuCheckboxItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            )}
+
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1.5"
+              onClick={() => setFiltersOpen((o) => !o)}
+            >
+              <SlidersHorizontalIcon className="size-3.5" />
+              Filtros
+              <ChevronDownIcon className={cn("size-3.5 transition-transform", filtersOpen && "rotate-180")} />
+            </Button>
+
+            {hasFilterActive && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 px-2 text-xs"
+                onClick={resetFilters}
+              >
+                <XIcon className="size-3.5" />
+                Restablecer
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {view === "lista" && (
+          <span className="md:ml-auto shrink-0 text-xs text-muted-foreground">{oppTotal} oportunidades</span>
+        )}
+
+        {view === "board" && (
+          <span className="md:ml-auto shrink-0 text-xs text-muted-foreground">
+            {filtered.length} oportunidades · {formatTotal(totalValue)}
+          </span>
+        )}
+      </div>
+      )}
+
+      {/* Row 3 — filtros avanzados, colapsados por defecto (botón "Filtros" en fila 2) */}
+      {view !== "sugerencias" && filtersOpen && (
+        <div className="flex shrink-0 flex-col gap-2 border-b bg-muted/30 px-4 py-2 md:flex-row md:items-center">
           <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:items-center">
             <div className="[&_button]:w-full md:[&_button]:w-auto">
               <SingleSelectFilter
@@ -943,53 +1025,10 @@ export function FunnelKanban() {
                     onChange={setResponsibleFilter}
                   />
                 </div>
-
-                {responsibleFilter.length > 0 && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="w-full h-8 px-2 text-xs md:w-auto"
-                    onClick={() => setResponsibleFilter([])}
-                  >
-                    <XIcon className="size-3.5" />
-                    Restablecer
-                  </Button>
-                )}
               </>
             )}
           </div>
         </div>
-
-        {view === "lista" && (
-          <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-2 md:ml-auto">
-            <span className="w-full text-xs text-muted-foreground md:w-auto">{oppTotal} oportunidades</span>
-            <div className="[&_button]:w-full md:[&_button]:w-auto">
-              <DropdownMenu>
-                <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8" />}>
-                  Columnas <ChevronDownIcon className="ml-1.5 size-3.5" />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {Object.entries(COLUMN_LABELS).map(([id, label]) => (
-                    <DropdownMenuCheckboxItem
-                      key={id}
-                      checked={columnVisibility[id] !== false}
-                      onCheckedChange={(v) => setColumnVisibility((prev) => ({ ...prev, [id]: !!v }))}
-                    >
-                      {label}
-                    </DropdownMenuCheckboxItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
-        )}
-
-        {view === "board" && (
-          <span className="md:ml-auto shrink-0 text-xs text-muted-foreground">
-            {filtered.length} oportunidades · {formatTotal(totalValue)}
-          </span>
-        )}
-      </div>
       )}
 
       {/* Board */}

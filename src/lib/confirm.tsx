@@ -180,6 +180,26 @@ export const contactConfirm = {
       tone: "block",
       blocking: true,
     }),
+  // Todos los seleccionados están bloqueados por oportunidad — no hay nada elegible.
+  allBlockedByOpportunity: (count: number) =>
+    confirmDialog({
+      title: "No puedes eliminar ninguno",
+      description: `${count} contacto${count > 1 ? "s tienen" : " tiene"} oportunidades asociadas. Desvincúlalas antes de eliminar.`,
+      confirmText: "Entendido",
+      tone: "block",
+      blocking: true,
+    }),
+  // Selección mixta: se eliminan los elegibles, los bloqueados por oportunidad quedan afuera.
+  bulkDelete: (eligibleCount: number, blockedCount: number) =>
+    confirmDialog({
+      title: eligibleCount > 1 ? `¿Eliminar ${eligibleCount} contactos?` : "¿Eliminar contacto?",
+      description: blockedCount > 0
+        ? `Se eliminarán ${eligibleCount} contacto${eligibleCount > 1 ? "s" : ""}. ${blockedCount} tiene${blockedCount > 1 ? "n" : ""} oportunidades asociadas y no se ${blockedCount > 1 ? "tocarán" : "tocará"}. Esta acción es irreversible.`
+        : "Esta acción es irreversible.",
+      confirmText: "Sí, eliminar",
+      cancelText: "Cancelar",
+      tone: "danger",
+    }),
   merge: (count: number, survivorName?: string) =>
     confirmDialog({
       title: "¿Fusionar contactos?",

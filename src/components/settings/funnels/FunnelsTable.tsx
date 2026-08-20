@@ -11,6 +11,7 @@ import {
   type VisibilityState,
 } from "@tanstack/react-table"
 import {
+  ChevronDown,
   CopyIcon,
   MoreHorizontalIcon,
   PencilIcon,
@@ -310,6 +311,7 @@ export function FunnelsTable() {
   const [refreshKey, setRefreshKey] = React.useState(0)
   const [createOpen, setCreateOpen] = React.useState(false)
   const [editingFunnel, setEditingFunnel] = React.useState<FunnelFormState | undefined>(undefined)
+  const [visualizacionOpen, setVisualizacionOpen] = React.useState(false)
 
   const isMobile = useIsMobile()
   React.useEffect(() => {
@@ -446,10 +448,11 @@ export function FunnelsTable() {
             {total} embudo{total !== 1 ? "s" : ""}
           </span>
           <div className="[&_button]:w-full md:[&_button]:w-auto">
-            <DropdownMenu>
-              <DropdownMenuTrigger render={<Button variant="outline" size="sm" />}>
+            <DropdownMenu open={visualizacionOpen} onOpenChange={setVisualizacionOpen}>
+              <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="gap-1.5" />}>
                 <Settings2Icon className="size-4" />
                 Visualización
+                <ChevronDown className={cn("size-4 transition-transform", visualizacionOpen && "rotate-180")} />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="min-w-40">
                 {table.getAllColumns().filter((col) => col.getCanHide()).map((col) => (

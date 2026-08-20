@@ -14,6 +14,7 @@ import {
 } from "@tanstack/react-table"
 import {
   ChevronDown,
+  Columns3Icon,
   DownloadIcon,
   EyeIcon,
   Link2,
@@ -21,6 +22,7 @@ import {
   MoreHorizontal,
   PencilIcon,
   SearchIcon,
+  SlidersHorizontalIcon,
   Trash2Icon,
   XIcon,
 } from "lucide-react"
@@ -68,6 +70,7 @@ import { getSortIcon } from "@/lib/table-utils"
 import { notify } from "@/lib/notify"
 import { orgConfirm } from "@/lib/confirm"
 import { useEntityRealtime } from "@/hooks/useEntityRealtime"
+import { cn } from "@/lib/utils"
 
 export interface Document {
   id: number
@@ -423,6 +426,8 @@ export function DocumentsTable() {
   const [loading, setLoading] = React.useState(true)
   const [searchInput, setSearchInput] = React.useState("")
   const [refreshKey, setRefreshKey] = React.useState(0)
+  const [filtersOpen, setFiltersOpen] = React.useState(false)
+  const [columnsOpen, setColumnsOpen] = React.useState(false)
   const [query, setQuery] = React.useState<QueryState>({
     page: 1,
     pageSize: 10,
@@ -582,8 +587,8 @@ export function DocumentsTable() {
         <Button size="sm" onClick={() => setUploadOpen(true)}>+ Subir Documento</Button>
       </div>
 
-      {/* Row 2 — filters. En mobile se apila en filas propias en vez de forzar scroll
-          horizontal; desde md hacia arriba queda igual que antes. */}
+      {/* Row 2 — búsqueda + toggle de filtros. En mobile se apila en filas propias
+          en vez de forzar scroll horizontal; desde md hacia arriba queda igual que antes. */}
       <div className="flex flex-col gap-2 border-b px-4 py-2 md:flex-row md:items-center">
         <div className="flex flex-col gap-2 border-b pb-2 md:flex-row md:items-center md:border-b-0 md:pb-0">
           <div className="relative w-full shrink-0 md:w-44">
@@ -596,6 +601,58 @@ export function DocumentsTable() {
             />
           </div>
 
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="[&_button]:w-full md:[&_button]:w-auto">
+              <DropdownMenu open={columnsOpen} onOpenChange={setColumnsOpen}>
+                <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8 gap-1.5" />}>
+                  <Columns3Icon className="size-3.5" />
+                  Columnas
+                  <ChevronDown className={cn("size-3.5 transition-transform", columnsOpen && "rotate-180")} />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {table
+                    .getAllColumns()
+                    .filter((col) => col.getCanHide())
+                    .map((col) => (
+                      <DropdownMenuCheckboxItem
+                        key={col.id}
+                        className="capitalize"
+                        checked={col.getIsVisible()}
+                        onCheckedChange={(value) => col.toggleVisibility(!!value)}
+                      >
+                        {columnLabels[col.id] ?? col.id}
+                      </DropdownMenuCheckboxItem>
+                    ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1.5"
+              onClick={() => setFiltersOpen((o) => !o)}
+            >
+              <SlidersHorizontalIcon className="size-3.5" />
+              Filtros
+              <ChevronDown className={cn("size-3.5 transition-transform", filtersOpen && "rotate-180")} />
+            </Button>
+
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={resetFilters}>
+                <XIcon className="size-3.5" />
+                Restablecer
+              </Button>
+            )}
+          </div>
+        </div>
+
+        <span className="md:ml-auto shrink-0 text-xs text-muted-foreground">{total} documentos</span>
+      </div>
+
+      {/* Row 3 — filtros avanzados, colapsados por defecto (botón "Filtros" en fila 2) */}
+      {filtersOpen && (
+        <div className="flex flex-col gap-2 border-b bg-muted/30 px-4 py-2 md:flex-row md:items-center">
           <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:items-center">
             <div className="[&_button]:w-full md:[&_button]:w-auto">
               <SingleSelectFilter
@@ -616,42 +673,9 @@ export function DocumentsTable() {
                 onChange={(v) => setQuery((q) => ({ ...q, page: 1, visibility: v === "all" ? null : v }))}
               />
             </div>
-
-            {hasActiveFilters && (
-              <Button variant="ghost" size="sm" className="col-span-2 h-8 px-2 text-xs md:col-span-1 md:w-auto" onClick={resetFilters}>
-                <XIcon className="size-3.5" />
-                Restablecer
-              </Button>
-            )}
           </div>
         </div>
-
-        <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-2 md:ml-auto">
-          <span className="w-full text-xs text-muted-foreground md:w-auto">{total} documentos</span>
-          <div className="[&_button]:w-full md:[&_button]:w-auto">
-            <DropdownMenu>
-              <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8" />}>
-                Columnas <ChevronDown className="ml-1.5 size-3.5" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {table
-                  .getAllColumns()
-                  .filter((col) => col.getCanHide())
-                  .map((col) => (
-                    <DropdownMenuCheckboxItem
-                      key={col.id}
-                      className="capitalize"
-                      checked={col.getIsVisible()}
-                      onCheckedChange={(value) => col.toggleVisibility(!!value)}
-                    >
-                      {columnLabels[col.id] ?? col.id}
-                    </DropdownMenuCheckboxItem>
-                  ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
-      </div>
+      )}
 
       <div className="mx-4 mt-3 rounded-md border">
         <Table>

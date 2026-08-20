@@ -14,11 +14,13 @@ import {
   BookOpenIcon,
   CheckCircle2Icon,
   ChevronDown,
+  Columns3Icon,
   FileTextIcon,
   ListIcon,
   MoreHorizontal,
   PencilIcon,
   SearchIcon,
+  SlidersHorizontalIcon,
   Trash2Icon,
   XIcon,
 } from "lucide-react"
@@ -366,6 +368,8 @@ export function BlogsTable() {
   const [createOpen, setCreateOpen] = React.useState(false)
   const [editingBlog, setEditingBlog] = React.useState<BlogFormValues | undefined>(undefined)
   const [editingBlogId, setEditingBlogId] = React.useState<number | undefined>(undefined)
+  const [filtersOpen, setFiltersOpen] = React.useState(false)
+  const [columnsOpen, setColumnsOpen] = React.useState(false)
 
   const columns = React.useMemo(
     () =>
@@ -502,8 +506,8 @@ export function BlogsTable() {
         </Button>
       </div>
 
-      {/* Row 2 — filters. En mobile se apila en filas propias en vez de forzar scroll
-          horizontal; desde md hacia arriba queda igual que antes. */}
+      {/* Row 2 — búsqueda + toggle de filtros. En mobile se apila en filas propias
+          en vez de forzar scroll horizontal; desde md hacia arriba queda igual que antes. */}
       <div className="flex flex-col gap-2 border-b px-4 py-2 md:flex-row md:items-center">
         <div className="flex flex-col gap-2 border-b pb-2 md:flex-row md:items-center md:border-b-0 md:pb-0">
           <div className="relative w-full shrink-0 md:w-44">
@@ -516,8 +520,60 @@ export function BlogsTable() {
             />
           </div>
 
-          {/* Un solo filtro — ocupa todo el ancho en mobile en vez de quedar
-              apretado a la izquierda con espacio vacío al lado. */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="[&_button]:w-full md:[&_button]:w-auto">
+              <DropdownMenu open={columnsOpen} onOpenChange={setColumnsOpen}>
+                <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8 gap-1.5" />}>
+                  <Columns3Icon className="size-3.5" />
+                  Columnas
+                  <ChevronDown className={cn("size-3.5 transition-transform", columnsOpen && "rotate-180")} />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {table
+                    .getAllColumns()
+                    .filter((col) => col.getCanHide())
+                    .map((col) => (
+                      <DropdownMenuCheckboxItem
+                        key={col.id}
+                        className="capitalize"
+                        checked={col.getIsVisible()}
+                        onCheckedChange={(v) => col.toggleVisibility(!!v)}
+                      >
+                        {columnLabels[col.id] ?? col.id}
+                      </DropdownMenuCheckboxItem>
+                    ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1.5"
+              onClick={() => setFiltersOpen((o) => !o)}
+            >
+              <SlidersHorizontalIcon className="size-3.5" />
+              Filtros
+              <ChevronDown className={cn("size-3.5 transition-transform", filtersOpen && "rotate-180")} />
+            </Button>
+
+            {hasFilters && (
+              <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={resetFilters}>
+                <XIcon className="size-3.5" />
+                Restablecer
+              </Button>
+            )}
+          </div>
+        </div>
+
+        <span className="md:ml-auto shrink-0 text-xs text-muted-foreground">
+          {loading ? "…" : `${total} blogs`}
+        </span>
+      </div>
+
+      {/* Row 3 — filtros avanzados, colapsados por defecto (botón "Filtros" en fila 2) */}
+      {filtersOpen && (
+        <div className="flex flex-col gap-2 border-b bg-muted/30 px-4 py-2 md:flex-row md:items-center">
           <div className="[&_button]:w-full md:[&_button]:w-auto">
             <SingleSelectFilter
               title="Estado"
@@ -532,43 +588,8 @@ export function BlogsTable() {
               }
             />
           </div>
-
-          {hasFilters && (
-            <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={resetFilters}>
-              <XIcon className="size-3.5" />
-              Restablecer
-            </Button>
-          )}
         </div>
-
-        <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-2 md:ml-auto">
-          <span className="w-full text-xs text-muted-foreground md:w-auto">
-            {loading ? "…" : `${total} blogs`}
-          </span>
-          <div className="[&_button]:w-full md:[&_button]:w-auto">
-            <DropdownMenu>
-              <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8" />}>
-                Columnas <ChevronDown className="ml-1.5 size-3.5" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {table
-                  .getAllColumns()
-                  .filter((col) => col.getCanHide())
-                  .map((col) => (
-                    <DropdownMenuCheckboxItem
-                      key={col.id}
-                      className="capitalize"
-                      checked={col.getIsVisible()}
-                      onCheckedChange={(v) => col.toggleVisibility(!!v)}
-                    >
-                      {columnLabels[col.id] ?? col.id}
-                    </DropdownMenuCheckboxItem>
-                  ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
-      </div>
+      )}
 
       {/* Table */}
       <div className="mx-4 mt-3 rounded-md border">

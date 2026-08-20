@@ -16,6 +16,7 @@ import {
   ArrowDownUpIcon,
   ArrowRightLeftIcon,
   ChevronDown,
+  Columns3Icon,
   ExternalLinkIcon,
   GitMergeIcon,
   ListIcon,
@@ -27,6 +28,7 @@ import {
   PhoneIcon,
   PlusCircleIcon,
   SearchIcon,
+  SlidersHorizontalIcon,
   Trash2Icon,
   UserIcon,
   XIcon,
@@ -600,6 +602,9 @@ export function ContactsTable() {
     sortOrder: undefined,
   })
   const [sorting, setSorting] = React.useState<SortingState>([])
+  const [filtersOpen, setFiltersOpen] = React.useState(false)
+  const [columnsOpen, setColumnsOpen] = React.useState(false)
+  const [optionsOpen, setOptionsOpen] = React.useState(false)
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>(DEFAULT_COLUMN_VISIBILITY)
   const isMobile = useIsMobile()
@@ -607,6 +612,7 @@ export function ContactsTable() {
     if (isMobile) setColumnVisibility(MOBILE_COLUMN_VISIBILITY)
   }, [isMobile])
   const [rowSelection, setRowSelection] = React.useState({})
+  const [bulkDeleting, setBulkDeleting] = React.useState(false)
   const [selectedContact, setSelectedContact] = React.useState<Contact | null>(null)
   const [sheetOpen, setSheetOpen] = React.useState(false)
   const [createOpen, setCreateOpen] = React.useState(false)
@@ -753,6 +759,40 @@ export function ContactsTable() {
     }
   }
 
+  async function handleBulkDelete() {
+    const ids = selectedRowIds
+    if (ids.length === 0 || bulkDeleting) return
+
+    setBulkDeleting(true)
+    try {
+      const checks = await Promise.all(ids.map((id) => contactService.checkCanDelete(id)))
+      const eligibleIds = ids.filter((_, i) => checks[i].canDelete)
+      const blockedCount = ids.length - eligibleIds.length
+
+      if (eligibleIds.length === 0) {
+        await contactConfirm.allBlockedByOpportunity(blockedCount)
+        return
+      }
+
+      const confirmed = await contactConfirm.bulkDelete(eligibleIds.length, blockedCount)
+      if (!confirmed) return
+
+      await Promise.all(eligibleIds.map((id) => contactService.delete(id)))
+      notify.success({
+        title: eligibleIds.length > 1 ? "Contactos eliminados" : "Contacto eliminado",
+        description: blockedCount > 0
+          ? `${eligibleIds.length} contacto${eligibleIds.length > 1 ? "s" : ""} eliminado${eligibleIds.length > 1 ? "s" : ""}. ${blockedCount} no se ${blockedCount > 1 ? "tocaron" : "tocó"} por tener oportunidades asociadas.`
+          : `${eligibleIds.length} contacto${eligibleIds.length > 1 ? "s fueron eliminados" : " fue eliminado"} correctamente.`,
+      })
+      setRowSelection({})
+      setRefreshKey((k) => k + 1)
+    } catch {
+      notify.error({ title: "Algo salió mal", description: "No se pudieron eliminar los contactos." })
+    } finally {
+      setBulkDeleting(false)
+    }
+  }
+
   const columns = React.useMemo(
     () =>
       getColumns(
@@ -790,6 +830,10 @@ export function ContactsTable() {
   const table = useReactTable({
     data: contacts,
     columns,
+    // Sin esto, la selección se identifica por posición en el array de la página
+    // actual — cambiar de página/orden/filtro corre el riesgo de dejar marcado un
+    // contacto distinto al que el usuario realmente seleccionó.
+    getRowId: (row) => String(row.id),
     manualPagination: true,
     manualSorting: true,
     rowCount: total,
@@ -824,8 +868,8 @@ export function ContactsTable() {
         <Button size="sm" onClick={() => setCreateOpen(true)}>+ Crear Contacto</Button>
       </div>
 
-      {/* Row 2 — filters. En mobile se apila en filas propias en vez de forzar scroll
-          horizontal; desde md hacia arriba queda igual que antes. */}
+      {/* Row 2 — búsqueda + toggle de filtros. En mobile se apila en filas propias
+          en vez de forzar scroll horizontal; desde md hacia arriba queda igual que antes. */}
       <div className="flex flex-col gap-2 border-b px-4 py-2 md:flex-row md:items-center">
         <div className="flex flex-col gap-2 md:flex-row md:items-center">
           <div className="relative w-full shrink-0 md:w-44">
@@ -838,40 +882,13 @@ export function ContactsTable() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:items-center">
+          <div className="flex flex-wrap items-center gap-2">
             <div className="[&_button]:w-full md:[&_button]:w-auto">
-              <OrgFilter selected={query.orgId} onChange={handleOrgFilter} />
-            </div>
-
-            <Separator orientation="vertical" className="mx-0.5 hidden data-[orientation=vertical]:h-5 data-[orientation=vertical]:self-auto md:block" />
-
-            <div className="[&_button]:w-full md:[&_button]:w-auto">
-              <DataTableFacetedFilter
-                column={table.getColumn("country")!}
-                title="País"
-                options={countryOptions}
-                counts={countryCountsMap}
-              />
-            </div>
-
-            {hasActiveFilters && (
-              <Button variant="ghost" size="sm" className="col-span-2 h-8 px-2 text-xs md:col-span-1 md:w-auto" onClick={resetFilters}>
-                <XIcon className="size-3.5" />
-                Restablecer
-              </Button>
-            )}
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-2 md:ml-auto">
-          <span className="text-xs text-muted-foreground">{total} contactos</span>
-
-          <div className="grid grid-cols-2 gap-2 md:flex md:items-center md:gap-2">
-            {/* Columnas siempre visible — es la acción más usada de las 4 */}
-            <div className="[&_button]:w-full md:[&_button]:w-auto">
-              <DropdownMenu>
-                <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8" />}>
-                  Columnas <ChevronDown className="ml-1.5 size-3.5" />
+              <DropdownMenu open={columnsOpen} onOpenChange={setColumnsOpen}>
+                <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8 gap-1.5" />}>
+                  <Columns3Icon className="size-3.5" />
+                  Columnas
+                  <ChevronDown className={cn("size-3.5 transition-transform", columnsOpen && "rotate-180")} />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   {table
@@ -891,62 +908,103 @@ export function ContactsTable() {
               </DropdownMenu>
             </div>
 
-            {/* Desktop: el resto de acciones sueltas, igual que antes */}
-            <div className="hidden items-center gap-2 md:flex">
-              {googleContactsIntegration && (
-                <Button variant="outline" size="sm" className="h-8" onClick={() => setImportOpen(true)}>
-                  <FcGoogle className="size-3.5" />
-                  Importar con Google
-                </Button>
-              )}
-              <Button variant="outline" size="sm" className="h-8" onClick={() => setMergeOpen(true)}>
-                <GitMergeIcon className="size-3.5" />
-                Fusionar duplicados
-              </Button>
-              <Button variant="outline" size="sm" className="h-8" onClick={handleOpenMove}>
-                <ArrowRightLeftIcon className="size-3.5" />
-                Mover de espacio{selectedRowIds.length > 0 ? ` (${selectedRowIds.length})` : ""}
-              </Button>
-              <Button variant="outline" size="sm" className="h-8" onClick={() => setImportExportOpen(true)}>
-                <ArrowDownUpIcon className="size-3.5" />
-                Importar / Exportar
-              </Button>
-            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1.5"
+              onClick={() => setFiltersOpen((o) => !o)}
+            >
+              <SlidersHorizontalIcon className="size-3.5" />
+              Filtros
+              <ChevronDown className={cn("size-3.5 transition-transform", filtersOpen && "rotate-180")} />
+            </Button>
 
-            {/* Mobile: el resto de acciones agrupadas en un menú, para no apilar botones */}
-            <div className="[&_button]:w-full md:hidden">
-              <DropdownMenu>
-                <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8" />}>
-                  <MoreHorizontal className="size-3.5" />
-                  Más
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuGroup>
-                    {googleContactsIntegration && (
-                      <DropdownMenuItem onClick={() => setImportOpen(true)}>
-                        <FcGoogle className="size-3.5" />
-                        Importar con Google
-                      </DropdownMenuItem>
-                    )}
-                    <DropdownMenuItem onClick={() => setMergeOpen(true)}>
-                      <GitMergeIcon className="size-3.5" />
-                      Fusionar duplicados
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={resetFilters}>
+                <XIcon className="size-3.5" />
+                Restablecer
+              </Button>
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-2 md:ml-auto">
+          {/* Contador de contactos oculto por ahora — con el sidebar expandido no
+              había espacio y quedaba casi invisible entre los filtros y las acciones.
+              Retomar cuando tengamos un lugar fijo para él (ver planificación con Kevin). */}
+
+          {/* Solo aparece con selección activa — borrado en lote */}
+          {selectedRowIds.length > 0 && (
+            <Button
+              variant="destructive"
+              size="sm"
+              className="h-8"
+              disabled={bulkDeleting}
+              onClick={handleBulkDelete}
+            >
+              <Trash2Icon className="size-3.5" />
+              {bulkDeleting ? "Eliminando..." : `Eliminar${selectedRowIds.length > 1 ? ` ${selectedRowIds.length}` : ""}`}
+            </Button>
+          )}
+
+          <Button variant="outline" size="sm" className="h-8" onClick={() => setImportExportOpen(true)}>
+            <ArrowDownUpIcon className="size-3.5" />
+            Importar / Exportar
+          </Button>
+
+          {/* Resto de acciones agrupadas — mismo lenguaje visual que Filtros/Columnas,
+              en vez de varios botones sueltos + un "Más" aparte solo para mobile. */}
+          <div className="[&_button]:w-full md:[&_button]:w-auto">
+            <DropdownMenu open={optionsOpen} onOpenChange={setOptionsOpen}>
+              <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8 gap-1.5" />}>
+                <MoreHorizontal className="size-3.5" />
+                Más Opciones
+                <ChevronDown className={cn("size-3.5 transition-transform", optionsOpen && "rotate-180")} />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuGroup>
+                  {googleContactsIntegration && (
+                    <DropdownMenuItem onClick={() => setImportOpen(true)}>
+                      <FcGoogle className="size-3.5" />
+                      Importar con Google
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleOpenMove}>
-                      <ArrowRightLeftIcon className="size-3.5" />
-                      Mover de espacio{selectedRowIds.length > 0 ? ` (${selectedRowIds.length})` : ""}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setImportExportOpen(true)}>
-                      <ArrowDownUpIcon className="size-3.5" />
-                      Importar / Exportar
-                    </DropdownMenuItem>
-                  </DropdownMenuGroup>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+                  )}
+                  <DropdownMenuItem onClick={() => setMergeOpen(true)}>
+                    <GitMergeIcon className="size-3.5" />
+                    Fusionar duplicados
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleOpenMove}>
+                    <ArrowRightLeftIcon className="size-3.5" />
+                    Mover de espacio{selectedRowIds.length > 0 ? ` (${selectedRowIds.length})` : ""}
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </div>
+
+      {/* Row 3 — filtros avanzados, colapsados por defecto (botón "Filtros" en fila 2) */}
+      {filtersOpen && (
+        <div className="flex flex-col gap-2 border-b bg-muted/30 px-4 py-2 md:flex-row md:items-center">
+          <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:items-center">
+            <div className="[&_button]:w-full md:[&_button]:w-auto">
+              <OrgFilter selected={query.orgId} onChange={handleOrgFilter} />
+            </div>
+
+            <Separator orientation="vertical" className="mx-0.5 hidden data-[orientation=vertical]:h-5 data-[orientation=vertical]:self-auto md:block" />
+
+            <div className="[&_button]:w-full md:[&_button]:w-auto">
+              <DataTableFacetedFilter
+                column={table.getColumn("country")!}
+                title="País"
+                options={countryOptions}
+                counts={countryCountsMap}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="mx-4 mt-3 rounded-md border">
         <Table>

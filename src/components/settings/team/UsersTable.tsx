@@ -26,6 +26,7 @@ import {
   PowerIcon,
   SearchIcon,
   ShieldIcon,
+  SlidersHorizontalIcon,
   Trash2Icon,
   UserPlusIcon,
   XIcon,
@@ -68,6 +69,7 @@ import { useIsWorkspaceOwner } from "@/hooks/useIsWorkspaceOwner"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { notify } from "@/lib/notify"
 import { useSessionStore } from "@/store/session.store"
+import { cn } from "@/lib/utils"
 
 declare module "@tanstack/react-table" {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -441,6 +443,8 @@ export function UsersTable() {
   const [inviteOpen, setInviteOpen] = React.useState(false)
   const [shareOpen, setShareOpen] = React.useState(false)
   const [refreshKey, setRefreshKey] = React.useState(0)
+  const [filtersOpen, setFiltersOpen] = React.useState(false)
+  const [visualizacionOpen, setVisualizacionOpen] = React.useState(false)
 
   const isMobile = useIsMobile()
   React.useEffect(() => {
@@ -659,25 +663,42 @@ export function UsersTable() {
           />
         </div>
 
-        {/* 2 filtros fijos y pares — Restablecer va en fila propia (col-span-2),
-            no como ítem del grid, mismo criterio que Contactos/Organizaciones. */}
-        <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:items-center">
-          <div className="[&_button]:w-full md:[&_button]:w-auto">
-            <SimpleFilter
-              label="Activo"
-              value={query.isActive}
-              onChange={(v) => setQuery((q) => ({ ...q, page: 1, isActive: v }))}
-            />
-          </div>
-          <div className="[&_button]:w-full md:[&_button]:w-auto">
-            <SimpleFilter
-              label="Admin"
-              value={query.isAdmin}
-              onChange={(v) => setQuery((q) => ({ ...q, page: 1, isAdmin: v }))}
-            />
-          </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <DropdownMenu open={visualizacionOpen} onOpenChange={setVisualizacionOpen}>
+            <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="gap-1.5" />}>
+              <LayoutIcon className="size-4" />
+              Visualización
+              <ChevronDown className={cn("size-4 transition-transform", visualizacionOpen && "rotate-180")} />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {table
+                .getAllColumns()
+                .filter((col) => col.getCanHide())
+                .map((col) => (
+                  <DropdownMenuCheckboxItem
+                    key={col.id}
+                    checked={col.getIsVisible()}
+                    onCheckedChange={(v) => col.toggleVisibility(!!v)}
+                  >
+                    {columnLabels[col.id] ?? col.id}
+                  </DropdownMenuCheckboxItem>
+                ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => setFiltersOpen((o) => !o)}
+          >
+            <SlidersHorizontalIcon className="size-3.5" />
+            Filtros
+            <ChevronDown className={cn("size-3.5 transition-transform", filtersOpen && "rotate-180")} />
+          </Button>
+
           {hasActiveFilters && (
-            <Button variant="ghost" size="sm" className="col-span-2 h-8 px-2 text-xs md:col-span-1 md:w-auto" onClick={resetFilters}>
+            <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={resetFilters}>
               <XIcon className="size-3.5" />
               Restablecer
             </Button>
@@ -688,29 +709,6 @@ export function UsersTable() {
           <span className="w-full text-xs text-muted-foreground md:w-auto">
             {total} usuarios
           </span>
-          <div className="[&_button]:w-full md:[&_button]:w-auto">
-            <DropdownMenu>
-              <DropdownMenuTrigger render={<Button variant="outline" size="sm" />}>
-                <LayoutIcon className="size-4" />
-                Visualización
-                <ChevronDown className="size-4" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {table
-                  .getAllColumns()
-                  .filter((col) => col.getCanHide())
-                  .map((col) => (
-                    <DropdownMenuCheckboxItem
-                      key={col.id}
-                      checked={col.getIsVisible()}
-                      onCheckedChange={(v) => col.toggleVisibility(!!v)}
-                    >
-                      {columnLabels[col.id] ?? col.id}
-                    </DropdownMenuCheckboxItem>
-                  ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
           <Button variant="outline" size="sm" className="w-full md:w-auto" onClick={() => setShareOpen(true)}>
             Compartir
           </Button>
@@ -722,6 +720,28 @@ export function UsersTable() {
           )}
         </div>
       </div>
+
+      {/* Fila de filtros avanzados, colapsada por defecto (botón "Filtros" de arriba) */}
+      {filtersOpen && (
+        <div className="flex flex-col gap-2 rounded-md bg-muted/30 px-3 py-2 md:flex-row md:items-center">
+          <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:items-center">
+            <div className="[&_button]:w-full md:[&_button]:w-auto">
+              <SimpleFilter
+                label="Activo"
+                value={query.isActive}
+                onChange={(v) => setQuery((q) => ({ ...q, page: 1, isActive: v }))}
+              />
+            </div>
+            <div className="[&_button]:w-full md:[&_button]:w-auto">
+              <SimpleFilter
+                label="Admin"
+                value={query.isAdmin}
+                onChange={(v) => setQuery((q) => ({ ...q, page: 1, isAdmin: v }))}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="overflow-x-auto rounded-md border">
         <Table>

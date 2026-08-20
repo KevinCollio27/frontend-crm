@@ -16,12 +16,14 @@ import {
   ArrowDownUpIcon,
   ArrowRightLeftIcon,
   ChevronDown,
+  Columns3Icon,
   ExternalLinkIcon,
   GitMergeIcon,
   ListIcon,
   MoreHorizontal,
   PencilIcon,
   SearchIcon,
+  SlidersHorizontalIcon,
   Trash2Icon,
   UserIcon,
   UsersIcon,
@@ -31,6 +33,7 @@ import * as React from "react"
 import { useRouter } from "next/navigation"
 import { useEntityRealtime } from "@/hooks/useEntityRealtime"
 import { useIsMobile } from "@/hooks/use-mobile"
+import { cn } from "@/lib/utils"
 
 import { EntityAccentBar } from "@/components/ui/entity-accent-bar"
 import { Button } from "@/components/ui/button"
@@ -379,6 +382,9 @@ export function OrganizationsTable() {
     sortOrder: undefined,
   })
   const [sorting, setSorting] = React.useState<SortingState>([])
+  const [filtersOpen, setFiltersOpen] = React.useState(false)
+  const [columnsOpen, setColumnsOpen] = React.useState(false)
+  const [optionsOpen, setOptionsOpen] = React.useState(false)
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>(
     DEFAULT_COLUMN_VISIBILITY
   )
@@ -543,8 +549,8 @@ export function OrganizationsTable() {
         <Button size="sm" onClick={() => setCreateOpen(true)}>+ Crear Organización</Button>
       </div>
 
-      {/* Row 2 — filters. En mobile se apila en filas propias en vez de forzar scroll
-          horizontal; desde md hacia arriba queda igual que antes. */}
+      {/* Row 2 — búsqueda + toggle de filtros. En mobile se apila en filas propias
+          en vez de forzar scroll horizontal; desde md hacia arriba queda igual que antes. */}
       <div className="flex flex-col gap-2 border-b px-4 py-2 md:flex-row md:items-center">
         <div className="flex flex-col gap-2 border-b pb-2 md:flex-row md:items-center md:border-b-0 md:pb-0">
           <div className="relative w-full shrink-0 md:w-44">
@@ -557,34 +563,13 @@ export function OrganizationsTable() {
             />
           </div>
 
-          {/* Un solo filtro — ocupa todo el ancho en mobile en vez de quedar
-              apretado a la izquierda con espacio vacío al lado. */}
-          <div className="[&_button]:w-full md:[&_button]:w-auto">
-            <SingleSelectFilter
-              title="Fuente"
-              options={SOURCE_OPTIONS}
-              selected={sourceFilter}
-              onChange={setSourceFilter}
-            />
-          </div>
-
-          {hasActiveFilters && (
-            <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={resetFilters}>
-              <XIcon className="size-3.5" />
-              Restablecer
-            </Button>
-          )}
-        </div>
-
-        <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-2 md:ml-auto">
-          <span className="w-full text-xs text-muted-foreground md:w-auto">{total} organizaciones</span>
-
-          <div className="grid grid-cols-2 gap-2 md:flex md:items-center md:gap-2">
-            {/* Columnas siempre visible — es la acción más usada */}
+          <div className="flex flex-wrap items-center gap-2">
             <div className="[&_button]:w-full md:[&_button]:w-auto">
-              <DropdownMenu>
-                <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8" />}>
-                  Columnas <ChevronDown className="ml-1.5 size-3.5" />
+              <DropdownMenu open={columnsOpen} onOpenChange={setColumnsOpen}>
+                <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8 gap-1.5" />}>
+                  <Columns3Icon className="size-3.5" />
+                  Columnas
+                  <ChevronDown className={cn("size-3.5 transition-transform", columnsOpen && "rotate-180")} />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   {table
@@ -604,50 +589,74 @@ export function OrganizationsTable() {
               </DropdownMenu>
             </div>
 
-            {/* Desktop: el resto de acciones sueltas, igual que antes */}
-            <div className="hidden items-center gap-2 md:flex">
-              <Button variant="outline" size="sm" className="h-8" onClick={() => setMergeOpen(true)}>
-                <GitMergeIcon className="size-3.5" />
-                Fusionar duplicados
-              </Button>
-              <Button variant="outline" size="sm" className="h-8" onClick={handleOpenMove}>
-                <ArrowRightLeftIcon className="size-3.5" />
-                Mover de espacio{selectedRowIds.length > 0 ? ` (${selectedRowIds.length})` : ""}
-              </Button>
-              <Button variant="outline" size="sm" className="h-8" onClick={() => setImportExportOpen(true)}>
-                <ArrowDownUpIcon className="size-3.5" />
-                Importar / Exportar
-              </Button>
-            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1.5"
+              onClick={() => setFiltersOpen((o) => !o)}
+            >
+              <SlidersHorizontalIcon className="size-3.5" />
+              Filtros
+              <ChevronDown className={cn("size-3.5 transition-transform", filtersOpen && "rotate-180")} />
+            </Button>
 
-            {/* Mobile: el resto de acciones agrupadas en un menú, para no apilar botones */}
-            <div className="[&_button]:w-full md:hidden">
-              <DropdownMenu>
-                <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8" />}>
-                  <MoreHorizontal className="size-3.5" />
-                  Más
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuGroup>
-                    <DropdownMenuItem onClick={() => setMergeOpen(true)}>
-                      <GitMergeIcon className="size-3.5" />
-                      Fusionar duplicados
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleOpenMove}>
-                      <ArrowRightLeftIcon className="size-3.5" />
-                      Mover de espacio{selectedRowIds.length > 0 ? ` (${selectedRowIds.length})` : ""}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setImportExportOpen(true)}>
-                      <ArrowDownUpIcon className="size-3.5" />
-                      Importar / Exportar
-                    </DropdownMenuItem>
-                  </DropdownMenuGroup>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={resetFilters}>
+                <XIcon className="size-3.5" />
+                Restablecer
+              </Button>
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-2 md:ml-auto">
+          {/* Contador de organizaciones oculto por ahora — mismo motivo que en Contactos,
+              con el sidebar expandido no había espacio y quedaba casi invisible. */}
+
+          <Button variant="outline" size="sm" className="h-8" onClick={() => setImportExportOpen(true)}>
+            <ArrowDownUpIcon className="size-3.5" />
+            Importar / Exportar
+          </Button>
+
+          {/* Resto de acciones agrupadas — mismo lenguaje visual que Filtros/Columnas,
+              en vez de botones sueltos + un "Más" aparte solo para mobile. */}
+          <div className="[&_button]:w-full md:[&_button]:w-auto">
+            <DropdownMenu open={optionsOpen} onOpenChange={setOptionsOpen}>
+              <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8 gap-1.5" />}>
+                <MoreHorizontal className="size-3.5" />
+                Más Opciones
+                <ChevronDown className={cn("size-3.5 transition-transform", optionsOpen && "rotate-180")} />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuGroup>
+                  <DropdownMenuItem onClick={() => setMergeOpen(true)}>
+                    <GitMergeIcon className="size-3.5" />
+                    Fusionar duplicados
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleOpenMove}>
+                    <ArrowRightLeftIcon className="size-3.5" />
+                    Mover de espacio{selectedRowIds.length > 0 ? ` (${selectedRowIds.length})` : ""}
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </div>
+
+      {/* Row 3 — filtros avanzados, colapsados por defecto (botón "Filtros" en fila 2) */}
+      {filtersOpen && (
+        <div className="flex flex-col gap-2 border-b bg-muted/30 px-4 py-2 md:flex-row md:items-center">
+          <div className="[&_button]:w-full md:[&_button]:w-auto">
+            <SingleSelectFilter
+              title="Fuente"
+              options={SOURCE_OPTIONS}
+              selected={sourceFilter}
+              onChange={setSourceFilter}
+            />
+          </div>
+        </div>
+      )}
 
       <div className="mx-4 mt-3 rounded-md border">
         <Table>

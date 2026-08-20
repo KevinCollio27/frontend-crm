@@ -25,6 +25,7 @@ import {
   ArrowUpRightIcon,
   CalendarIcon,
   ChevronDownIcon,
+  Columns3Icon,
   EyeIcon,
   KanbanSquareIcon,
   ListIcon,
@@ -32,6 +33,7 @@ import {
   MoreHorizontalIcon,
   PlusCircleIcon,
   SearchIcon,
+  SlidersHorizontalIcon,
   XIcon,
 } from "lucide-react"
 import type { VisibilityState } from "@tanstack/react-table"
@@ -482,6 +484,8 @@ export function ActivityKanban() {
   const [priorityFilter, setPriorityFilter]       = React.useState<string[]>([])
   const [responsibleFilter, setResponsibleFilter] = React.useState<string[]>([])
   const [refreshKey, setRefreshKey]               = React.useState(0)
+  const [filtersOpen, setFiltersOpen]             = React.useState(false)
+  const [columnsOpen, setColumnsOpen]             = React.useState(false)
   const [opps, setOpps]                           = React.useState<OppOption[]>([])
   const [loadingOpps, setLoadingOpps]             = React.useState(false)
   const [columnVisibility, setColumnVisibility]   = React.useState<VisibilityState>(DEFAULT_COLUMN_VISIBILITY)
@@ -863,8 +867,8 @@ export function ActivityKanban() {
         <Button size="sm" onClick={() => setCreateOpen(true)}>+ Crear Actividad</Button>
       </div>
 
-      {/* Row 2 — filters (compartida entre Lista y Board). En mobile se apila en
-          filas propias en vez de forzar scroll horizontal; desde md queda igual. */}
+      {/* Row 2 — búsqueda + toggle de filtros (compartida entre Lista y Board). En
+          mobile se apila en filas propias en vez de forzar scroll horizontal. */}
       <div className="flex shrink-0 flex-col gap-2 border-b px-4 py-2 md:flex-row md:items-center">
         <div className="flex flex-col gap-2 border-b pb-2 md:flex-row md:items-center md:border-b-0 md:pb-0">
           <div className="relative w-full shrink-0 md:w-44">
@@ -877,10 +881,76 @@ export function ActivityKanban() {
             />
           </div>
 
-          {/* Grid de 2 columnas — "Restablecer" es un ítem más del grid (no fila propia),
-              así que cuando el número de filtros sale impar, se empareja con él en vez
-              de quedar solo. Si no hay filtro activo, Restablecer no se muestra, pero en
-              ese caso el número de filtros base (Embudo+Estado, o los 4 de Board) es par. */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Columnas solo aplica a la vista Lista — Board no tiene columnas configurables */}
+            {view === "lista" && (
+              <div className="[&_button]:w-full md:[&_button]:w-auto">
+                <DropdownMenu open={columnsOpen} onOpenChange={setColumnsOpen}>
+                  <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8 gap-1.5" />}>
+                    <Columns3Icon className="size-3.5" />
+                    Columnas
+                    <ChevronDownIcon className={cn("size-3.5 transition-transform", columnsOpen && "rotate-180")} />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {Object.entries(COLUMN_LABELS).map(([id, label]) => (
+                      <DropdownMenuCheckboxItem
+                        key={id}
+                        checked={columnVisibility[id] !== false}
+                        onCheckedChange={(v) => setColumnVisibility((prev) => ({ ...prev, [id]: !!v }))}
+                      >
+                        {label}
+                      </DropdownMenuCheckboxItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            )}
+
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1.5"
+              onClick={() => setFiltersOpen((o) => !o)}
+            >
+              <SlidersHorizontalIcon className="size-3.5" />
+              Filtros
+              <ChevronDownIcon className={cn("size-3.5 transition-transform", filtersOpen && "rotate-180")} />
+            </Button>
+
+            {hasActiveFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 px-2 text-xs"
+                onClick={resetFilters}
+              >
+                <XIcon className="size-3.5" />
+                Restablecer
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {view === "lista" && (
+          <span className="md:ml-auto shrink-0 text-xs text-muted-foreground">{listTotal} actividades</span>
+        )}
+
+        {view === "board" && (
+          <span className="md:ml-auto shrink-0 text-xs text-muted-foreground">
+            {loading ? "Cargando…" : `${displayTotal} actividades`}
+            {!loading && displayOverdue > 0 && (
+              <span className="text-amber-600">
+                {" · "}{displayOverdue} atrasada{displayOverdue > 1 ? "s" : ""}
+              </span>
+            )}
+          </span>
+        )}
+      </div>
+
+      {/* Row 3 — filtros avanzados, colapsados por defecto (botón "Filtros" en fila 2).
+          El contenido depende de la vista activa, igual que antes. */}
+      {filtersOpen && (
+        <div className="flex shrink-0 flex-col gap-2 border-b bg-muted/30 px-4 py-2 md:flex-row md:items-center">
           <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:items-center">
             <div className="[&_button]:w-full md:[&_button]:w-auto">
               <FlowFilter flows={flows} selected={flowId} onChange={setFlowId} />
@@ -950,56 +1020,9 @@ export function ActivityKanban() {
                 </div>
               </>
             )}
-
-            {hasActiveFilters && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full h-8 px-2 text-xs md:w-auto"
-                onClick={resetFilters}
-              >
-                <XIcon className="size-3.5" />
-                Restablecer
-              </Button>
-            )}
           </div>
         </div>
-
-        {view === "lista" && (
-          <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-2 md:ml-auto">
-            <span className="w-full text-xs text-muted-foreground md:w-auto">{listTotal} actividades</span>
-            <div className="[&_button]:w-full md:[&_button]:w-auto">
-              <DropdownMenu>
-                <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8" />}>
-                  Columnas <ChevronDownIcon className="ml-1.5 size-3.5" />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {Object.entries(COLUMN_LABELS).map(([id, label]) => (
-                    <DropdownMenuCheckboxItem
-                      key={id}
-                      checked={columnVisibility[id] !== false}
-                      onCheckedChange={(v) => setColumnVisibility((prev) => ({ ...prev, [id]: !!v }))}
-                    >
-                      {label}
-                    </DropdownMenuCheckboxItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
-        )}
-
-        {view === "board" && (
-          <span className="md:ml-auto shrink-0 text-xs text-muted-foreground">
-            {loading ? "Cargando…" : `${displayTotal} actividades`}
-            {!loading && displayOverdue > 0 && (
-              <span className="text-amber-600">
-                {" · "}{displayOverdue} atrasada{displayOverdue > 1 ? "s" : ""}
-              </span>
-            )}
-          </span>
-        )}
-      </div>
+      )}
 
       {/* Board */}
       {view === "board" && (
