@@ -22,10 +22,10 @@ import {
   PencilIcon,
   SearchIcon,
   SlidersHorizontalIcon,
-  SmartphoneIcon,
   Trash2Icon,
   XIcon,
 } from "lucide-react"
+import { SiWhatsapp } from "react-icons/si"
 import * as React from "react"
 
 import { Button } from "@/components/ui/button"
@@ -236,11 +236,11 @@ function getColumns(
     cell: ({ row }) => {
       const { id, name, description } = row.original
       return (
-        <div className="flex items-stretch gap-2.5 max-w-xs">
+        <div className="flex items-stretch gap-2.5">
           <EntityAccentBar seed={id} />
-          <div className="leading-tight overflow-hidden">
-            <div className="text-sm font-medium truncate">{name}</div>
-            <div className="text-xs text-muted-foreground truncate">{description || "—"}</div>
+          <div className="leading-tight min-w-0 max-w-70">
+            <div className="truncate text-sm font-medium" title={name}>{name}</div>
+            <div className="truncate text-xs text-muted-foreground" title={description || undefined}>{description || "—"}</div>
           </div>
         </div>
       )
@@ -256,11 +256,11 @@ function getColumns(
     cell: ({ row }) => {
       const isWA: boolean = row.getValue("isWhatsappAgent")
       return isWA ? (
-        <span className="inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-xs font-medium bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-400">
-          <SmartphoneIcon className="size-3" /> WhatsApp
+        <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+          <SiWhatsapp className="size-3 text-[#25D366]" /> WhatsApp
         </span>
       ) : (
-        <span className="inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-400">
+        <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400">
           <MessageSquareTextIcon className="size-3" /> Widget Web
         </span>
       )
@@ -301,7 +301,7 @@ function getColumns(
         <span className={cn(
           "inline-flex rounded-full px-2 py-0.5 text-xs font-medium",
           enabled
-            ? "bg-violet-50 text-violet-600 dark:bg-violet-950 dark:text-violet-400"
+            ? "bg-violet-500/10 text-violet-600 dark:text-violet-400"
             : "bg-muted text-muted-foreground"
         )}>
           {enabled ? "Sí" : "No"}
@@ -312,9 +312,14 @@ function getColumns(
   {
     accessorKey: "chatTitle",
     header: "Título chat",
-    cell: ({ row }) => (
-      <div className="text-sm text-muted-foreground">{row.getValue("chatTitle")}</div>
-    ),
+    cell: ({ row }) => {
+      const chatTitle = row.getValue("chatTitle") as string
+      return (
+        <div className="min-w-0 max-w-40 truncate text-sm text-muted-foreground" title={chatTitle}>
+          {chatTitle}
+        </div>
+      )
+    },
     enableSorting: false,
   },
   {

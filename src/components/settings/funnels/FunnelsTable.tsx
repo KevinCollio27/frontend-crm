@@ -53,9 +53,47 @@ import {
 } from "@/components/ui/table"
 import { flowService } from "@/services/flow.service"
 import type { Flow } from "@/types/flow"
-import { ChipList } from "@/components/ui/chip-list"
+import { StageBadge } from "@/components/ui/stage-badge"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { CreateFunnelSheet } from "./CreateFunnelSheet"
 import type { FunnelFormState } from "./shared/form-state"
+
+// ─── Pasos — reusa StageBadge (mismo violeta que Etapa en la tabla de
+// Oportunidades) en vez del ChipList genérico gris, más overflow con tooltip
+// igual que Productos.
+function StepChips({ steps, max = 4 }: { steps: string[]; max?: number }) {
+  if (!steps.length) return <span className="text-sm text-muted-foreground">—</span>
+
+  const visible = steps.slice(0, max)
+  const overflow = steps.slice(max)
+
+  return (
+    <TooltipProvider>
+      <div className="flex flex-wrap gap-1.5">
+        {visible.map((step, i) => (
+          <StageBadge key={`${step}-${i}`} stage={step} />
+        ))}
+        {overflow.length > 0 && (
+          <Tooltip>
+            <TooltipTrigger
+              render={<span />}
+              className="inline-flex cursor-default items-center rounded-md border bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+            >
+              +{overflow.length}
+            </TooltipTrigger>
+            <TooltipContent side="top" align="start">
+              <div className="space-y-0.5">
+                {overflow.map((step, i) => (
+                  <div key={`${step}-${i}`}>{step}</div>
+                ))}
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        )}
+      </div>
+    </TooltipProvider>
+  )
+}
 
 // ─── Entity ──────────────────────────────────────────────────────────────────
 
@@ -182,7 +220,7 @@ function getColumns(
       return (
         <div className="flex items-stretch gap-2.5">
           <EntityAccentBar seed={row.original.id} />
-          <span className="text-sm font-medium self-center">{name}</span>
+          <div className="min-w-0 max-w-56 truncate self-center text-sm font-medium" title={name}>{name}</div>
         </div>
       )
     },
@@ -191,7 +229,7 @@ function getColumns(
     accessorKey: "steps",
     header: "Pasos",
     enableSorting: false,
-    cell: ({ row }) => <ChipList items={row.getValue("steps")} />,
+    cell: ({ row }) => <StepChips steps={row.getValue("steps")} />,
   },
   {
     accessorKey: "isActive",

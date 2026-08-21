@@ -27,7 +27,6 @@ import { SiWhatsapp } from "react-icons/si"
 import { cn } from "@/lib/utils"
 import { getSortIcon, getInitials } from "@/lib/table-utils"
 import { useSendActions } from "@/hooks/useSendActions"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { DataTablePagination } from "@/components/ui/data-table-pagination"
@@ -54,8 +53,10 @@ import type { OpportunityRaw } from "@/types/opportunity"
 import { FunnelPreviewSheet } from "./FunnelPreviewSheet"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { EntityAccentBar } from "@/components/ui/entity-accent-bar"
+import { StageBadge } from "@/components/ui/stage-badge"
 import { SendTemplateSheet } from "../contacts/SendTemplateSheet"
 import { SendEmailSheet } from "../contacts/SendEmailSheet"
+import { STATUS_CONFIG } from "./shared/status"
 
 // ─── Entity ──────────────────────────────────────────────────────────────────
 
@@ -127,13 +128,6 @@ export function mapOpportunity(d: OpportunityRaw): Opportunity {
 }
 
 // ─── Configs ─────────────────────────────────────────────────────────────────
-
-const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
-  en_progreso: { label: "En Progreso", className: "bg-blue-50 text-blue-700"        },
-  ganada:      { label: "Ganada",      className: "bg-emerald-50 text-emerald-700"  },
-  perdida:     { label: "Perdida",     className: "bg-red-50 text-red-700"          },
-  reabierta:   { label: "Reabierta",   className: "bg-amber-50 text-amber-700"      },
-}
 
 function formatValue(value: number, symbol: string) {
   if (value === 0) return "—"
@@ -260,9 +254,12 @@ function getColumns(
         return (
           <div className="flex items-stretch gap-2.5">
             <EntityAccentBar seed={opp.id} />
-            <div className="leading-tight min-w-0">
-              <span className="text-sm font-medium truncate">{opp.name}</span>
-              <div className="mt-0.5 text-xs text-muted-foreground truncate">
+            <div className="leading-tight min-w-0 max-w-70">
+              <div className="truncate text-sm font-medium" title={opp.name}>{opp.name}</div>
+              <div
+                className="mt-0.5 truncate text-xs text-muted-foreground"
+                title={`${opp.company} · ${opp.contact}`}
+              >
                 {opp.company} · {opp.contact}
               </div>
             </div>
@@ -280,9 +277,10 @@ function getColumns(
       cell: ({ row }) => {
         const cfg = STATUS_CONFIG[row.getValue("status") as string] ?? STATUS_CONFIG.en_progreso
         return (
-          <Badge className={cn("rounded-full border-0 text-xs px-2 py-0", cfg.className)}>
+          <span className={cn("inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium", cfg.badge)}>
+            <span className={cn("size-1.5 rounded-full", cfg.dot)} />
             {cfg.label}
-          </Badge>
+          </span>
         )
       },
     },
@@ -293,7 +291,11 @@ function getColumns(
           Etapa {getSortIcon(column.getIsSorted())}
         </Button>
       ),
-      cell: ({ row }) => <span className="text-sm">{row.getValue("stageName")}</span>,
+      cell: ({ row }) => {
+        const stage = row.getValue("stageName") as string
+        if (!stage || stage === "—") return <span className="text-sm text-muted-foreground">—</span>
+        return <StageBadge stage={stage} />
+      },
     },
     {
       id: "responsible",
@@ -313,7 +315,7 @@ function getColumns(
                 {initials}
               </AvatarFallback>
             </Avatar>
-            <span className="text-sm">{name}</span>
+            <span className="min-w-0 max-w-36 truncate text-sm" title={name}>{name}</span>
           </div>
         )
       },
@@ -325,7 +327,14 @@ function getColumns(
           Pipeline {getSortIcon(column.getIsSorted())}
         </Button>
       ),
-      cell: ({ row }) => <span className="text-sm text-muted-foreground">{row.getValue("flowName")}</span>,
+      cell: ({ row }) => {
+        const flowName = row.getValue("flowName") as string
+        return (
+          <div className="max-w-40 truncate text-sm text-muted-foreground" title={flowName}>
+            {flowName}
+          </div>
+        )
+      },
     },
     {
       accessorKey: "closeDate",

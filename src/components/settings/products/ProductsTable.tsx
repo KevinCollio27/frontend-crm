@@ -50,16 +50,16 @@ import {
 } from "@/components/ui/table"
 import { productService } from "@/services/product.service"
 import type { ProductRaw } from "@/types/product"
-import { ChipList } from "@/components/ui/chip-list"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { CreateProductSheet } from "./CreateProductSheet"
-import type { ProductFormState, ProductLabelType } from "./shared/form-state"
+import { labelTypeDef, type ProductFormState, type ProductLabelType } from "./shared/form-state"
 
 // ─── Entity ──────────────────────────────────────────────────────────────────
 
 export interface Product {
   id: number
   name: string
-  labels: string[]
+  labels: { name: string; type: ProductLabelType }[]
   createdAt: string
   raw: ProductRaw
 }
@@ -70,7 +70,7 @@ function mapProduct(r: ProductRaw): Product {
   return {
     id: r.id,
     name: r.name,
-    labels: r.product_label?.map((l) => l.name) ?? [],
+    labels: r.product_label?.map((l) => ({ name: l.name, type: l.type as ProductLabelType })) ?? [],
     createdAt: new Date(r.created_at).toLocaleDateString("es-CL", {
       day: "numeric",
       month: "short",
@@ -78,6 +78,53 @@ function mapProduct(r: ProductRaw): Product {
     }),
     raw: r,
   }
+}
+
+// ─── Etiquetas — un chip de color por tipo de campo, no gris genérico ─────────
+
+function ProductLabelChips({ labels, max = 4 }: { labels: Product["labels"]; max?: number }) {
+  if (!labels.length) return <span className="text-sm text-muted-foreground">—</span>
+
+  const visible = labels.slice(0, max)
+  const overflow = labels.slice(max)
+
+  return (
+    <TooltipProvider>
+      <div className="flex flex-wrap gap-1.5">
+        {visible.map((item, i) => {
+          const def = labelTypeDef(item.type)
+          const Icon = def.icon
+          return (
+            <span
+              key={`${item.name}-${i}`}
+              className={cn("inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium", def.badgeClass)}
+              title={def.label}
+            >
+              <Icon className="size-3" />
+              {item.name}
+            </span>
+          )
+        })}
+        {overflow.length > 0 && (
+          <Tooltip>
+            <TooltipTrigger
+              render={<span />}
+              className="inline-flex cursor-default items-center rounded-md border bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+            >
+              +{overflow.length}
+            </TooltipTrigger>
+            <TooltipContent side="top" align="start">
+              <div className="space-y-0.5">
+                {overflow.map((item, i) => (
+                  <div key={`${item.name}-${i}`}>{item.name}</div>
+                ))}
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        )}
+      </div>
+    </TooltipProvider>
+  )
 }
 
 function productToFormValues(product: Product): ProductFormState {
@@ -181,7 +228,7 @@ function getColumns(
     accessorKey: "labels",
     header: "Etiquetas",
     enableSorting: false,
-    cell: ({ row }) => <ChipList items={row.getValue("labels")} />,
+    cell: ({ row }) => <ProductLabelChips labels={row.getValue("labels")} />,
   },
   {
     accessorKey: "createdAt",

@@ -66,6 +66,7 @@ import { useSidebar } from "@/components/ui/sidebar"
 import { SingleSelectFilter, type SingleSelectOption } from "@/components/ui/single-select-filter"
 import { KanbanFacetedFilter } from "@/components/ui/faceted-filter"
 import { FunnelTable, COLUMN_LABELS, DEFAULT_COLUMN_VISIBILITY, MOBILE_COLUMN_VISIBILITY, mapOpportunity, type Opportunity } from "./FunnelTable"
+import { STATUS_CONFIG } from "./shared/status"
 import { SuggestionsView } from "./suggestions/SuggestionsView"
 import type { VisibilityState } from "@tanstack/react-table"
 import { FunnelPreviewSheet } from "./FunnelPreviewSheet"
@@ -92,13 +93,6 @@ interface StagePageState {
   page: number
   hasMore: boolean
   loadingMore: boolean
-}
-
-const STATUS_CONFIG: Record<OppStatus, { label: string; className: string; border: string }> = {
-  en_progreso: { label: "En Progreso", className: "bg-blue-50 text-blue-700",       border: ""                                },
-  ganada:      { label: "Ganada",      className: "bg-emerald-50 text-emerald-700", border: "border-l-2 border-l-emerald-500" },
-  perdida:     { label: "Perdida",     className: "bg-red-50 text-red-700",         border: "border-l-2 border-l-red-400"    },
-  reabierta:   { label: "Reabierta",   className: "bg-amber-50 text-amber-700",     border: "border-l-2 border-l-amber-400"  },
 }
 
 type FunnelView = "board" | "lista" | "sugerencias"
@@ -166,7 +160,7 @@ const OppCard = React.memo(function OppCard({
   onReopen,
   isDragging,
 }: OppCardProps) {
-  const statusCfg = STATUS_CONFIG[opp.status as OppStatus] ?? STATUS_CONFIG.en_progreso
+  const statusCfg = STATUS_CONFIG[opp.status] ?? STATUS_CONFIG.en_progreso
 
   return (
     <div
@@ -261,7 +255,7 @@ const OppCard = React.memo(function OppCard({
       </p>
 
       <div className="flex items-center gap-1.5 min-w-0">
-        <Badge className={cn("rounded-full border-0 text-xs px-2 py-0 shrink-0", statusCfg.className)}>
+        <Badge variant="outline" className={cn("rounded-full text-xs px-2 py-0 shrink-0", statusCfg.badge)}>
           {statusCfg.label}
         </Badge>
         {opp.closeDate && (

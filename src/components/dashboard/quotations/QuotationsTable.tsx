@@ -31,10 +31,12 @@ import {
   ShipIcon,
   SlidersHorizontalIcon,
   Trash2Icon,
+  TrendingDownIcon,
+  TrendingUpIcon,
   XIcon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { getSortIcon, getInitials } from "@/lib/table-utils"
+import { getSortIcon, getInitials, OVERDUE_BADGE_CLASS } from "@/lib/table-utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -77,6 +79,7 @@ import { QuotationHistorySheet } from "./QuotationHistorySheet"
 import { SendQuotationSheet } from "./SendQuotationSheet"
 import { TemplateAssignmentSheet } from "./TemplateAssignmentSheet"
 import { EntityAccentBar } from "@/components/ui/entity-accent-bar"
+import { STATUS_CONFIG } from "./shared/status"
 
 // ─── Entity ───────────────────────────────────────────────────────────────────
 
@@ -95,6 +98,7 @@ interface Quotation {
   opportunityName: string | null
   isSentToCargo:   boolean
   pdfTemplateId:   number | null
+  isExpired:       boolean
 }
 
 // ─── Map ──────────────────────────────────────────────────────────────────────
@@ -121,21 +125,13 @@ function mapQuotation(q: QuotationRaw): Quotation {
     opportunityName: q.opportunity?.name ?? null,
     isSentToCargo:   q.is_sent_to_cargo ?? false,
     pdfTemplateId:   q.pdf_template_id ?? null,
+    // "Vencida" solo aplica a lo que sigue esperando respuesta — un borrador
+    // nunca se envió, así que su fecha vencida no es una alerta real.
+    isExpired:       q.status === "sent" && !!q.valid_until && new Date(q.valid_until) < new Date(),
   }
 }
 
 // ─── Configs ──────────────────────────────────────────────────────────────────
-
-const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
-  draft:     { label: "Borrador",  className: "bg-muted text-muted-foreground border-border"      },
-  sent:      { label: "Enviada",   className: "bg-blue-50 text-blue-700 border-blue-200"          },
-  accepted:  { label: "Aceptada",  className: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-  rejected:  { label: "Rechazada", className: "bg-red-50 text-red-600 border-red-200"             },
-  borrador:  { label: "Borrador",  className: "bg-muted text-muted-foreground border-border"      },
-  enviada:   { label: "Enviada",   className: "bg-blue-50 text-blue-700 border-blue-200"          },
-  aceptada:  { label: "Aceptada",  className: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-  rechazada: { label: "Rechazada", className: "bg-red-50 text-red-600 border-red-200"             },
-}
 
 const STATUSES = [
   { key: "draft",    label: "Borrador",  dot: "bg-muted-foreground/60" },
@@ -159,6 +155,13 @@ const STATUS_OPTIONS: SingleSelectOption[] = [
 const TYPE_LABEL: Record<string, string> = {
   sale:     "Venta",
   purchase: "Compra",
+}
+
+// Decoración, no badge — es una dicotomía de dirección (ingreso/costo), no una
+// categoría abierta como Fuente, así que un ícono de color alcanza sin pill.
+const TYPE_CONFIG: Record<string, { icon: React.ElementType; className: string }> = {
+  sale:     { icon: TrendingUpIcon,   className: "text-emerald-600 dark:text-emerald-400" },
+  purchase: { icon: TrendingDownIcon, className: "text-amber-600 dark:text-amber-400"     },
 }
 
 const TYPE_OPTIONS: SingleSelectOption[] = [
@@ -293,9 +296,9 @@ function getColumns(
         return (
           <div className="flex items-stretch gap-2.5">
             <EntityAccentBar seed={q.id} />
-            <div className="leading-tight">
-              <div className="text-sm font-medium">{q.name}</div>
-              <div className="text-xs text-muted-foreground">{q.itemCount} item(s)</div>
+            <div className="leading-tight min-w-0 max-w-70">
+              <div className="text-sm font-medium truncate" title={q.name}>{q.name}</div>
+              <div className="text-xs text-muted-foreground truncate">{q.itemCount} item(s)</div>
             </div>
           </div>
         )
@@ -311,19 +314,24 @@ function getColumns(
         const normalizedCurrent = LEGACY_STATUS[current] ?? current
         const options = STATUSES.filter((s) => s.key !== normalizedCurrent)
         return (
+          <div className="flex items-center gap-1.5">
           <DropdownMenu>
             <DropdownMenuTrigger
               nativeButton={false}
               render={
                 <Badge
                   className={cn(
-                    "rounded-full border px-2.5 py-0.5 text-xs cursor-pointer hover:opacity-75 transition-opacity",
+                    "group gap-1 rounded-full border px-2.5 py-0.5 text-xs cursor-pointer hover:opacity-75 transition-opacity",
                     conf.className,
                   )}
                 />
               }
             >
               {conf.label}
+              <ChevronDown
+                data-icon="inline-end"
+                className="size-3 opacity-60 transition-transform group-data-open:rotate-180"
+              />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="min-w-36">
               <DropdownMenuGroup>
@@ -337,6 +345,12 @@ function getColumns(
               </DropdownMenuGroup>
             </DropdownMenuContent>
           </DropdownMenu>
+          {row.original.isExpired && (
+            <Badge variant="outline" className={cn("rounded-full text-xs px-2 py-0", OVERDUE_BADGE_CLASS)}>
+              Vencida
+            </Badge>
+          )}
+          </div>
         )
       },
     },
@@ -363,7 +377,7 @@ function getColumns(
       cell: ({ row }) => {
         const name = row.original.opportunityName
         if (!name) return <span className="text-sm text-muted-foreground">—</span>
-        return <span className="text-sm">{name}</span>
+        return <div className="max-w-52 truncate text-sm" title={name}>{name}</div>
       },
     },
     {
@@ -383,7 +397,7 @@ function getColumns(
               <AvatarImage src={responsible.avatarUrl ?? "https://github.com/shadcn.png"} alt={responsible.name} />
               <AvatarFallback className="text-[9px] font-semibold">{getInitials(responsible.name)}</AvatarFallback>
             </Avatar>
-            <span className="text-sm">{responsible.name}</span>
+            <span className="min-w-0 max-w-36 truncate text-sm" title={responsible.name}>{responsible.name}</span>
           </div>
         )
       },
@@ -391,11 +405,17 @@ function getColumns(
     {
       accessorKey: "type",
       header: "Tipo",
-      cell: ({ row }) => (
-        <span className="text-sm text-muted-foreground">
-          {TYPE_LABEL[row.getValue("type") as string] ?? row.getValue("type")}
-        </span>
-      ),
+      cell: ({ row }) => {
+        const type = row.getValue("type") as string
+        const conf = TYPE_CONFIG[type]
+        if (!conf) return <span className="text-sm text-muted-foreground">{type || "—"}</span>
+        return (
+          <span className={cn("inline-flex items-center gap-1 text-sm", conf.className)}>
+            <conf.icon className="size-3.5" />
+            {TYPE_LABEL[type] ?? type}
+          </span>
+        )
+      },
     },
     {
       accessorKey: "validUntil",

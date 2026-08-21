@@ -10,12 +10,9 @@ import {
   type VisibilityState,
 } from "@tanstack/react-table"
 import {
-  ArrowDownIcon,
   ArrowDownRightIcon,
-  ArrowUpIcon,
   ArrowUpRightIcon,
   ExternalLinkIcon,
-  MinusIcon,
   MoreHorizontal,
   PencilIcon,
   Trash2Icon,
@@ -52,7 +49,15 @@ import { CreateActivitySheet } from "./CreateActivitySheet"
 import { activityService } from "@/services/activity.service"
 import { orgConfirm } from "@/lib/confirm"
 import { notify } from "@/lib/notify"
-import { mapActivity, type Activity } from "@/lib/activity-utils"
+import {
+  ACTIVITY_TYPE_CONFIG,
+  DEFAULT_TYPE_CONFIG,
+  OVERDUE_BADGE_CLASS,
+  PRIORITY_CONFIG,
+  STAGE_CONFIG,
+  mapActivity,
+  type Activity,
+} from "@/lib/activity-utils"
 import { useWorkspaceTimezone } from "@/hooks/useWorkspaceTimezone"
 import type { ActivityRaw } from "@/types/activity"
 import { getInitials, getSortIcon } from "@/lib/table-utils"
@@ -65,26 +70,6 @@ export type { Activity }
 
 const TODAY = new Date().toISOString().slice(0, 10)
 
-const PRIORITY_CONFIG: Record<string, { icon: React.ReactNode; color: string }> = {
-  alta:  { icon: <ArrowUpIcon className="size-3" />,   color: "text-red-600"          },
-  media: { icon: <MinusIcon className="size-3" />,     color: "text-yellow-600"       },
-  baja:  { icon: <ArrowDownIcon className="size-3" />, color: "text-muted-foreground" },
-}
-
-const STAGE_CONFIG: Record<string, { dot: string; badge: string }> = {
-  pendiente:   { dot: "bg-amber-500",   badge: "bg-amber-500/10 text-amber-600"     },
-  en_progreso: { dot: "bg-blue-500",    badge: "bg-blue-500/10 text-blue-600"       },
-  completada:  { dot: "bg-emerald-500", badge: "bg-emerald-500/10 text-emerald-600" },
-  cancelada:   { dot: "bg-slate-400",   badge: "bg-slate-100 text-slate-500"        },
-}
-
-const STAGE_NAMES: Record<string, string> = {
-  pendiente:   "Pendiente",
-  en_progreso: "En Progreso",
-  completada:  "Completada",
-  cancelada:   "Cancelada",
-}
-
 export const COLUMN_LABELS: Record<string, string> = {
   id:              "ID",
   title:           "Título",
@@ -96,6 +81,7 @@ export const COLUMN_LABELS: Record<string, string> = {
 }
 
 export const DEFAULT_COLUMN_VISIBILITY: VisibilityState = {
+  type: false,
   createdAt: false,
 }
 
@@ -206,10 +192,10 @@ function getColumns(
         return (
           <div className="flex items-stretch gap-2.5">
             <EntityAccentBar seed={act.id} />
-            <div className="leading-tight min-w-0">
-              <div className="text-sm font-medium truncate">{act.title}</div>
+            <div className="leading-tight min-w-0 max-w-70">
+              <div className="text-sm font-medium truncate" title={act.title}>{act.title}</div>
               {act.opportunityName ? (
-                <div className="text-xs text-muted-foreground truncate">{act.opportunityName}</div>
+                <div className="text-xs text-muted-foreground truncate" title={act.opportunityName}>{act.opportunityName}</div>
               ) : act.googleEventId ? (
                 <div className="flex items-center gap-1 text-xs text-muted-foreground truncate">
                   <FcGoogle className="size-3 shrink-0" />
@@ -230,11 +216,20 @@ function getColumns(
           Tipo {getSortIcon(column.getIsSorted())}
         </Button>
       ),
-      cell: ({ row }) => (
-        <div className="text-sm text-muted-foreground">
-          {(row.getValue("type") as string) || "—"}
-        </div>
-      ),
+      cell: ({ row }) => {
+        const type = row.getValue("type") as string
+        if (!type) return <span className="text-sm text-muted-foreground">—</span>
+        const typeConfig = ACTIVITY_TYPE_CONFIG[type] ?? DEFAULT_TYPE_CONFIG
+        const TypeIcon = typeConfig.icon
+        return (
+          <div className="flex items-center gap-1.5 text-sm">
+            <div className={cn("flex size-5 shrink-0 items-center justify-center rounded", typeConfig.bgClass)}>
+              <TypeIcon className={cn("size-3", typeConfig.iconClass)} />
+            </div>
+            <span className="min-w-0 max-w-36 truncate" title={type}>{type}</span>
+          </div>
+        )
+      },
     },
     {
       accessorKey: "startDate",
@@ -278,12 +273,12 @@ function getColumns(
         return (
           <div className="leading-tight space-y-1">
             <div className="flex items-center gap-1.5">
-              <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium", config.badge)}>
+              <span className={cn("inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium", config.badge)}>
                 <div className={cn("size-1.5 rounded-full", config.dot)} />
-                {STAGE_NAMES[stageId] ?? stageId}
+                {config.label}
               </span>
               {overdue && (
-                <Badge className="rounded-full border-0 text-xs px-2 py-0 bg-red-50 text-red-600">
+                <Badge variant="outline" className={cn("rounded-full text-xs px-2 py-0", OVERDUE_BADGE_CLASS)}>
                   Atrasada
                 </Badge>
               )}
@@ -292,8 +287,8 @@ function getColumns(
               <div className="flex items-center gap-1 text-xs px-2">
                 <span className="text-muted-foreground">Prioridad:</span>
                 <span className={cn("inline-flex items-center gap-0.5", pConfig.color)}>
-                  {pConfig.icon}
-                  {priority.charAt(0).toUpperCase() + priority.slice(1)}
+                  <pConfig.icon className="size-3" />
+                  {pConfig.label}
                 </span>
               </div>
             )}
@@ -312,14 +307,14 @@ function getColumns(
       cell: ({ row }) => {
         const r = row.original.responsible
         return (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             <Avatar size="default">
               <AvatarImage src={r.avatarUrl ?? "https://github.com/shadcn.png"} alt={r.name} />
               <AvatarFallback className="text-base">
                 {getInitials(r.name)}
               </AvatarFallback>
             </Avatar>
-            <span className="text-sm">{r.name}</span>
+            <span className="min-w-0 max-w-36 truncate text-sm" title={r.name}>{r.name}</span>
           </div>
         )
       },

@@ -10,20 +10,7 @@ import {
 import { cn } from "@/lib/utils"
 import { ChevronDownIcon, TrendingUpIcon } from "lucide-react"
 import type { OpportunityDetailData } from "@/types/opportunity"
-
-// ─── Configs ──────────────────────────────────────────────────────────────────
-
-const STATUS_CONFIG = {
-  open: { label: "Abierta",  className: "bg-blue-50 text-blue-700"       },
-  won:  { label: "Ganada",   className: "bg-emerald-50 text-emerald-700" },
-  lost: { label: "Perdida",  className: "bg-red-50 text-red-600"         },
-}
-
-const PRIORITY_CONFIG = {
-  alta:  { label: "Alta",  className: "bg-red-50 text-red-700"         },
-  media: { label: "Media", className: "bg-amber-50 text-amber-700"     },
-  baja:  { label: "Baja",  className: "bg-emerald-50 text-emerald-700" },
-}
+import { PRIORITY_CONFIG, STATUS_CONFIG } from "../shared/status"
 
 function formatCurrency(value: number, symbol: string) {
   const formatted = new Intl.NumberFormat("es-CL", {
@@ -87,8 +74,8 @@ export function Col1Info({ data }: Props) {
       <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
         {/* Identidad */}
         <div className="flex items-center gap-3 p-3.5">
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-violet-100">
-            <TrendingUpIcon className="size-5 text-violet-600" />
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-950/40">
+            <TrendingUpIcon className="size-5 text-violet-600 dark:text-violet-400" />
           </div>
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold leading-snug">{data.name}</p>
@@ -148,7 +135,7 @@ export function Col1Info({ data }: Props) {
       <CollapsibleSection title="Propiedades del negocio">
         <div className="divide-y">
           <PropRow label="Estado">
-            <Badge className={cn("rounded-full border-0 px-2.5 py-0.5 text-xs", statusConf.className)}>
+            <Badge variant="outline" className={cn("rounded-full px-2.5 py-0.5 text-xs", statusConf.badge)}>
               {statusConf.label}
             </Badge>
           </PropRow>
@@ -170,13 +157,13 @@ export function Col1Info({ data }: Props) {
           )}
           {priorityConf && (
             <PropRow label="Prioridad">
-              <Badge className={cn("rounded-full border-0 px-2.5 py-0.5 text-xs", priorityConf.className)}>
+              <Badge variant="outline" className={cn("rounded-full px-2.5 py-0.5 text-xs", priorityConf.badge)}>
                 {priorityConf.label}
               </Badge>
             </PropRow>
           )}
           <PropRow label="Costo neto">
-            <span className="text-sm font-semibold tabular-nums text-emerald-600">
+            <span className="text-sm font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
               {formattedCost}
             </span>
           </PropRow>
@@ -202,7 +189,10 @@ export function Col1Info({ data }: Props) {
                   </span>
                 </div>
                 {r.is_main && (
-                  <Badge className="shrink-0 rounded-full border-0 bg-blue-50 px-2.5 py-0.5 text-xs text-blue-700">
+                  <Badge
+                    variant="outline"
+                    className="shrink-0 rounded-full border-blue-200 bg-blue-50 px-2.5 py-0.5 text-xs text-blue-700 dark:border-blue-800/60 dark:bg-blue-950/40 dark:text-blue-300"
+                  >
                     Principal
                   </Badge>
                 )}

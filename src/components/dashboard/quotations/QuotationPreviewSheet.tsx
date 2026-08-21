@@ -9,19 +9,15 @@ import { Section } from "@/components/ui/section"
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { cn } from "@/lib/utils"
+import { OVERDUE_BADGE_CLASS } from "@/lib/table-utils"
 import { useCargoIntegration } from "@/hooks/useCargoIntegration"
 import type { QuotationRaw } from "@/types/quotation"
 import { rawToForm } from "./shared/quotation-from-raw"
 import { formatMoney } from "./shared/currency"
 import { displayFieldValue } from "./shared/quotation-display"
 import { isAcceptedStatus } from "./shared/send-to-cargo"
+import { STATUS_CONFIG } from "./shared/status"
 
-const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
-  draft:    { label: "Borrador",  className: "bg-muted text-muted-foreground border-border" },
-  sent:     { label: "Enviada",   className: "bg-blue-50 text-blue-700 border-blue-200" },
-  accepted: { label: "Aceptada",  className: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-  rejected: { label: "Rechazada", className: "bg-red-50 text-red-600 border-red-200" },
-}
 const TYPE_LABEL: Record<string, string> = { sale: "Venta", purchase: "Compra" }
 
 interface QuotationPreviewSheetProps {
@@ -106,6 +102,8 @@ function QuotationPreview({ entity, onClose, onEdit, onDownload, downloading, on
   const statusConf = STATUS_CONFIG[entity.status] ?? { label: entity.status, className: "bg-muted text-muted-foreground border-border" }
   const typeLabel  = TYPE_LABEL[entity.type] ?? entity.type
   const canSendToCargo = hasCargoIntegration && isAcceptedStatus(entity.status) && !!onSendToCargo
+  // Mismo criterio que la tabla: solo lo que sigue esperando respuesta puede estar vencido.
+  const isExpired = entity.status === "sent" && !!entity.valid_until && new Date(entity.valid_until) < new Date()
 
   const subtotal          = entity.subtotal ?? 0
   const discountAmount    = entity.discount_amount ?? 0
@@ -123,8 +121,13 @@ function QuotationPreview({ entity, onClose, onEdit, onDownload, downloading, on
               <Badge className={cn("rounded-full border px-2.5 py-0.5 text-xs", statusConf.className)}>
                 {statusConf.label}
               </Badge>
+              {isExpired && (
+                <Badge variant="outline" className={cn("rounded-full px-2.5 py-0.5 text-xs", OVERDUE_BADGE_CLASS)}>
+                  Vencida
+                </Badge>
+              )}
               {entity.is_sent_to_cargo && (
-                <Badge className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-0.5 text-xs text-sky-700">
+                <Badge className="gap-1 rounded-full border border-sky-200 bg-sky-50 px-2.5 py-0.5 text-xs text-sky-700 dark:border-sky-800/60 dark:bg-sky-950/40 dark:text-sky-300">
                   <ShipIcon className="size-3" /> Enviado a Cargo
                 </Badge>
               )}

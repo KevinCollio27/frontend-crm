@@ -3,7 +3,25 @@
 import * as React from "react"
 import { format, isToday, isYesterday } from "date-fns"
 import { es } from "date-fns/locale"
-import { BotIcon, ChevronDown, ClockIcon, Loader2Icon } from "lucide-react"
+import {
+  BotIcon,
+  Building2Icon,
+  CalendarIcon,
+  ChevronDown,
+  ClockIcon,
+  FileIcon,
+  FileTextIcon,
+  FlagIcon,
+  GitBranchIcon,
+  GlobeIcon,
+  Loader2Icon,
+  MegaphoneIcon,
+  PackageIcon,
+  TagIcon,
+  TrendingUpIcon,
+  UserCogIcon,
+  UserIcon,
+} from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -24,15 +42,28 @@ import { getInitials } from "@/lib/table-utils"
 
 // ─── Configuración de entidades ──────────────────────────────────────────────
 
-const ENTITY_CONFIG: Record<string, { label: string; className: string }> = {
-  person:              { label: "Contacto",    className: "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400" },
-  organization:        { label: "Empresa",     className: "bg-violet-50 text-violet-700 dark:bg-violet-950/40 dark:text-violet-400" },
-  opportunity:         { label: "Oportunidad", className: "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400" },
-  opportunityActivity: { label: "Actividad",   className: "bg-green-50 text-green-700 dark:bg-green-950/40 dark:text-green-400" },
-  flow:                { label: "Embudo",      className: "bg-orange-50 text-orange-700 dark:bg-orange-950/40 dark:text-orange-400" },
-  product:             { label: "Producto",    className: "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400" },
-  userWorkspace:       { label: "Usuario",     className: "bg-cyan-50 text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-400" },
-  workspace:           { label: "Workspace",   className: "bg-muted text-muted-foreground" },
+// Un color por tipo de entidad (a diferencia de Fuente/Cargo, acá sí importa
+// distinguir cada valor a simple vista dentro del mismo timeline) — colores ya
+// probados en el resto de la app: Oportunidad y Embudo reusan el violeta e
+// ícono de Funnels, Actividad reusa el calendario genérico de Actividades.
+// Llaves = key_entity real en system_log (revisado en la base — la mayoría
+// snake_case, userWorkspace es la excepción). "opportunity_activity" antes
+// estaba mal escrito como "opportunityActivity" y nunca matcheaba nada, ni
+// acá ni en el filtro de abajo.
+const ENTITY_CONFIG: Record<string, { label: string; icon: React.ElementType; className: string }> = {
+  person:              { label: "Contacto",    icon: UserIcon,       className: "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400" },
+  organization:        { label: "Empresa",     icon: Building2Icon,  className: "bg-cyan-50 text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-400" },
+  opportunity:         { label: "Oportunidad", icon: TrendingUpIcon, className: "bg-violet-50 text-violet-700 dark:bg-violet-950/40 dark:text-violet-400" },
+  opportunity_activity:{ label: "Actividad",   icon: CalendarIcon,   className: "bg-green-50 text-green-700 dark:bg-green-950/40 dark:text-green-400" },
+  quotation:           { label: "Cotización",  icon: FileTextIcon,   className: "bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-400" },
+  document:            { label: "Documento",   icon: FileIcon,       className: "bg-teal-50 text-teal-700 dark:bg-teal-950/40 dark:text-teal-400" },
+  flow:                { label: "Embudo",      icon: GitBranchIcon,  className: "bg-orange-50 text-orange-700 dark:bg-orange-950/40 dark:text-orange-400" },
+  flow_stage:          { label: "Etapa",       icon: FlagIcon,       className: "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400" },
+  product:             { label: "Producto",    icon: PackageIcon,    className: "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400" },
+  label:               { label: "Catálogo",    icon: TagIcon,        className: "bg-pink-50 text-pink-700 dark:bg-pink-950/40 dark:text-pink-400" },
+  marketing:           { label: "Marketing",   icon: MegaphoneIcon,  className: "bg-fuchsia-50 text-fuchsia-700 dark:bg-fuchsia-950/40 dark:text-fuchsia-400" },
+  userWorkspace:       { label: "Usuario",     icon: UserCogIcon,    className: "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-400" },
+  workspace:           { label: "Workspace",   icon: GlobeIcon,      className: "bg-muted text-muted-foreground" },
 }
 
 const ENTITY_FILTERS = [
@@ -40,9 +71,14 @@ const ENTITY_FILTERS = [
   { key: "person",         label: "Contactos" },
   { key: "organization",   label: "Empresas" },
   { key: "opportunity",    label: "Oportunidades" },
-  { key: "opportunityActivity", label: "Actividades" },
+  { key: "opportunity_activity", label: "Actividades" },
+  { key: "quotation",      label: "Cotizaciones" },
+  { key: "document",       label: "Documentos" },
   { key: "flow",           label: "Embudos" },
+  { key: "flow_stage",     label: "Etapas" },
   { key: "product",        label: "Productos" },
+  { key: "label",          label: "Catálogo" },
+  { key: "marketing",      label: "Marketing" },
   { key: "userWorkspace",  label: "Usuarios" },
   { key: "workspace",      label: "Workspace" },
 ]
@@ -252,7 +288,7 @@ export function ActivityTimeline() {
                 <div className="absolute bottom-0 left-0 top-3 border-l-2" />
 
                 {group.logs.map((log) => {
-                  const entity = ENTITY_CONFIG[log.keyEntity] ?? { label: log.keyEntity, className: "bg-muted text-muted-foreground" }
+                  const entity = ENTITY_CONFIG[log.keyEntity] ?? { label: log.keyEntity, icon: TagIcon, className: "bg-muted text-muted-foreground" }
                   const time = format(new Date(log.createdAt), "HH:mm")
                   const userName = log.userName
                   const isSystem = !userName
@@ -289,9 +325,10 @@ export function ActivityTimeline() {
                             <span>{time}</span>
                           </div>
                           <Badge
-                            className={cn("rounded-full border-0 text-xs", entity.className)}
+                            className={cn("gap-1 rounded-full border-0 text-xs", entity.className)}
                             variant="secondary"
                           >
+                            <entity.icon className="size-3" />
                             {entity.label}
                           </Badge>
                         </div>

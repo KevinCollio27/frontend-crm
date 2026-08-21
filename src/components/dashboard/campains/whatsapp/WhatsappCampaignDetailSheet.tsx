@@ -2,23 +2,12 @@
 
 import * as React from "react"
 import { Loader2Icon } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { cn } from "@/lib/utils"
 import { whatsappCampaignService } from "@/services/whatsappCampaign.service"
 import type { WhatsappCampaignRaw } from "@/types/whatsappCampaign"
-
-const STATUS_BADGE: Record<string, string> = {
-  pending:   "bg-slate-400",
-  sent:      "bg-sky-500",
-  delivered: "bg-amber-500",
-  read:      "bg-green-600",
-  failed:    "bg-red-500",
-}
-
-const STATUS_LABEL: Record<string, string> = {
-  pending: "Pendiente", sent: "Enviado", delivered: "Entregado", read: "Leído", failed: "Falló",
-}
+import { RECIPIENT_STATUS_CONFIG } from "../shared/status"
 
 interface Props {
   open: boolean
@@ -70,18 +59,24 @@ export function WhatsappCampaignDetailSheet({ open, onOpenChange, campaignId }: 
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {(campaign.recipients ?? []).map((r) => (
+                      {(campaign.recipients ?? []).map((r) => {
+                        const statusCfg = RECIPIENT_STATUS_CONFIG[r.status]
+                        return (
                         <TableRow key={r.id}>
-                          <TableCell>
-                            <p className="text-sm font-medium">{r.name || "—"}</p>
-                            <p className="text-xs text-muted-foreground">{r.phone_number}</p>
+                          <TableCell className="max-w-40">
+                            <p className="truncate text-sm font-medium" title={r.name || undefined}>{r.name || "—"}</p>
+                            <p className="truncate text-xs text-muted-foreground">{r.phone_number}</p>
                           </TableCell>
                           <TableCell>
-                            <Badge className={`text-xs ${STATUS_BADGE[r.status] ?? "bg-slate-400"}`}>{STATUS_LABEL[r.status] ?? r.status}</Badge>
+                            <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium", statusCfg?.badge ?? "bg-muted text-muted-foreground")}>
+                              <span className={cn("size-1.5 rounded-full", statusCfg?.dot ?? "bg-muted-foreground")} />
+                              {statusCfg?.label ?? r.status}
+                            </span>
                             {r.error_message && <p className="mt-0.5 text-xs text-destructive">{r.error_message}</p>}
                           </TableCell>
                         </TableRow>
-                      ))}
+                        )
+                      })}
                     </TableBody>
                   </Table>
                 </div>

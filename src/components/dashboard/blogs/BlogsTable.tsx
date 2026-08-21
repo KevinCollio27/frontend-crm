@@ -217,7 +217,7 @@ function getColumns(
       return (
         <div className="flex items-stretch gap-2.5">
           <EntityAccentBar seed={blog.id} />
-          <div className="text-sm font-medium self-center">{name}</div>
+          <div className="min-w-0 max-w-56 truncate self-center text-sm font-medium" title={name}>{name}</div>
         </div>
       )
     },
@@ -302,7 +302,12 @@ function getColumns(
     header: "Dominios",
     cell: ({ row }) => {
       const domains: string | null = row.getValue("allowedDomains")
-      return <span className="text-xs text-muted-foreground">{domains ?? "—"}</span>
+      if (!domains) return <span className="text-xs text-muted-foreground">—</span>
+      return (
+        <span className="block max-w-48 truncate text-xs text-muted-foreground" title={domains}>
+          {domains}
+        </span>
+      )
     },
   },
   {

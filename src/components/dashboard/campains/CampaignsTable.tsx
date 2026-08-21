@@ -10,20 +10,26 @@ import {
   type VisibilityState,
 } from "@tanstack/react-table"
 import {
+  BuildingIcon,
   ChevronDown,
   Columns3Icon,
   EyeIcon,
+  HistoryIcon,
+  ListIcon,
   MailIcon,
   MessageCircleIcon,
   MoreHorizontal,
   RefreshCwIcon,
   SearchIcon,
   SlidersHorizontalIcon,
+  TargetIcon,
   Trash2Icon,
+  UsersIcon,
   XIcon,
 } from "lucide-react"
 import * as React from "react"
 
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { confirmDialog } from "@/lib/confirm"
@@ -50,7 +56,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { getSortIcon } from "@/lib/table-utils"
+import { getInitials, getSortIcon } from "@/lib/table-utils"
 import { cn } from "@/lib/utils"
 import { EntityAccentBar } from "@/components/ui/entity-accent-bar"
 import { campaignService } from "@/services/campaign.service"
@@ -59,6 +65,7 @@ import type { CampaignFormState } from "./shared/form-state"
 import { WhatsappCampaignsTable } from "./whatsapp/WhatsappCampaignsTable"
 import { CreateCampaignSheet } from "./CreateCampaignSheet"
 import { CampaignPreviewSheet } from "./CampaignPreviewSheet"
+import { CAMPAIGN_STATUS_CONFIG } from "./shared/status"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -74,7 +81,7 @@ export interface Campaign {
   clickedCount: number
   sentAt: string | null
   createdAt: string
-  createdBy: string
+  createdBy: { name: string; avatarUrl: string | null }
 }
 
 function mapCampaign(d: CampaignRaw): Campaign {
@@ -90,26 +97,26 @@ function mapCampaign(d: CampaignRaw): Campaign {
     clickedCount: d.clicked_count,
     sentAt: d.sent_at,
     createdAt: d.created_at,
-    createdBy: d.user.name,
+    createdBy: { name: d.user.name, avatarUrl: d.user.avatar_url },
   }
 }
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-const statusConfig: Record<string, { dot: string; badge: string; label: string }> = {
-  sent:       { dot: "bg-emerald-500", badge: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",      label: "Enviada"    },
-  draft:      { dot: "bg-zinc-400",    badge: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400", label: "Borrador"   },
-  processing: { dot: "bg-amber-500",   badge: "bg-amber-500/10 text-amber-600 dark:text-amber-400",            label: "Procesando" },
-  partial:    { dot: "bg-orange-500",  badge: "bg-orange-500/10 text-orange-600 dark:text-orange-400",         label: "Parcial"    },
-  failed:     { dot: "bg-red-500",     badge: "bg-red-500/10 text-red-600 dark:text-red-400",                  label: "Fallida"    },
-}
+// Audiencia es vocabulario cerrado (solo 5 valores posibles, definidos por el
+// formulario de creación) pero es una dimensión de la campaña, no un estado —
+// mismo criterio que Fuente en Contactos: un solo color identifica la
+// categoría "Audiencia", el ícono distingue el valor. Antes cada valor tenía
+// su propio color (sky/teal/purple/orange/pink) sin ninguna lógica detrás.
+const AUDIENCE_BADGE_CLASS =
+  "gap-1 border-fuchsia-200 bg-fuchsia-50 text-fuchsia-700 font-normal dark:border-fuchsia-800/60 dark:bg-fuchsia-950/40 dark:text-fuchsia-300"
 
-const audienceConfig: Record<string, { label: string; badge: string }> = {
-  all:          { label: "General",      badge: "bg-sky-50 text-sky-600 dark:bg-sky-950 dark:text-sky-400"             },
-  recent:       { label: "Recientes",    badge: "bg-teal-50 text-teal-600 dark:bg-teal-950 dark:text-teal-400"         },
-  specific:     { label: "Específica",   badge: "bg-purple-50 text-purple-600 dark:bg-purple-950 dark:text-purple-400" },
-  organization: { label: "Organización", badge: "bg-orange-50 text-orange-600 dark:bg-orange-950 dark:text-orange-400" },
-  custom_list:  { label: "Lista custom", badge: "bg-pink-50 text-pink-600 dark:bg-pink-950 dark:text-pink-400"         },
+const audienceConfig: Record<string, { label: string; icon: React.ElementType }> = {
+  all:          { label: "General",      icon: UsersIcon    },
+  recent:       { label: "Recientes",    icon: HistoryIcon  },
+  specific:     { label: "Específica",   icon: TargetIcon   },
+  organization: { label: "Organización", icon: BuildingIcon },
+  custom_list:  { label: "Lista custom", icon: ListIcon     },
 }
 
 // "any" en vez de "all" como sentinel de "sin filtro" — "all" ya es un valor
@@ -136,7 +143,6 @@ const columnLabels: Record<string, string> = {
 
 const DEFAULT_COLUMN_VISIBILITY: VisibilityState = {
   deliveredCount: false,
-  createdBy: false,
 }
 
 // En mobile no hay espacio para columnas de más — solo Nombre queda visible por
@@ -188,7 +194,12 @@ const skeletonCell: Record<string, React.ReactNode> = {
       <div className="h-3 w-14 animate-pulse rounded bg-muted" />
     </div>
   ),
-  createdBy:     <div className="h-4 w-24 animate-pulse rounded bg-muted" />,
+  createdBy: (
+    <div className="flex items-center gap-2">
+      <div className="size-6 shrink-0 animate-pulse rounded-full bg-muted" />
+      <div className="h-4 w-24 animate-pulse rounded bg-muted" />
+    </div>
+  ),
   actions:       <div className="size-8 animate-pulse rounded bg-muted" />,
 }
 
@@ -239,9 +250,9 @@ const columns: ColumnDef<Campaign>[] = [
       return (
         <div className="flex items-stretch gap-2.5">
           <EntityAccentBar seed={campaign.id} />
-          <div className="leading-tight">
-            <div className="text-sm font-medium">{name}</div>
-            <div className="text-xs text-muted-foreground">{campaign.subject}</div>
+          <div className="leading-tight min-w-0 max-w-70">
+            <div className="truncate text-sm font-medium" title={name}>{name}</div>
+            <div className="truncate text-xs text-muted-foreground" title={campaign.subject}>{campaign.subject}</div>
           </div>
         </div>
       )
@@ -257,9 +268,12 @@ const columns: ColumnDef<Campaign>[] = [
     cell: ({ row }) => {
       const v: string = row.getValue("audienceFilter")
       const cfg = audienceConfig[v]
+      if (!cfg) return <span className="text-sm text-muted-foreground">{v}</span>
+      const Icon = cfg.icon
       return (
-        <span className={cn("inline-flex rounded px-2 py-0.5 text-xs font-medium", cfg?.badge ?? "bg-muted text-muted-foreground")}>
-          {cfg?.label ?? v}
+        <span className={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-xs", AUDIENCE_BADGE_CLASS)}>
+          <Icon className="size-3" />
+          {cfg.label}
         </span>
       )
     },
@@ -273,7 +287,7 @@ const columns: ColumnDef<Campaign>[] = [
     ),
     cell: ({ row }) => {
       const s: string = row.getValue("status")
-      const cfg = statusConfig[s]
+      const cfg = CAMPAIGN_STATUS_CONFIG[s]
       return (
         <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium", cfg?.badge ?? "bg-muted text-muted-foreground")}>
           <span className={cn("size-1.5 rounded-full", cfg?.dot ?? "bg-muted-foreground")} />
@@ -337,11 +351,21 @@ const columns: ColumnDef<Campaign>[] = [
     },
   },
   {
-    accessorKey: "createdBy",
+    id: "createdBy",
+    accessorFn: (row) => row.createdBy.name,
     header: "Creado por",
-    cell: ({ row }) => (
-      <div className="text-sm text-muted-foreground">{row.getValue("createdBy")}</div>
-    ),
+    cell: ({ row }) => {
+      const { name, avatarUrl } = row.original.createdBy
+      return (
+        <div className="flex items-center gap-2">
+          <Avatar className="size-6 shrink-0">
+            <AvatarImage src={avatarUrl ?? "https://github.com/shadcn.png"} alt={name} />
+            <AvatarFallback className="text-[9px] font-semibold">{getInitials(name)}</AvatarFallback>
+          </Avatar>
+          <span className="min-w-0 max-w-32 truncate text-sm text-muted-foreground" title={name}>{name}</span>
+        </div>
+      )
+    },
   },
 ]
 

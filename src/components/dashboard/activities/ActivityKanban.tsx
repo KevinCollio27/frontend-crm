@@ -65,7 +65,13 @@ import { ActivityPreviewSheet } from "./ActivityPreviewSheet"
 import { CreateActivitySheet } from "./CreateActivitySheet"
 import { activityService } from "@/services/activity.service"
 import { flowService } from "@/services/flow.service"
-import { toWorkspaceDateTimeParts } from "@/lib/activity-utils"
+import {
+  ACTIVITY_TYPE_CONFIG,
+  DEFAULT_TYPE_CONFIG,
+  OVERDUE_BADGE_CLASS,
+  PRIORITY_CONFIG,
+  toWorkspaceDateTimeParts,
+} from "@/lib/activity-utils"
 import { useWorkspaceTimezone } from "@/hooks/useWorkspaceTimezone"
 import { useEntityRealtime } from "@/hooks/useEntityRealtime"
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -116,8 +122,8 @@ function mapBoardActivity(d: ActivityRaw, timezone: string): BoardActivity {
     id:              String(d.id),
     rawId:           d.id,
     title:           d.title ?? "Sin título",
-    type:            typeDetail?.value ?? "",
-    priority:        prioDetail?.value?.toLowerCase() ?? "",
+    type:            typeDetail?.option ?? "",
+    priority:        prioDetail?.option?.toLowerCase() ?? "",
     stageId:         d.status ?? (d.is_completed ? "completada" : "pendiente"),
     startDate:       d.date_from ? toWorkspaceDateTimeParts(d.date_from, timezone).date : "",
     endDate:         d.date_to   ? toWorkspaceDateTimeParts(d.date_to, timezone).date   : "",
@@ -151,30 +157,13 @@ const STATUS_OPTIONS: SingleSelectOption[] = [
   ...BOARD_STAGES.map((s) => ({ value: s.id, label: s.name })),
 ]
 
-const PRIORITY_CONFIG: Record<string, { label: string; className: string }> = {
-  alta:  { label: "Alta",  className: "bg-red-50 text-red-700"         },
-  media: { label: "Media", className: "bg-amber-50 text-amber-700"     },
-  baja:  { label: "Baja",  className: "bg-emerald-50 text-emerald-700" },
-}
-
-const TYPE_CONFIG: Record<string, { className: string }> = {
-  "Reunión":       { className: "bg-blue-50 text-blue-700"     },
-  "Llamada":       { className: "bg-violet-50 text-violet-700" },
-  "Correo":        { className: "bg-sky-50 text-sky-700"       },
-  "Seguimiento":   { className: "bg-orange-50 text-orange-700" },
-  "Revisión":      { className: "bg-teal-50 text-teal-700"     },
-  "Planificación": { className: "bg-indigo-50 text-indigo-700" },
-  "Video Llamada": { className: "bg-purple-50 text-purple-700" },
-  "Visita":        { className: "bg-emerald-50 text-emerald-700" },
-  "Email":         { className: "bg-sky-50 text-sky-700"       },
-}
-
 const TODAY = new Date().toISOString().slice(0, 10)
 
-// Mismo criterio visual que Oportunidades: completada ≈ ganada, cancelada ≈ perdida.
+// "cancelada" es un cierre neutro, no un error — mismo criterio que STAGE_CONFIG
+// en activity-utils.ts (el rojo se reserva para alertas reales, no para lo cancelado).
 const CARD_BORDER: Record<string, string> = {
   completada: "border-l-2 border-l-emerald-500",
-  cancelada:  "border-l-2 border-l-red-400",
+  cancelada:  "border-l-2 border-l-slate-400",
 }
 
 function isOverdue(activity: BoardActivity) {
@@ -257,9 +246,10 @@ interface ActivityCardProps {
 const ActivityCard = React.memo(function ActivityCard({
   activity, onMove, onPreview, onViewDetail, isDragging,
 }: ActivityCardProps) {
-  const priority  = PRIORITY_CONFIG[activity.priority]
-  const typeStyle = TYPE_CONFIG[activity.type] ?? { className: "bg-muted text-muted-foreground" }
-  const overdue   = isOverdue(activity)
+  const priority   = PRIORITY_CONFIG[activity.priority]
+  const typeConfig = ACTIVITY_TYPE_CONFIG[activity.type] ?? DEFAULT_TYPE_CONFIG
+  const TypeIcon   = typeConfig.icon
+  const overdue    = isOverdue(activity)
 
   const dateDisplay =
     activity.startDate === activity.endDate || !activity.startDate
@@ -316,17 +306,19 @@ const ActivityCard = React.memo(function ActivityCard({
 
       <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
         {activity.type && (
-          <Badge className={cn("rounded-full border-0 text-xs px-2 py-0 shrink-0", typeStyle.className)}>
+          <Badge className={cn("rounded-full border-0 text-xs px-2 py-0 shrink-0 gap-1", typeConfig.bgClass, typeConfig.iconClass)}>
+            <TypeIcon className="size-3" />
             {activity.type}
           </Badge>
         )}
         {priority && (
-          <Badge className={cn("rounded-full border-0 text-xs px-2 py-0 shrink-0", priority.className)}>
+          <Badge variant="outline" className={cn("rounded-full text-xs px-2 py-0 shrink-0 gap-1", priority.badge)}>
+            <priority.icon className="size-3" />
             {priority.label}
           </Badge>
         )}
         {overdue && (
-          <Badge className="rounded-full border-0 text-xs px-2 py-0 shrink-0 bg-red-50 text-red-600">
+          <Badge variant="outline" className={cn("rounded-full text-xs px-2 py-0 shrink-0", OVERDUE_BADGE_CLASS)}>
             Atrasada
           </Badge>
         )}

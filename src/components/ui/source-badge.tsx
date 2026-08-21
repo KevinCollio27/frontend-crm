@@ -71,7 +71,7 @@ export function getSourceMeta(contactSource: string | null, origin: string): Sou
   }
   if (origin === "widget") return { label: "Widget IA", icon: <MessageSquareTextIcon style={{ color: IA_COLOR }} /> }
   if (origin === "CRM") return { label: "Manual", icon: <UserIcon /> }
-  if (origin === "SYSTEM_USER") return { label: "Sistema", icon: <UserIcon /> }
+  if (origin === "SYSTEM_USER" || origin === "SYSTEM_WORKSPACE") return { label: "Sistema", icon: <UserIcon /> }
   if (origin === "AGENT") return { label: "Agente IA", icon: <BotIcon style={{ color: IA_COLOR }} /> }
   return { label: origin, icon: <TagIcon /> }
 }

@@ -22,11 +22,33 @@ import type { ActivityRaw } from "@/types/activity"
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
+// Mismos tonos que STAGE_CONFIG en activity-utils.tsx — "cancelada" queda
+// neutro (no rojo), el rojo se reserva para alertas reales.
 const STAGE_CONFIG = {
-  pendiente:   { label: "Pendiente",   activeBg: "bg-amber-100",   activeText: "text-amber-800",   hoverColor: "hover:text-amber-700 hover:bg-amber-50 hover:border-amber-200"   },
-  en_progreso: { label: "En progreso", activeBg: "bg-blue-100",    activeText: "text-blue-800",    hoverColor: "hover:text-blue-700 hover:bg-blue-50 hover:border-blue-200"       },
-  completada:  { label: "Completada",  activeBg: "bg-emerald-100", activeText: "text-emerald-800", hoverColor: "hover:text-emerald-700 hover:bg-emerald-50 hover:border-emerald-200" },
-  cancelada:   { label: "Cancelada",   activeBg: "bg-red-100",     activeText: "text-red-800",     hoverColor: "hover:text-red-600 hover:bg-red-50 hover:border-red-200"          },
+  pendiente: {
+    label: "Pendiente",
+    activeBg: "bg-amber-100 dark:bg-amber-950/50",
+    activeText: "text-amber-800 dark:text-amber-300",
+    hoverColor: "hover:text-amber-700 hover:bg-amber-50 hover:border-amber-200 dark:hover:text-amber-300 dark:hover:bg-amber-950/40 dark:hover:border-amber-800/60",
+  },
+  en_progreso: {
+    label: "En progreso",
+    activeBg: "bg-blue-100 dark:bg-blue-950/50",
+    activeText: "text-blue-800 dark:text-blue-300",
+    hoverColor: "hover:text-blue-700 hover:bg-blue-50 hover:border-blue-200 dark:hover:text-blue-300 dark:hover:bg-blue-950/40 dark:hover:border-blue-800/60",
+  },
+  completada: {
+    label: "Completada",
+    activeBg: "bg-emerald-100 dark:bg-emerald-950/50",
+    activeText: "text-emerald-800 dark:text-emerald-300",
+    hoverColor: "hover:text-emerald-700 hover:bg-emerald-50 hover:border-emerald-200 dark:hover:text-emerald-300 dark:hover:bg-emerald-950/40 dark:hover:border-emerald-800/60",
+  },
+  cancelada: {
+    label: "Cancelada",
+    activeBg: "bg-slate-200 dark:bg-slate-800/60",
+    activeText: "text-slate-700 dark:text-slate-300",
+    hoverColor: "hover:text-slate-600 hover:bg-slate-100 hover:border-slate-300 dark:hover:text-slate-300 dark:hover:bg-slate-800/40 dark:hover:border-slate-700/60",
+  },
 } as const
 
 type StageId = keyof typeof STAGE_CONFIG

@@ -2,26 +2,15 @@
 
 import * as React from "react"
 import { EyeIcon, Loader2Icon, PlusIcon, SearchIcon } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { whatsappCampaignService } from "@/services/whatsappCampaign.service"
 import type { WhatsappCampaignRaw } from "@/types/whatsappCampaign"
 import { CreateWhatsappCampaignSheet } from "./CreateWhatsappCampaignSheet"
 import { WhatsappCampaignDetailSheet } from "./WhatsappCampaignDetailSheet"
-
-const STATUS_BADGE: Record<string, string> = {
-  draft:      "bg-slate-400",
-  processing: "bg-sky-500",
-  sent:       "bg-green-600",
-  partial:    "bg-amber-500",
-  failed:     "bg-red-500",
-}
-
-const STATUS_LABEL: Record<string, string> = {
-  draft: "Borrador", processing: "Enviando", sent: "Enviada", partial: "Parcial", failed: "Falló",
-}
+import { CAMPAIGN_STATUS_CONFIG } from "../shared/status"
 
 export function WhatsappCampaignsTable() {
   const [data, setData] = React.useState<WhatsappCampaignRaw[]>([])
@@ -92,13 +81,19 @@ export function WhatsappCampaignsTable() {
                 </TableCell>
               </TableRow>
             ) : data.length ? (
-              data.map((c) => (
+              data.map((c) => {
+                const statusCfg = CAMPAIGN_STATUS_CONFIG[c.status]
+                return (
                 <TableRow key={c.id}>
                   <TableCell className="font-medium">
-                    {c.name}
-                    <span className="ml-1.5 font-normal text-xs text-muted-foreground">#{c.id}</span>
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <span className="max-w-52 truncate" title={c.name}>{c.name}</span>
+                      <span className="shrink-0 font-normal text-xs text-muted-foreground">#{c.id}</span>
+                    </div>
                   </TableCell>
-                  <TableCell><span className="font-mono text-xs">{c.template_name}</span></TableCell>
+                  <TableCell>
+                    <span className="block max-w-32 truncate font-mono text-xs" title={c.template_name}>{c.template_name}</span>
+                  </TableCell>
                   <TableCell>{c.total_count}</TableCell>
                   <TableCell>
                     <span className="text-xs text-muted-foreground">
@@ -107,7 +102,10 @@ export function WhatsappCampaignsTable() {
                     </span>
                   </TableCell>
                   <TableCell>
-                    <Badge className={`text-xs ${STATUS_BADGE[c.status] ?? "bg-slate-400"}`}>{STATUS_LABEL[c.status] ?? c.status}</Badge>
+                    <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium", statusCfg?.badge ?? "bg-muted text-muted-foreground")}>
+                      <span className={cn("size-1.5 rounded-full", statusCfg?.dot ?? "bg-muted-foreground")} />
+                      {statusCfg?.label ?? c.status}
+                    </span>
                   </TableCell>
                   <TableCell>
                     <span className="text-sm text-muted-foreground">{new Date(c.created_at).toLocaleDateString("es-CL")}</span>
@@ -118,7 +116,8 @@ export function WhatsappCampaignsTable() {
                     </Button>
                   </TableCell>
                 </TableRow>
-              ))
+                )
+              })
             ) : (
               <TableRow>
                 <TableCell colSpan={7} className="h-24 text-center text-sm text-muted-foreground">

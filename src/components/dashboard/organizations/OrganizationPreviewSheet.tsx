@@ -4,6 +4,7 @@ import * as React from "react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetFooter } from "@/components/ui/sheet"
+import { SourceBadge } from "@/components/ui/source-badge"
 import { cn } from "@/lib/utils"
 import { getFlag, getInitials } from "@/lib/table-utils"
 import {
@@ -149,7 +150,9 @@ export function OrganizationPreviewSheet({ organization, open, onOpenChange, onV
               {getFlag(organization.country)}{" "}
               {countryNames[organization.country] ?? organization.country}
             </InfoRow>
-            <InfoRow label="Fuente">{organization.source}</InfoRow>
+            <InfoRow label="Fuente">
+              <SourceBadge contactSource={organization.contactSource} origin={organization.origin} />
+            </InfoRow>
             <InfoRow label="Miembro desde">
               {new Date(organization.createdAt).toLocaleDateString("es-CL", {
                 day: "numeric",

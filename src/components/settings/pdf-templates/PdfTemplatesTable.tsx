@@ -127,12 +127,15 @@ function getColumns(
           Nombre {getSortIcon(column.getIsSorted())}
         </Button>
       ),
-      cell: ({ row }) => (
-        <div className="flex items-stretch gap-2.5">
-          <EntityAccentBar seed={row.original.id} />
-          <span className="text-sm font-medium self-center">{row.getValue("name")}</span>
-        </div>
-      ),
+      cell: ({ row }) => {
+        const name = row.getValue("name") as string
+        return (
+          <div className="flex items-stretch gap-2.5">
+            <EntityAccentBar seed={row.original.id} />
+            <div className="min-w-0 max-w-70 truncate self-center text-sm font-medium" title={name}>{name}</div>
+          </div>
+        )
+      },
     },
     {
       accessorKey: "isDefault",

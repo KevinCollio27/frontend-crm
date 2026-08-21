@@ -2,24 +2,17 @@
 
 import * as React from "react"
 import { CheckIcon, MailIcon, MousePointerClickIcon, RefreshCwIcon, XIcon } from "lucide-react"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
+import { getInitials } from "@/lib/table-utils"
 import { campaignService, type CampaignContactEvent } from "@/services/campaign.service"
 import type { CampaignRaw } from "@/types/campaign"
+import { CAMPAIGN_STATUS_CONFIG } from "./shared/status"
 
 type PreviewTab = "general" | "metricas" | "seguimiento"
 type SeguimientoFilter = "todos" | "abrieron" | "click" | "no_abrieron"
-
-// ─── Config ───────────────────────────────────────────────────────────────────
-
-const statusConfig: Record<string, { dot: string; badge: string; label: string }> = {
-  sent:       { dot: "bg-emerald-500", badge: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400", label: "Enviada" },
-  draft:      { dot: "bg-zinc-400",    badge: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400", label: "Borrador" },
-  processing: { dot: "bg-amber-500",   badge: "bg-amber-500/10 text-amber-600 dark:text-amber-400", label: "Procesando" },
-  partial:    { dot: "bg-orange-500",  badge: "bg-orange-500/10 text-orange-600 dark:text-orange-400", label: "Parcial" },
-  failed:     { dot: "bg-red-500",     badge: "bg-red-500/10 text-red-600 dark:text-red-400", label: "Fallida" },
-}
 
 const audienceLabel: Record<string, string> = {
   all:          "General (todos los contactos)",
@@ -94,7 +87,7 @@ function CampaignPreviewBody({ campaignId, onClose, onResend }: {
     </div>
   )
 
-  const status = statusConfig[campaign.status]
+  const status = CAMPAIGN_STATUS_CONFIG[campaign.status]
 
   return (
     <div className="flex h-full flex-col">
@@ -185,7 +178,18 @@ function GeneralTab({ campaign }: { campaign: CampaignRaw }) {
               ? new Date(campaign.sent_at).toLocaleString("es-CL", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
               : "—"}
           />
-          <InfoRow label="Creada por" value={campaign.user.name} />
+          <InfoRow
+            label="Creada por"
+            value={
+              <span className="flex items-center gap-1.5">
+                <Avatar className="size-5 shrink-0">
+                  <AvatarImage src={campaign.user.avatar_url ?? "https://github.com/shadcn.png"} alt={campaign.user.name} />
+                  <AvatarFallback className="text-[9px] font-semibold">{getInitials(campaign.user.name)}</AvatarFallback>
+                </Avatar>
+                {campaign.user.name}
+              </span>
+            }
+          />
           <InfoRow
             label="Remitente"
             value={

@@ -50,6 +50,12 @@ interface SessionState {
   isPlatformAdmin: boolean;
   isAuthenticated: boolean;
   isLoading: boolean;
+  // false hasta que `hydrate()` corre al menos una vez en el cliente — el
+  // primer render del cliente debe coincidir exactamente con el del server
+  // (sin acceso a localStorage) para evitar mismatches de hidratación en
+  // cualquier UI que dependa de `user`/`isAdmin` para decidir si renderizar
+  // un elemento (no solo su contenido). Ver useIsWorkspaceAdmin.
+  hasHydrated: boolean;
   setSession: (user: User, workspaceId: number | null) => void;
   enterAsPlatformAdmin: (workspace: PlatformAdminViewing) => void;
   exitPlatformAdminView: () => void;
@@ -68,6 +74,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   isPlatformAdmin: _initial?.isPlatformAdmin ?? false,
   isAuthenticated: !!_initial?.user,
   isLoading: true, // still validate with server even if cache hit
+  hasHydrated: false,
 
   // Representa "esta es tu sesión real" — por eso siempre limpia
   // platformAdminViewing (si venías viendo un workspace ajeno, este llamado
@@ -120,14 +127,14 @@ export const useSessionStore = create<SessionState>((set, get) => ({
           // no lo pisamos con el de user_workspace[0].
           const stillPlatformAdmin = prev.platformAdminViewing?.id === workspaceId ? prev.platformAdminViewing : null;
           writeCache(data.user, workspaceId, stillPlatformAdmin, isPlatformAdmin);
-          return { user: data.user, workspaceId, platformAdminViewing: stillPlatformAdmin, isPlatformAdmin, isAuthenticated: true, isLoading: false };
+          return { user: data.user, workspaceId, platformAdminViewing: stillPlatformAdmin, isPlatformAdmin, isAuthenticated: true, isLoading: false, hasHydrated: true };
         });
       } else {
         clearCache();
-        set({ user: null, workspaceId: null, platformAdminViewing: null, isPlatformAdmin: false, isAuthenticated: false, isLoading: false });
+        set({ user: null, workspaceId: null, platformAdminViewing: null, isPlatformAdmin: false, isAuthenticated: false, isLoading: false, hasHydrated: true });
       }
     } catch {
-      set({ isLoading: false });
+      set({ isLoading: false, hasHydrated: true });
     }
   },
 }));

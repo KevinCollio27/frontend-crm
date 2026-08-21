@@ -36,6 +36,7 @@ import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
 
 import { EntityAccentBar } from "@/components/ui/entity-accent-bar"
+import { SourceBadge } from "@/components/ui/source-badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -77,7 +78,8 @@ export interface Organization {
   industry: string
   webPage: string
   country: string
-  source: string
+  contactSource: string | null
+  origin: string
   createdAt: string
   contactCount: number
 }
@@ -90,7 +92,8 @@ function mapOrganization(o: OrganizationRaw): Organization {
     industry: o.industry ?? "",
     webPage: o.web_page ?? "",
     country: o.pais_origen ?? "CL",
-    source: o.contact_source ?? o.origin ?? "CRM",
+    contactSource: o.contact_source ?? null,
+    origin: o.origin ?? "CRM",
     createdAt: (o.created_at ?? "").slice(0, 10),
     contactCount: o.person?.length ?? 0,
   }
@@ -107,7 +110,6 @@ const columnLabels: Record<string, string> = {
 }
 
 const DEFAULT_COLUMN_VISIBILITY: VisibilityState = {
-  source: false,
   createdAt: false,
 }
 
@@ -122,12 +124,14 @@ const MOBILE_COLUMN_VISIBILITY: VisibilityState = {
   createdAt: false,
 }
 
-// Únicas fuentes reales hoy en producción (más allá de casos legacy como
-// CAMIONGO/SYSTEM_WORKSPACE, que no aplican a un workspace normal).
+// Únicas fuentes reales hoy en producción — filtra por origin (organización no
+// tiene contact_source por canal como Contactos), mismos labels que SourceBadge.
 const SOURCE_OPTIONS: SingleSelectOption[] = [
   { value: "all", label: "Todas" },
-  { value: "CRM", label: "CRM" },
-  { value: "widget", label: "Widget" },
+  { value: "CRM", label: "Manual" },
+  { value: "widget", label: "Widget IA" },
+  { value: "CAMIONGO", label: "Importado" },
+  { value: "SYSTEM_WORKSPACE", label: "Sistema" },
 ]
 
 function getColumns(
@@ -254,14 +258,15 @@ function getColumns(
       },
     },
     {
-      accessorKey: "source",
+      id: "source",
+      accessorKey: "contactSource",
       header: ({ column }) => (
         <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
           Fuente {getSortIcon(column.getIsSorted())}
         </Button>
       ),
       cell: ({ row }) => (
-        <div className="capitalize text-sm">{row.getValue("source")}</div>
+        <SourceBadge contactSource={row.original.contactSource} origin={row.original.origin} />
       ),
     },
     {
@@ -510,7 +515,7 @@ export function OrganizationsTable() {
   // Estado en Funnels, no hay soporte de "fuente" en el backend todavía.
   const filteredOrganizations = React.useMemo(() => {
     if (sourceFilter === "all") return organizations
-    return organizations.filter((o) => o.source.toLowerCase() === sourceFilter.toLowerCase())
+    return organizations.filter((o) => o.origin === sourceFilter)
   }, [organizations, sourceFilter])
 
   const table = useReactTable({

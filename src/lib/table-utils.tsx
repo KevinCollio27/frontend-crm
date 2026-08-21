@@ -30,6 +30,12 @@ export const SOURCE_LABEL: Record<string, string> = {
   google_contacts:  "Google",
 }
 
+// Color compartido para "esto venció y sigue sin resolverse" — Actividades
+// (Atrasada) y Cotizaciones (Vencida) usan el mismo tono para que la app
+// tenga un único lenguaje visual para esta alerta, no uno por tabla.
+export const OVERDUE_BADGE_CLASS =
+  "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-800/60 dark:bg-rose-950/40 dark:text-rose-300"
+
 export function getInitials(name: string) {
   return name
     .split(" ")

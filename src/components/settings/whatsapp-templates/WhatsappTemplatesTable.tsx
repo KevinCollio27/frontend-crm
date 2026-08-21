@@ -88,10 +88,13 @@ const MOBILE_COLUMN_VISIBILITY: VisibilityState = {
   bodyText: false,
 }
 
-const STATUS_BADGE: Record<string, string> = {
-  APPROVED: "bg-green-600",
-  PENDING:  "bg-amber-500",
-  REJECTED: "bg-red-500",
+// Mismo criterio que CAMPAIGN_STATUS_CONFIG (Campañas) — pill suave con
+// dark: propio, antes era fondo sólido sin texto propio (heredaba el color
+// del Badge por defecto, un lenguaje visual distinto al resto de la app).
+const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
+  APPROVED: { label: "Aprobado",  className: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" },
+  PENDING:  { label: "Pendiente", className: "bg-amber-500/10 text-amber-600 dark:text-amber-400"       },
+  REJECTED: { label: "Rechazado", className: "bg-red-500/10 text-red-600 dark:text-red-400"              },
 }
 
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
@@ -122,7 +125,12 @@ function getColumns(
           Nombre {getSortIcon(column.getIsSorted())}
         </Button>
       ),
-      cell: ({ row }) => <span className="font-mono text-sm">{row.getValue("name")}</span>,
+      cell: ({ row }) => {
+        const name = row.getValue("name") as string
+        return (
+          <span className="block max-w-52 truncate font-mono text-sm" title={name}>{name}</span>
+        )
+      },
     },
     {
       accessorKey: "language",
@@ -139,7 +147,8 @@ function getColumns(
       header: "Estado",
       cell: ({ row }) => {
         const status = row.getValue("status") as string
-        return <Badge className={`text-xs ${STATUS_BADGE[status] ?? "bg-slate-400"}`}>{status}</Badge>
+        const conf = STATUS_CONFIG[status] ?? { label: status, className: "bg-muted text-muted-foreground" }
+        return <Badge variant="secondary" className={cn("rounded-full text-xs", conf.className)}>{conf.label}</Badge>
       },
     },
     {

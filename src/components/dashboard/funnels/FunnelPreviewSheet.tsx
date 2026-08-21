@@ -3,16 +3,14 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetFooter } from "@/components/ui/sheet"
+import { StageBadge } from "@/components/ui/stage-badge"
 import { cn } from "@/lib/utils"
 import {
-  ArrowDownIcon,
-  ArrowUpIcon,
   BuildingIcon,
   CalendarIcon,
   ClipboardListIcon,
   EyeIcon,
   FileTextIcon,
-  MinusIcon,
   PencilIcon,
   TargetIcon,
   Trash2,
@@ -20,6 +18,8 @@ import {
   UsersIcon,
   ZapIcon,
 } from "lucide-react"
+import { PRIORITY_CONFIG, STATUS_CONFIG } from "./shared/status"
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface DealLike {
@@ -36,24 +36,6 @@ interface DealLike {
   priority?: string
   quotationCount?: number
   activityCount?: number
-}
-
-// ─── Configs ──────────────────────────────────────────────────────────────────
-
-const PRIORITY_CONFIG: Record<string, { icon: React.ElementType; label: string; color: string }> = {
-  alta:  { icon: ArrowUpIcon,   label: "Alta",  color: "text-red-600"          },
-  media: { icon: MinusIcon,     label: "Media", color: "text-yellow-600"        },
-  baja:  { icon: ArrowDownIcon, label: "Baja",  color: "text-muted-foreground" },
-}
-
-const STATUS_CONFIG: Record<string, { label: string; badge: string; dot: string }> = {
-  open:        { label: "Abierta",     badge: "bg-blue-500/10 text-blue-600",       dot: "bg-blue-500"     },
-  won:         { label: "Ganada",      badge: "bg-emerald-500/10 text-emerald-600", dot: "bg-emerald-500"  },
-  lost:        { label: "Perdida",     badge: "bg-red-500/10 text-red-600",         dot: "bg-red-500"      },
-  en_progreso: { label: "En Progreso", badge: "bg-blue-500/10 text-blue-600",       dot: "bg-blue-500"     },
-  ganada:      { label: "Ganada",      badge: "bg-emerald-500/10 text-emerald-600", dot: "bg-emerald-500"  },
-  perdida:     { label: "Perdida",     badge: "bg-red-500/10 text-red-600",         dot: "bg-red-500"      },
-  reabierta:   { label: "Reabierta",   badge: "bg-amber-500/10 text-amber-600",     dot: "bg-amber-500"    },
 }
 
 function formatValue(value: number, symbol = "$") {
@@ -116,8 +98,8 @@ export function FunnelPreviewSheet({ deal, open, onOpenChange }: Props) {
 
         {/* Identity */}
         <div className="flex shrink-0 items-center gap-4 border-b px-5 py-4">
-          <div className="size-14 shrink-0 rounded-xl flex items-center justify-center bg-violet-50">
-            <TrendingUpIcon className="size-7 text-violet-600" />
+          <div className="size-14 shrink-0 rounded-xl flex items-center justify-center bg-violet-50 dark:bg-violet-950/40">
+            <TrendingUpIcon className="size-7 text-violet-600 dark:text-violet-400" />
           </div>
           <div className="flex min-w-0 flex-col gap-1">
             <span className="text-sm font-medium leading-snug line-clamp-2">{deal.name}</span>
@@ -125,12 +107,12 @@ export function FunnelPreviewSheet({ deal, open, onOpenChange }: Props) {
               {deal.company} · {deal.contact}
             </div>
             <div className="flex gap-1.5 flex-wrap mt-0.5">
-              <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium", statusConf.badge)}>
+              <span className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium", statusConf.badge)}>
                 <span className={cn("size-1.5 rounded-full", statusConf.dot)} />
                 {statusConf.label}
               </span>
               {priorityConf && PriorityIcon && (
-                <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-muted", priorityConf.color)}>
+                <span className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium", priorityConf.badge)}>
                   <PriorityIcon className="size-3" />
                   {priorityConf.label}
                 </span>
@@ -166,9 +148,11 @@ export function FunnelPreviewSheet({ deal, open, onOpenChange }: Props) {
                 {formatValue(deal.value, deal.currency)}
               </span>
             </InfoRow>
-            <InfoRow label="Etapa">{stageName}</InfoRow>
+            <InfoRow label="Etapa">
+              {stageName === "—" ? stageName : <StageBadge stage={stageName} />}
+            </InfoRow>
             <InfoRow label="Estado">
-              <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium", statusConf.badge)}>
+              <span className={cn("inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium", statusConf.badge)}>
                 <span className={cn("size-1.5 rounded-full", statusConf.dot)} />
                 {statusConf.label}
               </span>

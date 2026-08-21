@@ -14,7 +14,13 @@ import {
   Trash2,
   UsersIcon,
 } from "lucide-react"
-import { ACTIVITY_TYPE_CONFIG, DEFAULT_TYPE_CONFIG, PRIORITY_CONFIG } from "@/lib/activity-utils"
+import {
+  ACTIVITY_TYPE_CONFIG,
+  DEFAULT_TYPE_CONFIG,
+  OVERDUE_BADGE_CLASS,
+  PRIORITY_CONFIG,
+  STAGE_CONFIG,
+} from "@/lib/activity-utils"
 import { STAGES } from "./data"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -30,15 +36,6 @@ interface ActivityLike {
   responsible: { name: string; initials: string; avatarUrl?: string | null }
   opportunityName?: string
   funnelName?: string
-}
-
-// ─── Configs ──────────────────────────────────────────────────────────────────
-
-const STAGE_CONFIG: Record<string, { dot: string; badge: string; label: string }> = {
-  pendiente:   { dot: "bg-amber-500",       badge: "bg-amber-500/10 text-amber-600",     label: "Pendiente"   },
-  en_progreso: { dot: "bg-blue-500",        badge: "bg-blue-500/10 text-blue-600",       label: "En Progreso" },
-  completada:  { dot: "bg-emerald-500",     badge: "bg-emerald-500/10 text-emerald-600", label: "Completada"  },
-  cancelada:   { dot: "bg-muted-foreground",badge: "bg-muted text-muted-foreground",     label: "Cancelada"   },
 }
 
 const TODAY = new Date().toISOString().slice(0, 10)
@@ -111,12 +108,12 @@ export function ActivityPreviewSheet({ activity, open, onOpenChange, onViewDetai
               <span className="w-fit rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
                 {activity.type}
               </span>
-              <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium", stageConfig.badge)}>
+              <span className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium", stageConfig.badge)}>
                 <span className={cn("size-1.5 rounded-full", stageConfig.dot)} />
                 {stageName}
               </span>
               {overdue && (
-                <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-600">
+                <span className={cn("rounded-full border px-2 py-0.5 text-xs font-medium", OVERDUE_BADGE_CLASS)}>
                   Atrasada
                 </span>
               )}
@@ -148,7 +145,7 @@ export function ActivityPreviewSheet({ activity, open, onOpenChange, onViewDetai
           <div className="flex flex-col gap-1.5 px-4 py-3">
             <InfoRow label="Tipo">{activity.type}</InfoRow>
             <InfoRow label="Estado">
-              <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium", stageConfig.badge)}>
+              <span className={cn("inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium", stageConfig.badge)}>
                 <span className={cn("size-1.5 rounded-full", stageConfig.dot)} />
                 {stageName}
               </span>
@@ -163,7 +160,7 @@ export function ActivityPreviewSheet({ activity, open, onOpenChange, onViewDetai
             )}
             <InfoRow label="Fecha inicio">{fmtDate(activity.startDate)}</InfoRow>
             <InfoRow label="Fecha límite">
-              <span className={cn(overdue && "text-red-600 font-medium")}>
+              <span className={cn(overdue && "text-red-600 dark:text-red-400 font-medium")}>
                 {fmtDate(activity.endDate)}
                 {overdue && " · Atrasada"}
               </span>

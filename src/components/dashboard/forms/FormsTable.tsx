@@ -200,9 +200,9 @@ function buildColumns(
       return (
         <div className="flex items-stretch gap-2.5">
           <EntityAccentBar seed={form.id} />
-          <div className="leading-tight">
-            <div className="text-sm font-medium">{name}</div>
-            <div className="text-xs text-muted-foreground font-mono">{form.slug}</div>
+          <div className="leading-tight min-w-0 max-w-70">
+            <div className="truncate text-sm font-medium" title={name}>{name}</div>
+            <div className="truncate text-xs text-muted-foreground font-mono" title={form.slug}>{form.slug}</div>
           </div>
         </div>
       )
@@ -218,9 +218,9 @@ function buildColumns(
     cell: ({ row }) => {
       const name: string = row.getValue("flowName")
       return (
-        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+        <div className="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
           <GitBranchIcon className="size-3.5 shrink-0" />
-          {name}
+          <span className="min-w-0 max-w-40 truncate" title={name}>{name}</span>
         </div>
       )
     },

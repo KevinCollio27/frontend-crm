@@ -17,7 +17,6 @@ import {
   Columns3Icon,
   DownloadIcon,
   EyeIcon,
-  Link2,
   ListIcon,
   MoreHorizontal,
   PencilIcon,
@@ -26,18 +25,11 @@ import {
   Trash2Icon,
   XIcon,
 } from "lucide-react"
-import {
-  FaRegFile,
-  FaRegFileExcel,
-  FaRegFileImage,
-  FaRegFilePdf,
-  FaRegFilePowerpoint,
-  FaRegFileWord,
-  FaRegFileZipper,
-} from "react-icons/fa6"
 import * as React from "react"
 
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
+import { CategoryBadge } from "@/components/ui/category-badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
   DropdownMenu,
@@ -66,11 +58,14 @@ import { UploadDocumentSheet, type DocumentToEdit } from "./UploadDocumentSheet"
 import { documentService } from "@/services/document.service"
 import type { DocumentRaw } from "@/types/document"
 import { useIsMobile } from "@/hooks/use-mobile"
-import { getSortIcon } from "@/lib/table-utils"
+import { getSortIcon, getInitials } from "@/lib/table-utils"
 import { notify } from "@/lib/notify"
 import { orgConfirm } from "@/lib/confirm"
 import { useEntityRealtime } from "@/hooks/useEntityRealtime"
 import { cn } from "@/lib/utils"
+import { DEFAULT_FILE_TYPE_CONFIG, FILE_TYPE_CONFIG } from "./shared/file-type"
+import { CATEGORY_LABEL } from "./shared/category"
+import { VISIBILITY_CONFIG } from "./shared/visibility"
 
 export interface Document {
   id: number
@@ -81,7 +76,7 @@ export interface Document {
   fileSize: number | null
   category: string
   visibility: string
-  uploadedBy: string
+  uploadedBy: { name: string; avatarUrl: string | null } | null
   createdAt: string
 }
 
@@ -95,7 +90,7 @@ function mapDocument(d: DocumentRaw): Document {
     fileSize: d.file_size,
     category: d.category ?? "",
     visibility: d.visibility,
-    uploadedBy: d.user?.name ?? "",
+    uploadedBy: d.user ? { name: d.user.name, avatarUrl: d.user.avatar_url } : null,
     createdAt: (d.created_at ?? "").slice(0, 10),
   }
 }
@@ -106,45 +101,6 @@ const formatSize = (bytes: number | null) => {
   if (!bytes) return "—"
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
-
-const fileConfig: Record<string, { icon: React.ElementType; iconClass: string; bgClass: string }> = {
-  pdf:  { icon: FaRegFilePdf,        iconClass: "text-red-600 dark:text-red-400",       bgClass: "bg-red-50 dark:bg-red-950"       },
-  png:  { icon: FaRegFileImage,      iconClass: "text-blue-600 dark:text-blue-400",     bgClass: "bg-blue-50 dark:bg-blue-950"     },
-  jpg:  { icon: FaRegFileImage,      iconClass: "text-blue-600 dark:text-blue-400",     bgClass: "bg-blue-50 dark:bg-blue-950"     },
-  jpeg: { icon: FaRegFileImage,      iconClass: "text-blue-600 dark:text-blue-400",     bgClass: "bg-blue-50 dark:bg-blue-950"     },
-  svg:  { icon: FaRegFileImage,      iconClass: "text-blue-600 dark:text-blue-400",     bgClass: "bg-blue-50 dark:bg-blue-950"     },
-  docx: { icon: FaRegFileWord,       iconClass: "text-sky-600 dark:text-sky-400",       bgClass: "bg-sky-50 dark:bg-sky-950"       },
-  doc:  { icon: FaRegFileWord,       iconClass: "text-sky-600 dark:text-sky-400",       bgClass: "bg-sky-50 dark:bg-sky-950"       },
-  xlsx: { icon: FaRegFileExcel,      iconClass: "text-green-600 dark:text-green-400",   bgClass: "bg-green-50 dark:bg-green-950"   },
-  xls:  { icon: FaRegFileExcel,      iconClass: "text-green-600 dark:text-green-400",   bgClass: "bg-green-50 dark:bg-green-950"   },
-  pptx: { icon: FaRegFilePowerpoint, iconClass: "text-orange-600 dark:text-orange-400", bgClass: "bg-orange-50 dark:bg-orange-950" },
-  ppt:  { icon: FaRegFilePowerpoint, iconClass: "text-orange-600 dark:text-orange-400", bgClass: "bg-orange-50 dark:bg-orange-950" },
-  zip:  { icon: FaRegFileZipper,     iconClass: "text-yellow-600 dark:text-yellow-400", bgClass: "bg-yellow-50 dark:bg-yellow-950" },
-  rar:  { icon: FaRegFileZipper,     iconClass: "text-yellow-600 dark:text-yellow-400", bgClass: "bg-yellow-50 dark:bg-yellow-950" },
-  link: { icon: Link2,               iconClass: "text-violet-600 dark:text-violet-400", bgClass: "bg-violet-50 dark:bg-violet-950" },
-}
-
-const fileTypeBadge: Record<string, string> = {
-  pdf:  "bg-red-50 text-red-600 dark:bg-red-950 dark:text-red-400",
-  png:  "bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400",
-  jpg:  "bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400",
-  jpeg: "bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400",
-  docx: "bg-sky-50 text-sky-600 dark:bg-sky-950 dark:text-sky-400",
-  doc:  "bg-sky-50 text-sky-600 dark:bg-sky-950 dark:text-sky-400",
-  xlsx: "bg-green-50 text-green-600 dark:bg-green-950 dark:text-green-400",
-  xls:  "bg-green-50 text-green-600 dark:bg-green-950 dark:text-green-400",
-  pptx: "bg-orange-50 text-orange-600 dark:bg-orange-950 dark:text-orange-400",
-  ppt:  "bg-orange-50 text-orange-600 dark:bg-orange-950 dark:text-orange-400",
-  link: "bg-violet-50 text-violet-600 dark:bg-violet-950 dark:text-violet-400",
-}
-
-const categoryLabels: Record<string, string> = {
-  contrato:     "Contrato",
-  factura:      "Factura",
-  presentacion: "Presentación",
-  manual:       "Manual",
-  otro:         "Otro",
 }
 
 // ─── Filtros ──────────────────────────────────────────────────────────────────
@@ -244,15 +200,15 @@ function getColumns(
         const name: string = row.getValue("name")
         const description = row.original.description
         const fileType = row.original.fileType
-        const config = fileConfig[fileType] ?? { icon: FaRegFile, iconClass: "text-muted-foreground", bgClass: "bg-muted" }
+        const config = FILE_TYPE_CONFIG[fileType] ?? DEFAULT_FILE_TYPE_CONFIG
         const Icon = config.icon
         return (
           <div className="flex items-center gap-2.5">
             <div className={`flex size-6 shrink-0 items-center justify-center rounded ${config.bgClass}`}>
               <Icon className={`size-3.5 ${config.iconClass}`} />
             </div>
-            <div className="leading-tight">
-              <div className="text-sm font-medium">{name}</div>
+            <div className="leading-tight min-w-0 max-w-70">
+              <div className="truncate text-sm font-medium" title={name}>{name}</div>
               {description && (
                 <div className="max-w-48 truncate text-xs text-muted-foreground">{description}</div>
               )}
@@ -270,11 +226,7 @@ function getColumns(
       ),
       cell: ({ row }) => {
         const ft: string = row.getValue("fileType")
-        return (
-          <span className={`inline-flex rounded px-2 py-0.5 text-xs font-medium uppercase ${fileTypeBadge[ft] ?? "bg-muted text-muted-foreground"}`}>
-            {ft}
-          </span>
-        )
+        return <span className="text-sm text-muted-foreground uppercase">{ft}</span>
       },
     },
     {
@@ -286,11 +238,8 @@ function getColumns(
       ),
       cell: ({ row }) => {
         const cat: string = row.getValue("category")
-        return (
-          <div className="text-sm text-muted-foreground">
-            {(categoryLabels[cat] ?? cat) || "—"}
-          </div>
-        )
+        if (!cat) return <span className="text-sm text-muted-foreground">—</span>
+        return <CategoryBadge category={CATEGORY_LABEL[cat] ?? cat} />
       },
     },
     {
@@ -302,27 +251,35 @@ function getColumns(
       ),
       cell: ({ row }) => {
         const v: string = row.getValue("visibility")
+        const conf = VISIBILITY_CONFIG[v] ?? VISIBILITY_CONFIG.private
         return (
-          <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-            v === "public"
-              ? "bg-emerald-50 text-emerald-600"
-              : "bg-muted text-muted-foreground"
-          }`}>
-            {v === "public" ? "Público" : "Privado"}
+          <span className={cn("inline-flex rounded-full border px-2 py-0.5 text-xs font-medium", conf.className)}>
+            {conf.label}
           </span>
         )
       },
     },
     {
-      accessorKey: "uploadedBy",
+      id: "uploadedBy",
+      accessorFn: (row) => row.uploadedBy?.name ?? "",
       header: ({ column }) => (
         <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
           Subido por {getSortIcon(column.getIsSorted())}
         </Button>
       ),
-      cell: ({ row }) => (
-        <div className="text-sm text-muted-foreground">{row.getValue("uploadedBy") || "—"}</div>
-      ),
+      cell: ({ row }) => {
+        const uploadedBy = row.original.uploadedBy
+        if (!uploadedBy) return <span className="text-sm text-muted-foreground">—</span>
+        return (
+          <div className="flex items-center gap-2">
+            <Avatar className="size-6 shrink-0">
+              <AvatarImage src={uploadedBy.avatarUrl ?? "https://github.com/shadcn.png"} alt={uploadedBy.name} />
+              <AvatarFallback className="text-[9px] font-semibold">{getInitials(uploadedBy.name)}</AvatarFallback>
+            </Avatar>
+            <span className="min-w-0 max-w-36 truncate text-sm" title={uploadedBy.name}>{uploadedBy.name}</span>
+          </div>
+        )
+      },
     },
     {
       accessorKey: "createdAt",
@@ -406,7 +363,12 @@ const skeletonCell: Record<string, React.ReactNode> = {
   fileType:   <div className="h-5 w-12 animate-pulse rounded bg-muted" />,
   category:   <div className="h-4 w-24 animate-pulse rounded bg-muted" />,
   visibility: <div className="h-5 w-16 animate-pulse rounded-full bg-muted" />,
-  uploadedBy: <div className="h-4 w-24 animate-pulse rounded bg-muted" />,
+  uploadedBy: (
+    <div className="flex items-center gap-2">
+      <div className="size-6 shrink-0 animate-pulse rounded-full bg-muted" />
+      <div className="h-4 w-24 animate-pulse rounded bg-muted" />
+    </div>
+  ),
   createdAt:  <div className="h-4 w-20 animate-pulse rounded bg-muted" />,
   fileSize:   <div className="h-4 w-16 animate-pulse rounded bg-muted" />,
   actions:    <div className="size-8 animate-pulse rounded bg-muted" />,

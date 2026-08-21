@@ -226,9 +226,9 @@ function getColumns(
                 {getInitials(name)}
               </AvatarFallback>
             </Avatar>
-            <div className="leading-tight">
-              <div className="text-sm font-medium">{name}</div>
-              <div className="text-xs text-muted-foreground">{email || "—"}</div>
+            <div className="leading-tight min-w-0 max-w-70">
+              <div className="text-sm font-medium truncate" title={name}>{name}</div>
+              <div className="text-xs text-muted-foreground truncate" title={email || undefined}>{email || "—"}</div>
             </div>
           </div>
         )
@@ -246,7 +246,7 @@ function getColumns(
         return (
           <div className="flex items-stretch gap-2.5">
             {c.orgId !== null && <EntityAccentBar seed={c.orgId} />}
-            <span className="text-sm self-center">{c.org}</span>
+            <div className="min-w-0 max-w-44 truncate self-center text-sm" title={c.org}>{c.org}</div>
           </div>
         )
       },

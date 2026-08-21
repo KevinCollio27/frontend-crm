@@ -16,9 +16,9 @@ interface PositionBadgeProps {
 
 export function PositionBadge({ position, className }: PositionBadgeProps) {
   return (
-    <Badge variant="outline" className={cn(POSITION_BADGE_CLASS, className)}>
-      <BriefcaseIcon />
-      {position}
+    <Badge variant="outline" className={cn(POSITION_BADGE_CLASS, "max-w-48", className)} title={position}>
+      <BriefcaseIcon className="shrink-0" />
+      <span className="min-w-0 truncate">{position}</span>
     </Badge>
   )
 }

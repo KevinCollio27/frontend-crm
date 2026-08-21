@@ -10,55 +10,14 @@ import {
 } from "@/components/ui/collapsible"
 import { cn } from "@/lib/utils"
 import { getInitials } from "@/lib/table-utils"
+import { ChevronDownIcon } from "lucide-react"
 import {
-  CalendarIcon,
-  ChevronDownIcon,
-  EyeIcon,
-  MailIcon,
-  MapPinIcon,
-  PhoneIcon,
-  SearchIcon,
-  UsersIcon,
-  VideoIcon,
-} from "lucide-react"
+  ACTIVITY_TYPE_CONFIG,
+  DEFAULT_TYPE_CONFIG,
+  PRIORITY_CONFIG,
+  STAGE_CONFIG,
+} from "@/lib/activity-utils"
 import type { ActivityRaw } from "@/types/activity"
-
-// ─── Configs ──────────────────────────────────────────────────────────────────
-
-const TYPE_ICON: Record<string, React.ElementType> = {
-  "Reunión":       UsersIcon,
-  "Llamada":       PhoneIcon,
-  "Correo":        MailIcon,
-  "Seguimiento":   SearchIcon,
-  "Revisión":      EyeIcon,
-  "Planificación": CalendarIcon,
-  "Video Llamada": VideoIcon,
-  "Visita":        MapPinIcon,
-}
-
-const TYPE_STYLE: Record<string, { bg: string; icon: string }> = {
-  "Reunión":       { bg: "bg-violet-100",  icon: "text-violet-600"  },
-  "Llamada":       { bg: "bg-blue-100",    icon: "text-blue-600"    },
-  "Correo":        { bg: "bg-amber-100",   icon: "text-amber-600"   },
-  "Seguimiento":   { bg: "bg-cyan-100",    icon: "text-cyan-600"    },
-  "Revisión":      { bg: "bg-orange-100",  icon: "text-orange-600"  },
-  "Planificación": { bg: "bg-emerald-100", icon: "text-emerald-600" },
-  "Video Llamada": { bg: "bg-pink-100",    icon: "text-pink-600"    },
-  "Visita":        { bg: "bg-red-100",     icon: "text-red-600"     },
-}
-
-const STAGE_CONFIG: Record<string, { label: string; className: string }> = {
-  pendiente:   { label: "Pendiente",   className: "bg-amber-50 text-amber-700"     },
-  en_progreso: { label: "En progreso", className: "bg-blue-50 text-blue-700"       },
-  completada:  { label: "Completada",  className: "bg-emerald-50 text-emerald-700" },
-  cancelada:   { label: "Cancelada",   className: "bg-red-50 text-red-600"         },
-}
-
-const PRIORITY_CONFIG: Record<string, { label: string; className: string }> = {
-  alta:  { label: "Alta",  className: "bg-red-50 text-red-700"         },
-  media: { label: "Media", className: "bg-amber-50 text-amber-700"     },
-  baja:  { label: "Baja",  className: "bg-emerald-50 text-emerald-700" },
-}
 
 function fmtDate(iso: string | null) {
   if (!iso) return "—"
@@ -102,14 +61,14 @@ export function Col1Info({ activity }: Props) {
   const typeDetail = activity.opportunity_activity_detail.find((d) => d.label?.key === "activity_type")
   const prioDetail = activity.opportunity_activity_detail.find((d) => d.label?.key === "priority")
 
-  const type      = typeDetail?.value ?? ""
-  const priority  = prioDetail?.value?.toLowerCase() ?? "media"
+  const type      = typeDetail?.option ?? ""
+  const priority  = prioDetail?.option?.toLowerCase() ?? "media"
   const stageId   = activity.status ?? (activity.is_completed ? "completada" : "pendiente")
   const responsible = activity.user?.name ?? "—"
   const responsibleAvatarUrl = activity.user?.avatar_url ?? null
 
-  const typeStyle  = TYPE_STYLE[type]  ?? { bg: "bg-muted", icon: "text-muted-foreground" }
-  const TypeIcon   = TYPE_ICON[type]   ?? CalendarIcon
+  const typeConfig = ACTIVITY_TYPE_CONFIG[type] ?? DEFAULT_TYPE_CONFIG
+  const TypeIcon   = typeConfig.icon
   const stageConf    = STAGE_CONFIG[stageId]    ?? STAGE_CONFIG.pendiente
   const priorityConf = PRIORITY_CONFIG[priority] ?? PRIORITY_CONFIG.media
 
@@ -119,17 +78,19 @@ export function Col1Info({ activity }: Props) {
       {/* Identidad */}
       <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
         <div className="flex items-center gap-3 p-3.5">
-          <div className={cn("flex size-12 shrink-0 items-center justify-center rounded-xl", typeStyle.bg)}>
-            <TypeIcon className={cn("size-6", typeStyle.icon)} />
+          <div className={cn("flex size-12 shrink-0 items-center justify-center rounded-xl", typeConfig.bgClass)}>
+            <TypeIcon className={cn("size-6", typeConfig.iconClass)} />
           </div>
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold leading-snug">{activity.title ?? "Sin título"}</p>
             <p className="mt-0.5 truncate text-xs text-muted-foreground">{type || "Sin tipo"}</p>
-            <div className="mt-1 flex flex-wrap gap-1">
-              <Badge className={cn("rounded-full border-0 px-2.5 py-0.5 text-xs", stageConf.className)}>
+            <div className="mt-1 flex flex-wrap items-center gap-1">
+              <span className={cn("inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium", stageConf.badge)}>
+                <span className={cn("size-1.5 rounded-full", stageConf.dot)} />
                 {stageConf.label}
-              </Badge>
-              <Badge className={cn("rounded-full border-0 px-2.5 py-0.5 text-xs", priorityConf.className)}>
+              </span>
+              <Badge variant="outline" className={cn("rounded-full px-2.5 py-0.5 text-xs gap-1", priorityConf.badge)}>
+                <priorityConf.icon className="size-3" />
                 {priorityConf.label}
               </Badge>
             </div>

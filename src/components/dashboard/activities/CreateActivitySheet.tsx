@@ -370,8 +370,8 @@ export function CreateActivitySheet({
     if (isEdit && activity) {
       setMode("actividad")
       setTitle(activity.title ?? "")
-      const existingType = activity.opportunity_activity_detail.find((d) => d.label?.key === "activity_type")?.value ?? ""
-      const existingPrio = activity.opportunity_activity_detail.find((d) => d.label?.key === "priority")?.value ?? ""
+      const existingType = activity.opportunity_activity_detail.find((d) => d.label?.key === "activity_type")?.option ?? ""
+      const existingPrio = activity.opportunity_activity_detail.find((d) => d.label?.key === "priority")?.option ?? ""
       setActivityType(existingType)
       setPriority(existingPrio)
       // date_from/date_to vienen en UTC — hay que convertirlos de vuelta a la hora del

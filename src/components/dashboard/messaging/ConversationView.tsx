@@ -463,12 +463,12 @@ export function ConversationView({ conversation, loadingMessages = false, onConv
             className={cn(
               "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors",
               isWsp
-                ? "border-[#25D366] bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30"
+                ? "border-[#25D366] bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300"
                 : isIg
-                ? "border-pink-400 bg-pink-50 text-pink-700 dark:bg-pink-950/30"
+                ? "border-pink-400 bg-pink-50 text-pink-700 dark:bg-pink-950/30 dark:text-pink-300"
                 : isFb
-                ? "border-blue-400 bg-blue-50 text-blue-700 dark:bg-blue-950/30"
-                : "border-blue-400 bg-blue-50 text-blue-700 dark:bg-blue-950/30"
+                ? "border-blue-400 bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300"
+                : "border-blue-400 bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300"
             )}
           >
             {isWsp ? (
