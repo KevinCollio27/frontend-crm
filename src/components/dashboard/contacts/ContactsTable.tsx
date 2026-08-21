@@ -41,6 +41,8 @@ import { useEntityRealtime } from "@/hooks/useEntityRealtime"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { EntityAccentBar } from "@/components/ui/entity-accent-bar"
+import { PositionBadge } from "@/components/ui/position-badge"
+import { SourceBadge } from "@/components/ui/source-badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -93,7 +95,8 @@ export interface Contact {
   emails: string[]
   phone: string
   country: string
-  source: string
+  contactSource: string | null
+  origin: string
   createdAt: string
   internalPosition: string
 }
@@ -113,7 +116,8 @@ function mapPerson(p: Person): Contact {
     emails,
     phone,
     country: p.pais_origen ?? "CL",
-    source: p.contact_source ?? p.origin ?? "CRM",
+    contactSource: p.contact_source ?? null,
+    origin: p.origin ?? "CRM",
     createdAt: (p.created_at ?? "").slice(0, 10),
     internalPosition: p.internal_position ?? "",
   }
@@ -145,7 +149,6 @@ const columnLabels: Record<string, string> = {
 }
 
 const DEFAULT_COLUMN_VISIBILITY: VisibilityState = {
-  source: false,
   createdAt: false,
   internalPosition: false,
 }
@@ -255,11 +258,12 @@ function getColumns(
           Cargo {getSortIcon(column.getIsSorted())}
         </Button>
       ),
-      cell: ({ row }) => (
-        <div className="text-sm text-muted-foreground">
-          {(row.getValue("internalPosition") as string) || "—"}
-        </div>
-      ),
+      cell: ({ row }) => {
+        const position = row.getValue("internalPosition") as string
+        return position
+          ? <PositionBadge position={position} />
+          : <span className="text-sm text-muted-foreground">—</span>
+      },
     },
     {
       accessorKey: "phone",
@@ -289,14 +293,15 @@ function getColumns(
       },
     },
     {
-      accessorKey: "source",
+      id: "source",
+      accessorKey: "contactSource",
       header: ({ column }) => (
         <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
           Fuente {getSortIcon(column.getIsSorted())}
         </Button>
       ),
       cell: ({ row }) => (
-        <div className="capitalize text-sm">{row.getValue("source")}</div>
+        <SourceBadge contactSource={row.original.contactSource} origin={row.original.origin} />
       ),
     },
     {

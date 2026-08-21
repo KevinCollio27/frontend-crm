@@ -14,19 +14,20 @@ export const getSortIcon = (sorted: false | "asc" | "desc") => {
 }
 
 export const SOURCE_LABEL: Record<string, string> = {
-  linkedin:      "LinkedIn",
-  whatsapp:      "WhatsApp",
-  email:         "Correo Electrónico",
-  referral:      "Referido/Recomendación",
-  phone_call:    "Llamada Telefónica",
-  website:       "Sitio Web/Formulario",
-  instagram:     "Instagram",
-  facebook:      "Facebook",
-  event:         "Evento/Feria",
-  online_ads:    "Publicidad Online",
-  partner:       "Partner/Intermediario",
-  inbound_call:  "Llamada Entrante",
-  cold_outreach: "Prospección en Frío",
+  linkedin:         "LinkedIn",
+  whatsapp:         "WhatsApp",
+  email:            "Correo",
+  referral:         "Referido",
+  phone_call:       "Llamada Telefónica",
+  website:          "Sitio Web/Formulario",
+  instagram:        "Instagram",
+  facebook:         "Facebook",
+  event:            "Evento/Feria",
+  online_ads:       "Publicidad Online",
+  partner:          "Partner/Intermediario",
+  inbound_call:     "Llamada Entrante",
+  cold_outreach:    "Prospección en Frío",
+  google_contacts:  "Google",
 }
 
 export function getInitials(name: string) {

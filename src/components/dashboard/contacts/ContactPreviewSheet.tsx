@@ -3,6 +3,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetFooter } from "@/components/ui/sheet"
+import { SourceBadge } from "@/components/ui/source-badge"
 import { cn } from "@/lib/utils"
 import {
   BadgeCheck,
@@ -173,7 +174,9 @@ export function ContactPreviewSheet({ contact, open, onOpenChange, onViewDetails
               {getFlag(contact.country)}{" "}
               {countryNames[contact.country] ?? contact.country}
             </InfoRow>
-            <InfoRow label="Fuente">{contact.source}</InfoRow>
+            <InfoRow label="Fuente">
+              <SourceBadge contactSource={contact.contactSource} origin={contact.origin} />
+            </InfoRow>
             <InfoRow label="Miembro desde">
               {new Date(contact.createdAt).toLocaleDateString("es-CL", {
                 day: "numeric",
