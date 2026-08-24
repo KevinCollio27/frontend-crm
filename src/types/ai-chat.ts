@@ -21,6 +21,7 @@ export interface AiMessage {
   created_at: string
   tokens_used?: number
   model_used?: string
+  images?: string[]
 }
 
 export interface AiConversationDetail {

@@ -7,6 +7,7 @@ import {
   PencilIcon,
   PlusIcon,
   SearchIcon,
+  SlidersHorizontalIcon,
   Trash2Icon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -18,6 +19,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { useIsWorkspaceAdmin } from "@/hooks/useIsWorkspaceAdmin"
+import { ChatContextSheet } from "./ChatContextSheet"
 import {
   type ChatConversation,
   type ChatDateGroup,
@@ -45,6 +48,8 @@ export function ChatSidebar({
   onBack,
 }: ChatSidebarProps) {
   const [search, setSearch] = React.useState("")
+  const [contextOpen, setContextOpen] = React.useState(false)
+  const isWorkspaceAdmin = useIsWorkspaceAdmin()
 
   const filtered = React.useMemo(() => {
     if (!search.trim()) return conversations
@@ -121,6 +126,21 @@ export function ChatSidebar({
           })
         )}
       </div>
+
+      {isWorkspaceAdmin && (
+        <div className="-mx-2 -mb-2 shrink-0 border-t px-2 pt-2">
+          <Button
+            variant="ghost"
+            className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground"
+            onClick={() => setContextOpen(true)}
+          >
+            <SlidersHorizontalIcon className="size-4" />
+            Contexto
+          </Button>
+        </div>
+      )}
+
+      <ChatContextSheet open={contextOpen} onOpenChange={setContextOpen} />
     </div>
   )
 }

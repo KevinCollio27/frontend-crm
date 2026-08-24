@@ -5,9 +5,16 @@ import type {
   AiChatResponse,
 } from "@/types/ai-chat"
 
+export interface ChatMessageImagePayload {
+  url: string
+  filePath?: string
+  fileName?: string
+}
+
 export interface ChatMessagePayload {
   role: string
   content: string
+  images?: ChatMessageImagePayload[]
 }
 
 export interface ChatPayload {

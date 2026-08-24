@@ -2,18 +2,16 @@
 
 import * as React from "react"
 import {
-  CalendarPlusIcon,
   HistoryIcon,
+  ImagePlusIcon,
+  LoaderCircleIcon,
   MicIcon,
-  PaperclipIcon,
-  UserPlusIcon,
-  TrendingUpIcon,
+  SquareIcon,
 } from "lucide-react"
 import {
   IconArrowUp,
   IconCirclePlus,
   IconPaperclip,
-  IconPlus,
   IconSparkles,
   IconX,
 } from "@tabler/icons-react"
@@ -22,16 +20,11 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { MarkdownContent } from "@/components/dashboard/MarkdownContent"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { useSessionStore } from "@/store/session.store"
+import { notify } from "@/lib/notify"
+import { aiAudioService } from "@/services/ai-audio.service"
 import { type ChatConversation, type ChatMessage, QUICK_ACTIONS } from "./data"
 
 // ─── Shared input bar ─────────────────────────────────────────────────────────
@@ -53,9 +46,142 @@ function InputBar({ onSubmit, autoFocus, disabled = false }: InputBarProps) {
   const [prompt, setPrompt]           = React.useState("")
   const [isDragOver, setIsDragOver]   = React.useState(false)
   const [attached, setAttached]       = React.useState<AttachedFile[]>([])
+  const [isRecording, setIsRecording]     = React.useState(false)
+  const [isTranscribing, setIsTranscribing] = React.useState(false)
+  const [elapsedSec, setElapsedSec]       = React.useState(0)
   const fileInputRef                  = React.useRef<HTMLInputElement>(null)
+  const mediaRecorderRef              = React.useRef<MediaRecorder | null>(null)
+  const audioChunksRef                = React.useRef<Blob[]>([])
+  const audioContextRef               = React.useRef<AudioContext | null>(null)
+  const analyserRef                   = React.useRef<AnalyserNode | null>(null)
+  const rafIdRef                      = React.useRef<number | null>(null)
+  const timerIdRef                    = React.useRef<ReturnType<typeof setInterval> | null>(null)
+  const barRefs                       = React.useRef<(HTMLDivElement | null)[]>([])
+
+  const BAR_COUNT = 28
 
   const generateId = () => Math.random().toString(36).slice(2, 8)
+
+  function formatElapsed(sec: number) {
+    const m = Math.floor(sec / 60).toString().padStart(2, "0")
+    const s = (sec % 60).toString().padStart(2, "0")
+    return `${m}:${s}`
+  }
+
+  function animateWaveform() {
+    const analyser = analyserRef.current
+    if (!analyser) return
+    const data = new Uint8Array(analyser.fftSize)
+    analyser.getByteTimeDomainData(data)
+    const chunkSize = Math.max(1, Math.floor(data.length / BAR_COUNT))
+    for (let i = 0; i < BAR_COUNT; i++) {
+      const start = i * chunkSize
+      let sumSquares = 0
+      for (let j = start; j < start + chunkSize; j++) {
+        const v = (data[j] - 128) / 128
+        sumSquares += v * v
+      }
+      const rms = Math.sqrt(sumSquares / chunkSize)
+      const boosted = Math.min(1, rms * 5)
+      const height = 4 + boosted * 32
+      const el = barRefs.current[i]
+      if (el) el.style.height = `${height}px`
+    }
+    rafIdRef.current = requestAnimationFrame(animateWaveform)
+  }
+
+  function blobToBase64(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = reject
+      reader.readAsDataURL(blob)
+    })
+  }
+
+  async function startRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const recorder = new MediaRecorder(stream)
+      audioChunksRef.current = []
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data)
+      }
+
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((track) => track.stop())
+
+        if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current)
+        rafIdRef.current = null
+        audioContextRef.current?.close().catch(() => {})
+        audioContextRef.current = null
+        analyserRef.current = null
+        if (timerIdRef.current) clearInterval(timerIdRef.current)
+        timerIdRef.current = null
+        setElapsedSec(0)
+
+        const blob = new Blob(audioChunksRef.current, { type: "audio/webm" })
+        if (blob.size === 0) return
+
+        setIsTranscribing(true)
+        try {
+          const base64 = await blobToBase64(blob)
+          const text = await aiAudioService.transcribe(base64)
+          if (text?.trim()) {
+            setPrompt((prev) => (prev.trim() ? `${prev.trim()} ${text.trim()}` : text.trim()))
+          }
+        } catch {
+          notify.error({ title: "No se pudo transcribir el audio", description: "Intenta grabar de nuevo." })
+        } finally {
+          setIsTranscribing(false)
+        }
+      }
+
+      // Análisis de audio en vivo para las ondas — no crítico, si falla la grabación sigue igual.
+      try {
+        const AudioContextCtor = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+        const audioCtx = new AudioContextCtor()
+        const source = audioCtx.createMediaStreamSource(stream)
+        const analyser = audioCtx.createAnalyser()
+        analyser.fftSize = 512
+        source.connect(analyser)
+        audioContextRef.current = audioCtx
+        analyserRef.current = analyser
+        rafIdRef.current = requestAnimationFrame(animateWaveform)
+      } catch {
+        // sin ondas animadas, pero la grabación sigue funcionando
+      }
+
+      timerIdRef.current = setInterval(() => setElapsedSec((s) => s + 1), 1000)
+
+      recorder.start()
+      mediaRecorderRef.current = recorder
+      setIsRecording(true)
+    } catch {
+      notify.error({ title: "No se pudo acceder al micrófono", description: "Revisa los permisos del navegador." })
+    }
+  }
+
+  function stopRecording() {
+    mediaRecorderRef.current?.stop()
+    setIsRecording(false)
+  }
+
+  function toggleRecording() {
+    if (isRecording) stopRecording()
+    else startRecording()
+  }
+
+  // Si el componente se desmonta a mitad de una grabación, liberar mic/timer/audio context.
+  React.useEffect(() => {
+    return () => {
+      if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current)
+      if (timerIdRef.current) clearInterval(timerIdRef.current)
+      audioContextRef.current?.close().catch(() => {})
+      mediaRecorderRef.current?.stream.getTracks().forEach((t) => t.stop())
+    }
+  }, [])
 
   const processFiles = (files: File[]) => {
     for (const file of files) {
@@ -156,15 +282,35 @@ function InputBar({ onSubmit, autoFocus, disabled = false }: InputBarProps) {
         </div>
       )}
 
-      {/* Textarea */}
-      <Textarea
-        value={prompt}
-        onChange={(e) => setPrompt(e.target.value)}
-        onKeyDown={handleKeyDown}
-        placeholder="Pregunta lo que quieras..."
-        autoFocus={autoFocus}
-        className="max-h-48 min-h-11 resize-none rounded-none border-none bg-transparent! p-0 text-sm shadow-none focus-visible:border-transparent focus-visible:ring-0"
-      />
+      {/* Textarea / grabación */}
+      {isRecording ? (
+        <div className="flex h-11 items-center gap-3">
+          <span className="flex shrink-0 items-center gap-1.5 text-sm font-medium text-destructive">
+            <span className="size-2 rounded-full bg-destructive animate-pulse" />
+            {formatElapsed(elapsedSec)}
+          </span>
+          <div className="flex h-full flex-1 items-center justify-center gap-0.75 overflow-hidden">
+            {Array.from({ length: BAR_COUNT }).map((_, i) => (
+              <div
+                key={i}
+                ref={(el) => { barRefs.current[i] = el }}
+                className="w-0.75 shrink-0 rounded-full bg-destructive/60"
+                style={{ height: 4 }}
+              />
+            ))}
+          </div>
+          <span className="shrink-0 text-xs text-muted-foreground">Intenta hablarnos...</span>
+        </div>
+      ) : (
+        <Textarea
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Pregunta lo que quieras..."
+          autoFocus={autoFocus}
+          className="max-h-48 min-h-11 resize-none rounded-none border-none bg-transparent! p-0 text-sm shadow-none focus-visible:border-transparent focus-visible:ring-0"
+        />
+      )}
 
       {/* Toolbar */}
       <div className="flex items-center gap-1">
@@ -172,6 +318,7 @@ function InputBar({ onSubmit, autoFocus, disabled = false }: InputBarProps) {
           ref={fileInputRef}
           type="file"
           multiple
+          accept="image/*"
           className="sr-only"
           onChange={(e) => {
             processFiles(Array.from(e.target.files ?? []))
@@ -179,57 +326,16 @@ function InputBar({ onSubmit, autoFocus, disabled = false }: InputBarProps) {
           }}
         />
 
-        {/* + dropdown */}
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                type="button"
-                className="-ml-0.5 rounded-md"
-                aria-label="Adjuntar o crear"
-              />
-            }
-          >
-            <IconPlus size={16} />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-48 rounded-2xl p-1.5">
-            <DropdownMenuGroup className="space-y-0.5">
-              <DropdownMenuLabel className="px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                Adjuntar
-              </DropdownMenuLabel>
-              <DropdownMenuItem className="rounded-md text-xs" onClick={() => openFiles("image/*")}>
-                <PaperclipIcon className="size-3.5 text-muted-foreground" />
-                Imagen
-              </DropdownMenuItem>
-              <DropdownMenuItem className="rounded-md text-xs" onClick={() => openFiles("*")}>
-                <PaperclipIcon className="size-3.5 text-muted-foreground" />
-                Archivo
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-
-            <DropdownMenuSeparator />
-
-            <DropdownMenuGroup className="space-y-0.5">
-              <DropdownMenuLabel className="px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                Crear en CRM
-              </DropdownMenuLabel>
-              <DropdownMenuItem className="rounded-md text-xs">
-                <UserPlusIcon className="size-3.5 text-muted-foreground" />
-                Contacto
-              </DropdownMenuItem>
-              <DropdownMenuItem className="rounded-md text-xs">
-                <TrendingUpIcon className="size-3.5 text-muted-foreground" />
-                Oportunidad
-              </DropdownMenuItem>
-              <DropdownMenuItem className="rounded-md text-xs">
-                <CalendarPlusIcon className="size-3.5 text-muted-foreground" />
-                Actividad
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          type="button"
+          className="-ml-0.5 rounded-md text-muted-foreground"
+          aria-label="Adjuntar imagen"
+          onClick={() => openFiles("image/*")}
+        >
+          <ImagePlusIcon className="size-4" />
+        </Button>
 
         {/* Send / Mic */}
         <div className="ml-auto">
@@ -238,8 +344,22 @@ function InputBar({ onSubmit, autoFocus, disabled = false }: InputBarProps) {
               <IconArrowUp size={15} />
             </Button>
           ) : (
-            <Button variant="ghost" size="icon-sm" type="button" className="rounded-md text-muted-foreground" aria-label="Voz">
-              <MicIcon className="size-4" />
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              type="button"
+              className={cn("rounded-md", isRecording ? "text-destructive" : "text-muted-foreground")}
+              aria-label={isRecording ? "Detener grabación" : "Grabar audio"}
+              onClick={toggleRecording}
+              disabled={disabled || isTranscribing}
+            >
+              {isTranscribing ? (
+                <LoaderCircleIcon className="size-4 animate-spin" />
+              ) : isRecording ? (
+                <SquareIcon className="size-4 fill-current" />
+              ) : (
+                <MicIcon className="size-4" />
+              )}
             </Button>
           )}
         </div>
@@ -250,12 +370,41 @@ function InputBar({ onSubmit, autoFocus, disabled = false }: InputBarProps) {
 
 // ─── Message bubbles ──────────────────────────────────────────────────────────
 
-function UserBubble({ content }: { content: string }) {
+function UserBubble({ content, images }: { content: string; images?: string[] }) {
+  const user = useSessionStore((s) => s.user)
+  const initials = (user?.name ?? "")
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2)
+
+  const hasImages = images && images.length > 0
+
   return (
-    <div className="flex justify-end">
-      <div className="max-w-[75%] rounded-2xl rounded-br-sm bg-primary px-4 py-2.5 text-sm text-primary-foreground">
-        {content}
+    <div className="flex items-end justify-end gap-3">
+      <div className="max-w-[75%] overflow-hidden rounded-2xl rounded-br-sm bg-primary text-primary-foreground">
+        {hasImages && (
+          <div className={cn("grid gap-1 p-1", images!.length > 1 ? "grid-cols-2" : "grid-cols-1")}>
+            {images!.map((src, i) => (
+              <Image
+                key={i}
+                src={src}
+                alt="Imagen adjunta"
+                width={240}
+                height={240}
+                unoptimized
+                className="aspect-square w-full rounded-lg object-cover"
+              />
+            ))}
+          </div>
+        )}
+        {content && <div className="px-4 py-2.5 text-sm">{content}</div>}
       </div>
+      <Avatar className="size-7 shrink-0">
+        <AvatarImage src={user?.avatar_url || "https://github.com/shadcn.png"} alt={user?.name ?? ""} />
+        <AvatarFallback className="text-xs">{initials}</AvatarFallback>
+      </Avatar>
     </div>
   )
 }
@@ -264,7 +413,7 @@ function AssistantBubble({ content }: { content: string }) {
   return (
     <div className="flex items-start gap-3">
       <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-violet-100 dark:bg-violet-950/40">
-        <IconSparkles size={14} className="text-violet-600" />
+        <IconSparkles size={14} className="text-violet-600 dark:text-violet-400" />
       </div>
       <div className="flex-1 pt-0.5 text-sm leading-relaxed text-foreground">
         <MarkdownContent content={content} />
@@ -357,7 +506,7 @@ export function ChatView({ conversation, onSubmit, sending = false, onOpenHistor
         <div className="mx-auto flex max-w-2xl flex-col gap-6">
           {conversation.messages.map((msg) =>
             msg.role === "user" ? (
-              <UserBubble key={msg.id} content={msg.content} />
+              <UserBubble key={msg.id} content={msg.content} images={msg.images} />
             ) : (
               <AssistantBubble key={msg.id} content={msg.content} />
             )
@@ -365,7 +514,7 @@ export function ChatView({ conversation, onSubmit, sending = false, onOpenHistor
           {sending && (
             <div className="flex items-start gap-3">
               <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-violet-100 dark:bg-violet-950/40">
-                <IconSparkles size={14} className="text-violet-600" />
+                <IconSparkles size={14} className="text-violet-600 dark:text-violet-400" />
               </div>
               <div className="flex gap-1 pt-3">
                 <span className="size-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:0ms]" />

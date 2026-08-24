@@ -10,6 +10,7 @@ import { ChatView } from "@/components/dashboard/chat/ChatView"
 import { type ChatConversation, type ChatMessage, type ChatDateGroup } from "@/components/dashboard/chat/data"
 import { notify } from "@/lib/notify"
 import { aiChatService } from "@/services/ai-chat.service"
+import { aiChatImageService } from "@/services/ai-chat-image.service"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
 import type { AiConversationGrouped, AiConversationListItem } from "@/types/ai-chat"
@@ -95,6 +96,7 @@ export default function ChatPage() {
             role: m.role as "user" | "assistant",
             content: m.content,
             createdAt: m.created_at,
+            images: m.images,
           }))
       )
     } catch {
@@ -108,22 +110,46 @@ export default function ChatPage() {
     setCurrentMessages([])
   }
 
-  const handleSubmit = async (prompt: string, _files: File[]) => {
-    if (!prompt.trim() || sending) return
+  const handleSubmit = async (prompt: string, files: File[]) => {
+    const imageFiles = files.filter((f) => f.type.startsWith("image/"))
+    if ((!prompt.trim() && imageFiles.length === 0) || sending) return
     setSending(true)
+
+    let uploaded: { url: string; filePath: string; fileName: string }[] = []
+    if (imageFiles.length > 0) {
+      try {
+        uploaded = await Promise.all(imageFiles.map((f) => aiChatImageService.upload(f)))
+      } catch {
+        toast.error("No se pudo subir la imagen")
+        setSending(false)
+        return
+      }
+    }
 
     const userMsg: ChatMessage = {
       id: `tmp-${Date.now()}`,
       role: "user",
       content: prompt,
       createdAt: "ahora",
+      images: uploaded.length > 0 ? uploaded.map((u) => u.url) : undefined,
     }
     const history = [...currentMessages, userMsg]
     setCurrentMessages(history)
 
     try {
+      const payloadMessages = currentMessages.map((m) => ({
+        role: m.role,
+        content: m.content,
+        images: m.images?.map((url) => ({ url })),
+      }))
+      payloadMessages.push({
+        role: userMsg.role,
+        content: userMsg.content,
+        images: uploaded.map((u) => ({ url: u.url, filePath: u.filePath, fileName: u.fileName })),
+      })
+
       const response = await aiChatService.chat({
-        messages: history.map((m) => ({ role: m.role, content: m.content })),
+        messages: payloadMessages,
         conversationId: selectedId ? Number(selectedId) : undefined,
       })
 

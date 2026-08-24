@@ -13,6 +13,7 @@ export interface ChatMessage {
   role: "user" | "assistant"
   content: string
   createdAt: string
+  images?: string[]
 }
 
 export interface ChatConversation {
