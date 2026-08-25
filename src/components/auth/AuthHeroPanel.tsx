@@ -9,7 +9,7 @@ export const AuthHeroPanel = () => (
 
     <div className="relative z-10 flex h-full flex-col justify-between p-8">
       <div className="w-fit rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs text-white backdrop-blur-sm">
-        CRM para Ventas y Logística
+        Para cualquier negocio que vende
       </div>
 
       <div>
@@ -26,7 +26,7 @@ export const AuthHeroPanel = () => (
       <div className="flex items-center gap-2">
         <img src="/images/goxt-negro.png" alt="GOXT" className="h-5 w-auto brightness-0 invert" />
         <span className="text-xs text-white/70">
-          Impulsando ventas logísticas en toda Latinoamérica
+          Impulsando el crecimiento de negocios en toda Latinoamérica
         </span>
       </div>
     </div>
