@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet"
 import { Stepper, type StepperStep } from "@/components/ui/stepper"
 import { Textarea } from "@/components/ui/textarea"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { whatsappService } from "@/services/whatsapp.service"
 import type { TemplateButtonPayload, WhatsappTemplateRaw } from "@/types/whatsapp"
 import { WhatsAppTemplatePreview } from "./WhatsAppTemplatePreview"
@@ -191,6 +192,7 @@ function TemplateWizard({
   }
 
   return (
+    <TooltipProvider>
     <div className="flex h-full flex-col">
       {/* Header */}
       <div className="border-b px-5 py-4 sm:px-6">
@@ -226,7 +228,20 @@ function TemplateWizard({
               </div>
             </Section>
 
-            <Section title="Categoría" description="Define qué política de Meta aplica a este template.">
+            <Section
+              title="Categoría"
+              description="Define qué política de Meta aplica a este template."
+              actions={
+                <Tooltip>
+                  <TooltipTrigger render={<InfoIcon className="size-4 text-muted-foreground" />} />
+                  <TooltipContent side="left" className="flex-col items-start gap-1 max-w-72 text-left">
+                    <p><span className="font-semibold">UTILITY</span>: transaccional (confirmaciones, avisos de pedido).</p>
+                    <p><span className="font-semibold">MARKETING</span>: promoción o inicio de contacto, la más restringida por Meta.</p>
+                    <p><span className="font-semibold">AUTHENTICATION</span>: código de verificación (OTP).</p>
+                  </TooltipContent>
+                </Tooltip>
+              }
+            >
               <Select value={category} onValueChange={(v) => setCategory(v ?? "UTILITY")}>
                 <SelectTrigger>
                   <SelectValue />
@@ -426,5 +441,6 @@ function TemplateWizard({
         </div>
       </div>
     </div>
+    </TooltipProvider>
   )
 }
