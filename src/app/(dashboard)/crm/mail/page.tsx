@@ -4,7 +4,7 @@ import * as React from "react"
 import { Suspense } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import DOMPurify from "dompurify"
-import { MailIcon, Loader2Icon, PencilLineIcon } from "lucide-react"
+import { MailIcon, PencilLineIcon } from "lucide-react"
 import { PageHeader } from "@/components/dashboard/PageHeader"
 import { ComposeDialog } from "@/components/dashboard/mail/ComposeDialog"
 import { MailNav, folders as MAIL_FOLDERS } from "@/components/dashboard/mail/MailNav"
@@ -64,7 +64,14 @@ function sanitizeEmailHtml(html?: string): string | undefined {
   // el resto del CRM. WHOLE_DOCUMENT preserva <head>/<style> cuando el correo trae un
   // documento completo (no solo el fragmento del <body>). <link> se sigue prohibiendo:
   // cargar una hoja de estilos externa no aporta nada acá y sí puede filtrar referrer.
-  return DOMPurify.sanitize(html, { WHOLE_DOCUMENT: true, FORBID_TAGS: ["link"] })
+  const sanitized = DOMPurify.sanitize(html, { WHOLE_DOCUMENT: true, FORBID_TAGS: ["link"] })
+  // El iframe fuerza fondo blanco siempre (ver bg-white en EmailBody), pero algunos correos
+  // (invitaciones de Calendar/Meet) traen su propio @media (prefers-color-scheme: dark) que
+  // aclara los textos pensando en un fondo oscuro real. Eso sigue el modo oscuro del SO, no
+  // el de la app (el iframe no hereda la clase .dark del CRM) — el resultado es texto claro
+  // sobre nuestro fondo blanco, ilegible. Se neutraliza la condición para que ese bloque
+  // nunca aplique y el correo use siempre sus estilos pensados para fondo claro.
+  return sanitized.replace(/prefers-color-scheme\s*:\s*dark/gi, "min-resolution: 999999dpi")
 }
 
 function mapGmailMessage(raw: GmailMessageRaw): Mail {
@@ -134,6 +141,12 @@ function MailPageContent() {
   const activeFolder: Folder = folderParam && VALID_FOLDERS.has(folderParam as Folder) ? (folderParam as Folder) : "inbox"
   const selectedThreadId = searchParams.get("thread")
   const goxtOnly = searchParams.get("goxt") === "1"
+  const searchQuery = searchParams.get("q") ?? ""
+
+  // Valor tal cual lo escribe el usuario (responde a cada tecla, ver MailList). Se debounce
+  // antes de comprometerlo a la URL/fetch (searchQuery arriba) — mismo criterio que GOXT: una
+  // búsqueda real contra Gmail, paginada, que ignora la carpeta activa.
+  const [searchInput, setSearchInput] = React.useState(searchQuery)
 
   const [gmailConnectionId, setGmailConnectionId] = React.useState<number | null | undefined>(undefined)
   const [gmailAccountEmail, setGmailAccountEmail] = React.useState<string | null>(null)
@@ -164,12 +177,23 @@ function MailPageContent() {
   const [mobileShowMail, setMobileShowMail] = React.useState(false)
   React.useEffect(() => { setMobileShowMail(false) }, [activeFolder])
 
-  function updateUrl(folder: Folder, threadId: string | null, goxt: boolean = goxtOnly) {
+  function updateUrl(folder: Folder, threadId: string | null, goxt: boolean = goxtOnly, q: string = searchQuery) {
     const params = new URLSearchParams()
     params.set("folder", folder)
     if (threadId) params.set("thread", threadId)
     if (goxt) params.set("goxt", "1")
+    if (q) params.set("q", q)
     router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+  }
+
+  // Comprometer la búsqueda a la URL (y así al fetch) recién al presionar Enter — search real
+  // contra Gmail, no un filtro local, así que no vale pegarle a la API en cada tecla ni en cada
+  // pausa (eso se sentía como que la lista "refrescaba sola"). Escribir y confirmar también
+  // apaga GOXT: son dos formas de buscar, no se combinan.
+  function submitSearch(value: string) {
+    const trimmed = value.trim()
+    if (trimmed === searchQuery) return
+    updateUrl(activeFolder, null, trimmed ? false : goxtOnly, trimmed)
   }
 
   React.useEffect(() => {
@@ -192,7 +216,7 @@ function MailPageContent() {
   // toda la cuenta, igual que buscar en Gmail) — por eso se resuelve con su propio labelId
   // virtual en vez de combinarse con el de la carpeta.
   React.useEffect(() => {
-    const scopeKey = `${activeFolder}:${goxtOnly}`
+    const scopeKey = `${activeFolder}:${goxtOnly}:${searchQuery}`
     const scopeChanged = scopeKeyRef.current !== scopeKey
     scopeKeyRef.current = scopeKey
 
@@ -201,7 +225,8 @@ function MailPageContent() {
       setPageTokens([undefined])
     }
 
-    const labelId = goxtOnly ? "GOXT" : FOLDER_TO_LABEL[activeFolder]
+    // La búsqueda ignora carpeta/GOXT, igual que en Gmail — busca en toda la cuenta.
+    const labelId = searchQuery ? "INBOX" : goxtOnly ? "GOXT" : FOLDER_TO_LABEL[activeFolder]
     if (!labelId || !gmailConnectionId) {
       setThreads([])
       return
@@ -213,7 +238,7 @@ function MailPageContent() {
 
     let cancelled = false
     setListLoading(true)
-    integrationService.getGmailThreads(gmailConnectionId, { labelId, maxResults: PAGE_SIZE, pageToken })
+    integrationService.getGmailThreads(gmailConnectionId, { labelId, q: searchQuery || undefined, maxResults: PAGE_SIZE, pageToken })
       .then((res) => {
         if (cancelled) return
         const mapped = res.threads.map(mapGmailThreadSummary)
@@ -229,7 +254,7 @@ function MailPageContent() {
       .finally(() => { if (!cancelled) setListLoading(false) })
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeFolder, goxtOnly, gmailConnectionId, pageIndex, refreshTick])
+  }, [activeFolder, goxtOnly, searchQuery, gmailConnectionId, pageIndex, refreshTick])
 
   // Detalle completo (body, imágenes inline, adjuntos) — se pide aparte, solo para el
   // thread que efectivamente se abre, no para toda la lista.
@@ -276,7 +301,7 @@ function MailPageContent() {
   // queda oculta. Va dentro del header de MailList (mismo patrón que Mensajería).
   const mobileHeader = (
     <div className="flex w-full items-center gap-2 md:hidden">
-      <Select value={activeFolder} onValueChange={(v) => { if (v) updateUrl(v as Folder, null, false) }}>
+      <Select value={activeFolder} onValueChange={(v) => { if (v) { updateUrl(v as Folder, null, false, ""); setSearchInput("") } }}>
         <SelectTrigger size="sm" className="min-w-0 flex-1">
           <SelectValue placeholder="Carpeta">
             {(v: Folder) => {
@@ -333,7 +358,7 @@ function MailPageContent() {
               Redactar
             </Button>
           </div>
-          <MailNav activeFolder={activeFolder} onFolderChange={(folder) => updateUrl(folder, null, false)} />
+          <MailNav activeFolder={activeFolder} onFolderChange={(folder) => { updateUrl(folder, null, false, ""); setSearchInput("") }} />
         </div>
 
         {/* Columna 2 — lista (único scroll). En mobile, pantalla completa y
@@ -353,28 +378,26 @@ function MailPageContent() {
                 </p>
               </div>
             </div>
-          ) : !goxtOnly && !FOLDER_TO_LABEL[activeFolder] ? (
+          ) : !goxtOnly && !searchQuery && !FOLDER_TO_LABEL[activeFolder] ? (
             <div className="flex h-full flex-col">
               <div className="border-b px-4 py-2 md:hidden">{mobileHeader}</div>
               <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center">
                 <p className="text-sm text-muted-foreground">Esta carpeta todavía no está conectada.</p>
               </div>
             </div>
-          ) : listLoading ? (
-            <div className="flex h-full flex-col">
-              <div className="border-b px-4 py-2 md:hidden">{mobileHeader}</div>
-              <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-                <Loader2Icon className="mr-2 size-4 animate-spin" /> Cargando correos...
-              </div>
-            </div>
           ) : (
             <MailList
               folder={activeFolder}
               threads={threads}
+              loading={listLoading}
               selectedId={selectedThreadId}
               onSelect={(threadId) => { updateUrl(activeFolder, threadId); if (isMobile) setMobileShowMail(true) }}
               goxtOnly={goxtOnly}
-              onGoxtOnlyChange={(value) => updateUrl(activeFolder, null, value)}
+              onGoxtOnlyChange={(value) => { updateUrl(activeFolder, null, value, ""); setSearchInput("") }}
+              searchInput={searchInput}
+              onSearchInputChange={setSearchInput}
+              onSearchSubmit={submitSearch}
+              searchActive={!!searchQuery}
               hasPrevPage={pageIndex > 0}
               hasNextPage={!!nextPageToken}
               onPrevPage={handlePrevPage}

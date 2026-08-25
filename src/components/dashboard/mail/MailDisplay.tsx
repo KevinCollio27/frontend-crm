@@ -520,9 +520,22 @@ export function MailDisplay({ thread, loading, connectionId, accountEmail, onRep
     return (
       <div className="flex h-full flex-col">
         <BackBar onBack={onBack} />
-        <div className="flex flex-1 flex-col items-center justify-center gap-2 text-muted-foreground">
-          <Loader2Icon className="size-6 animate-spin" />
-          <p className="text-sm">Cargando correo...</p>
+        <div className="border-b p-3">
+          <div className="h-4 w-2/3 animate-pulse rounded bg-muted" />
+        </div>
+        <div className="flex-1 space-y-2 overflow-y-auto p-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="rounded-lg border p-3">
+              <div className="flex items-start gap-3">
+                <div className="size-8 shrink-0 animate-pulse rounded-full bg-muted" />
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <div className="h-4 w-40 animate-pulse rounded bg-muted" />
+                  <div className="h-3 w-full animate-pulse rounded bg-muted" />
+                  <div className="h-3 w-2/3 animate-pulse rounded bg-muted" />
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     )

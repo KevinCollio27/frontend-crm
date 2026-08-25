@@ -44,7 +44,7 @@ export const integrationService = {
 
   async getGmailThreads(
     integrationId: number,
-    params: { labelId: string; maxResults?: number; pageToken?: string }
+    params: { labelId: string; maxResults?: number; pageToken?: string; q?: string }
   ): Promise<GmailThreadListPageRaw> {
     const res = await api.get<never, { data: GmailThreadListPageRaw }>(
       `integration/gmail/${integrationId}/threads`,
