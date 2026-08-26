@@ -63,7 +63,11 @@ export function MonthView({ currentDate, activities, googleEvents = [], onDayCli
 
   return (
     <div className="flex flex-col">
-      <div className="sticky top-0 z-10 grid grid-cols-7 border-b bg-background">
+      {/* z-[1]: alcanza para taparle el paso a las celdas de días que scrollean debajo,
+          pero sin empatar con el z-10 del Sidebar (SidebarInset no arma su propio stacking
+          context, así que un z-10 acá competía directo contra el Sidebar y, en empate, ganaba
+          el contenido por venir después en el DOM — tapaba el panel del workspace switcher). */}
+      <div className="sticky top-0 z-1 grid grid-cols-7 border-b bg-background">
         {WEEKDAYS.map((day) => (
           <div key={day} className="py-2.5 text-center text-xs font-medium text-muted-foreground">
             {day}
