@@ -6,7 +6,10 @@ import { ActividadesTab } from "./tabs/ActividadesTab"
 import { CorreoTab } from "./tabs/CorreoTab"
 import { CotizacionesTab } from "./tabs/CotizacionesTab"
 import { DocumentosTab } from "./tabs/DocumentosTab"
-import { FacturasTab } from "./tabs/FacturasTab"
+// Oculto por ahora — la tabla de facturas (TanStack completo: filtros facetados,
+// paginación, dropdowns) detrás del overlay "Próximamente" con backdrop-blur colgaba la
+// pestaña. Cuando se conecte de verdad, reactivar acá y en TABS/Panel más abajo.
+// import { FacturasTab } from "./tabs/FacturasTab"
 import { HistorialTab } from "./tabs/HistorialTab"
 import { NotasTab } from "./tabs/NotasTab"
 import { WhatsAppTab } from "./tabs/WhatsAppTab"
@@ -17,7 +20,7 @@ const TABS = [
   { value: "actividades",  label: "Actividades"  },
   { value: "documentos",   label: "Documentos"   },
   { value: "cotizaciones", label: "Cotizaciones" },
-  { value: "facturas",     label: "Facturas"     },
+  // { value: "facturas",     label: "Facturas"     }, // oculto — ver import más arriba
   { value: "correo",       label: "Correo"       },
   { value: "whatsapp",     label: "WhatsApp"     },
 ]
@@ -72,7 +75,7 @@ export function Col2Tabs({ opportunityId, opportunityName, flowName, contactName
           <TabsPrimitive.Panel value="actividades"  className="outline-none"><ActividadesTab  opportunityId={opportunityId} opportunityName={opportunityName} flowName={flowName} /></TabsPrimitive.Panel>
           <TabsPrimitive.Panel value="documentos"   className="outline-none"><DocumentosTab   opportunityId={opportunityId} /></TabsPrimitive.Panel>
           <TabsPrimitive.Panel value="cotizaciones" className="outline-none"><CotizacionesTab opportunityId={opportunityId} opportunityName={opportunityName} flowName={flowName} contactEmail={contactEmail} /></TabsPrimitive.Panel>
-          <TabsPrimitive.Panel value="facturas"     className="outline-none"><FacturasTab     opportunityId={opportunityId} /></TabsPrimitive.Panel>
+          {/* <TabsPrimitive.Panel value="facturas" className="outline-none"><FacturasTab opportunityId={opportunityId} /></TabsPrimitive.Panel> */}
           <TabsPrimitive.Panel value="correo"       className="outline-none"><CorreoTab       opportunityId={opportunityId} contactName={contactName} contactEmail={contactEmail} /></TabsPrimitive.Panel>
           <TabsPrimitive.Panel value="whatsapp"    className="outline-none"><WhatsAppTab    opportunityId={opportunityId} contactPhone={contactPhone} /></TabsPrimitive.Panel>
         </div>
