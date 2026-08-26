@@ -34,9 +34,11 @@ function formatCurrency(value: number, symbol: string) {
     currency: "CLP",
     maximumFractionDigits: 0,
   }).format(value)
-  return symbol === "CLP"
-    ? formatted
-    : `${symbol} ${new Intl.NumberFormat("es-CL", { maximumFractionDigits: 0 }).format(value)}`
+  if (symbol === "CLP") return formatted
+  // UF se cotiza con decimales (ej. "2,5 UF") — el resto de las monedas acá se maneja
+  // como monto entero.
+  const maximumFractionDigits = symbol === "UF" ? 2 : 0
+  return `${symbol} ${new Intl.NumberFormat("es-CL", { maximumFractionDigits }).format(value)}`
 }
 
 function CopyButton({ value }: { value: string }) {

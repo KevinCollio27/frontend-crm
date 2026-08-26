@@ -84,11 +84,20 @@ const CURRENCY_SYMBOL: Record<string, string> = {
   EUR: "€",
 }
 
+// amountRaw guarda el número en formato JS (punto decimal, ej. "2.5") — el separador
+// visual (coma para UF, que sí se cotiza con decimales) se aplica solo acá, al mostrar.
 function formatAmount(raw: string, currencyCode: string): string {
   if (!raw) return ""
+  const locale = CURRENCY_LOCALE[currencyCode] ?? "es-CL"
+  if (currencyCode === "UF") {
+    const [intPart, decPart] = raw.split(".")
+    const intNum = parseInt(intPart || "0", 10)
+    if (isNaN(intNum)) return ""
+    const formattedInt = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(intNum)
+    return decPart !== undefined ? `${formattedInt},${decPart}` : formattedInt
+  }
   const num = parseInt(raw, 10)
   if (isNaN(num)) return ""
-  const locale = CURRENCY_LOCALE[currencyCode] ?? "es-CL"
   return new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(num)
 }
 
@@ -478,7 +487,7 @@ export function CreateOpportunitySheet({
         organization_id:      organization?.id ?? null,
         plannedClousureDate:  closeDate || null,
         description:          description.trim() || null,
-        net_cost:             amountRaw ? parseInt(amountRaw, 10) : null,
+        net_cost:             amountRaw ? parseFloat(amountRaw) : null,
         netCostCurrencyId:    amountRaw && currencyId ? currencyId : null,
         responsible:          responsible ? [{ id: responsible.id, isMain: true }] : [],
         priority:             priorityItem,
@@ -677,6 +686,18 @@ export function CreateOpportunitySheet({
                       placeholder="0"
                       value={formatAmount(amountRaw, currencyCode)}
                       onChange={(e) => {
+                        if (currencyCode === "UF") {
+                          const v = e.target.value.replace(/[^\d,]/g, "")
+                          const firstComma = v.indexOf(",")
+                          if (firstComma === -1) {
+                            setAmountRaw(v)
+                          } else {
+                            const intPart = v.slice(0, firstComma).replace(/,/g, "")
+                            const decPart = v.slice(firstComma + 1).replace(/,/g, "").slice(0, 2)
+                            setAmountRaw(`${intPart}.${decPart}`)
+                          }
+                          return
+                        }
                         const digits = e.target.value.replace(/\D/g, "")
                         setAmountRaw(digits)
                       }}
