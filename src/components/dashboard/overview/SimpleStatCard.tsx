@@ -17,7 +17,9 @@ interface Props {
 }
 
 // Mismo layout que OpenOpportunitiesCard/DotMatrixStatCard (Ref 1/2) pero sin gráfico —
-// Ref 3. Reutilizable para Contactos, Organizaciones, Cotizaciones y Actividades.
+// Ref 3. Reutilizable para Contactos, Organizaciones, Cotizaciones y Actividades. Mismo
+// criterio de tema: dark mode pixel-idéntico al #131313 original, light mode con los
+// tokens reales de la app.
 export function SimpleStatCard({ title, kpiKey, icon: Icon, goodDirection, trendLabel }: Props) {
   const [stats, setStats] = React.useState<DashboardStatsRaw | null>(null)
   const [loading, setLoading] = React.useState(true)
@@ -35,26 +37,30 @@ export function SimpleStatCard({ title, kpiKey, icon: Icon, goodDirection, trend
   const isFlat = !kpi || kpi.trend.state === "flat"
   const isGoodNews = kpi?.trend.state === goodDirection
   const sign = trendLabel ? "" : kpi ? (kpi.trend.state === "up" ? "+" : kpi.trend.state === "down" ? "-" : "") : ""
-  const trendColorClass = isFlat ? "text-neutral-400" : isGoodNews ? "text-emerald-400" : "text-red-400"
+  const trendColorClass = isFlat
+    ? "text-muted-foreground dark:text-neutral-400"
+    : isGoodNews
+      ? "text-emerald-600 dark:text-emerald-400"
+      : "text-red-600 dark:text-red-400"
 
   return (
-    <div className="flex flex-col gap-4 rounded-xl bg-[#131313] px-6 py-5">
+    <div className="flex flex-col gap-4 rounded-xl bg-white px-6 py-5 ring-1 ring-foreground/10 dark:bg-[#131313] dark:ring-0">
       <div className="flex items-center gap-2.5">
-        <Icon className="size-8 text-neutral-400" />
+        <Icon className="size-8 text-muted-foreground dark:text-neutral-400" />
         <div>
-          <p className="text-sm text-neutral-400">{title}</p>
-          <p className="text-base font-semibold text-white">{loading ? "…" : (kpi?.description ?? "")}</p>
+          <p className="text-sm text-muted-foreground dark:text-neutral-400">{title}</p>
+          <p className="text-base font-semibold text-foreground dark:text-white">{loading ? "…" : (kpi?.description ?? "")}</p>
         </div>
       </div>
       <div className="flex flex-col gap-1">
-        <p className="text-3xl font-bold text-white">{loading ? "…" : (kpi?.value ?? "0")}</p>
+        <p className="text-3xl font-bold text-foreground dark:text-white">{loading ? "…" : (kpi?.value ?? "0")}</p>
         <p className="text-sm">
           {!loading && kpi && (
             <span className={cn("font-medium", trendColorClass)}>
               {sign}{kpi.trend.value}{trendLabel ? ` ${trendLabel}` : ""}
             </span>
           )}
-          {!trendLabel && <span className="text-neutral-400"> vs. mes anterior</span>}
+          {!trendLabel && <span className="text-muted-foreground dark:text-neutral-400"> vs. mes anterior</span>}
         </p>
       </div>
     </div>

@@ -20,7 +20,9 @@ interface Props {
 
 // Mismo layout que OpenOpportunitiesCard (Ref 1) pero con el gráfico de dot-matrix de
 // Ref 2 en vez del sparkline — reutilizable para Ganadas y Perdidas, que comparten
-// estructura y solo cambian ícono/color/dirección.
+// estructura y solo cambian ícono/color/dirección. Mismo criterio de tema que
+// OpenOpportunitiesCard: dark mode pixel-idéntico al #131313 original, light mode con
+// los tokens reales de la app.
 export function DotMatrixStatCard({ title, kpiKey, icon: Icon, goodDirection, barHeights }: Props) {
   const [stats, setStats] = React.useState<DashboardStatsRaw | null>(null)
   const [loading, setLoading] = React.useState(true)
@@ -37,25 +39,29 @@ export function DotMatrixStatCard({ title, kpiKey, icon: Icon, goodDirection, ba
   const kpi = stats?.kpis[kpiKey]
   const isGoodNews = kpi?.trend.state === goodDirection
   const sign = kpi ? (kpi.trend.state === "up" ? "+" : kpi.trend.state === "down" ? "-" : "") : ""
-  const trendColorClass = !kpi || kpi.trend.state === "flat" ? "text-neutral-400" : isGoodNews ? "text-emerald-400" : "text-red-400"
+  const trendColorClass = !kpi || kpi.trend.state === "flat"
+    ? "text-muted-foreground dark:text-neutral-400"
+    : isGoodNews
+      ? "text-emerald-600 dark:text-emerald-400"
+      : "text-red-600 dark:text-red-400"
 
   return (
-    <div className="flex items-center justify-between gap-4 rounded-xl bg-[#131313] px-6 py-5">
+    <div className="flex items-center justify-between gap-4 rounded-xl bg-white px-6 py-5 ring-1 ring-foreground/10 dark:bg-[#131313] dark:ring-0">
       <div className="flex flex-col gap-4">
         <div className="flex items-center gap-2.5">
-          <Icon className="size-8 text-neutral-400" />
+          <Icon className="size-8 text-muted-foreground dark:text-neutral-400" />
           <div>
-            <p className="text-sm text-neutral-400">{title}</p>
-            <p className="text-base font-semibold text-white">{loading ? "…" : (kpi?.description ?? "")}</p>
+            <p className="text-sm text-muted-foreground dark:text-neutral-400">{title}</p>
+            <p className="text-base font-semibold text-foreground dark:text-white">{loading ? "…" : (kpi?.description ?? "")}</p>
           </div>
         </div>
         <div className="flex flex-col gap-1">
-          <p className="text-3xl font-bold text-white">{loading ? "…" : (kpi?.value ?? "0")}</p>
+          <p className="text-3xl font-bold text-foreground dark:text-white">{loading ? "…" : (kpi?.value ?? "0")}</p>
           <p className="text-sm">
             {!loading && kpi && (
               <span className={cn("font-medium", trendColorClass)}>{sign}{kpi.trend.value}</span>
             )}{" "}
-            <span className="text-neutral-400">vs. mes anterior</span>
+            <span className="text-muted-foreground dark:text-neutral-400">vs. mes anterior</span>
           </p>
         </div>
       </div>
@@ -66,12 +72,12 @@ export function DotMatrixStatCard({ title, kpiKey, icon: Icon, goodDirection, ba
               <div
                 key={rowIdx}
                 className={cn(
-                  "size-1.5 rounded-[2px]",
+                  "size-1.5 rounded-xs",
                   rowIdx >= filled
-                    ? "bg-neutral-700/60"
+                    ? "bg-muted dark:bg-neutral-700/60"
                     : rowIdx === filled - 1
-                      ? "bg-white"
-                      : "bg-neutral-400"
+                      ? "bg-foreground dark:bg-white"
+                      : "bg-muted-foreground dark:bg-neutral-400"
                 )}
               />
             ))}
