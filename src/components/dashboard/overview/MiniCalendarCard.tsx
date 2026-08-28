@@ -4,7 +4,8 @@ import * as React from "react"
 import { useRouter } from "next/navigation"
 import { addMonths, eachDayOfInterval, endOfMonth, endOfWeek, format, isSameMonth, isToday, startOfMonth, startOfWeek, subMonths } from "date-fns"
 import { es } from "date-fns/locale"
-import { CalendarDaysIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react"
+import { CalendarDaysIcon, ChevronLeftIcon, ChevronRightIcon, Loader2Icon } from "lucide-react"
+import { FcGoogle } from "react-icons/fc"
 import { ActivityPreviewSheet } from "@/components/dashboard/activities/ActivityPreviewSheet"
 import { CreateActivitySheet } from "@/components/dashboard/activities/CreateActivitySheet"
 import { DayActivitiesSheet } from "@/components/dashboard/calendar/DayActivitiesSheet"
@@ -14,7 +15,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { activityConfirm } from "@/lib/confirm"
 import { mapActivity, type Activity } from "@/lib/activity-utils"
 import { mapGoogleEvent, type GoogleEvent } from "@/lib/google-event-utils"
-import { notify } from "@/lib/notify"
+import { integrationNotify, notify } from "@/lib/notify"
 import { cn } from "@/lib/utils"
 import { activityService } from "@/services/activity.service"
 import { integrationService } from "@/services/integration.service"
@@ -40,6 +41,7 @@ export function MiniCalendarCard() {
 
   const [googleConnectionId, setGoogleConnectionId] = React.useState<number | null>(null)
   const [googleEvents, setGoogleEvents] = React.useState<GoogleEvent[]>([])
+  const [connectingGoogle, setConnectingGoogle] = React.useState(false)
 
   const [selectedDay, setSelectedDay] = React.useState<Date | null>(null)
   const [daySheetOpen, setDaySheetOpen] = React.useState(false)
@@ -53,7 +55,7 @@ export function MiniCalendarCard() {
   const [createOpen, setCreateOpen] = React.useState(false)
   const [editActivity, setEditActivity] = React.useState<ActivityRaw | null>(null)
 
-  React.useEffect(() => {
+  const loadGoogleConnection = React.useCallback(() => {
     integrationService.getWorkspaceIntegrations()
       .then((connections) => {
         const conn = connections.find((c) => c.provider_key === "google-calendar" && c.is_active)
@@ -61,6 +63,39 @@ export function MiniCalendarCard() {
       })
       .catch(() => setGoogleConnectionId(null))
   }, [])
+
+  React.useEffect(() => { loadGoogleConnection() }, [loadGoogleConnection])
+
+  // Escucha el mismo aviso que ya usa Configuración → Integraciones cuando el popup de
+  // Google termina el OAuth (ver src/app/(public)/auth/google-calendar/callback).
+  React.useEffect(() => {
+    function handleMessage(event: MessageEvent) {
+      if (event.origin !== window.location.origin) return
+      if (event.data?.type === "GOOGLE_CALENDAR_AUTH_SUCCESS") {
+        integrationNotify.connected("Google Calendar")
+        loadGoogleConnection()
+      } else if (event.data?.type === "GOOGLE_CALENDAR_AUTH_ERROR") {
+        integrationNotify.error(event.data.message ?? "No se pudo conectar Google Calendar.")
+      }
+    }
+    window.addEventListener("message", handleMessage)
+    return () => window.removeEventListener("message", handleMessage)
+  }, [loadGoogleConnection])
+
+  async function handleConnectGoogle() {
+    setConnectingGoogle(true)
+    try {
+      const authUrl = await integrationService.getGoogleCalendarAuthUrl()
+      const popup = window.open(authUrl, "google-calendar-oauth", "width=520,height=650")
+      if (!popup) {
+        integrationNotify.error("El navegador bloqueó la ventana emergente. Habilita los popups para este sitio e intenta de nuevo.")
+      }
+    } catch (error) {
+      integrationNotify.error((error as { message?: string })?.message ?? "No se pudo iniciar la conexión con Google Calendar.")
+    } finally {
+      setConnectingGoogle(false)
+    }
+  }
 
   React.useEffect(() => {
     if (!workspaceId) return
@@ -83,15 +118,15 @@ export function MiniCalendarCard() {
       })
         .then((raw) => { if (!cancelled) setGoogleEvents(raw.map(mapGoogleEvent)) })
         .catch(() => { if (!cancelled) setGoogleEvents([]) })
-    } else {
-      setGoogleEvents([])
     }
+    // Si no hay conexión, no se toca googleEvents acá — se filtra en el render
+    // (visibleGoogleEvents) para no llamar setState síncrono dentro del efecto.
 
     return () => { cancelled = true }
   }, [currentDate.getFullYear(), currentDate.getMonth(), workspaceId, refreshKey, googleConnectionId, timezone])
 
   const linkedGoogleEventIds = new Set(activities.map((a) => a.googleEventId).filter((id): id is string => !!id))
-  const visibleGoogleEvents = googleEvents.filter((e) => !linkedGoogleEventIds.has(e.id))
+  const visibleGoogleEvents = googleConnectionId ? googleEvents.filter((e) => !linkedGoogleEventIds.has(e.id)) : []
 
   const monthStart = startOfMonth(currentDate)
   const monthEnd = endOfMonth(currentDate)
@@ -178,6 +213,19 @@ export function MiniCalendarCard() {
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-1">
+            {!googleConnectionId && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="mr-1 gap-1.5"
+                onClick={handleConnectGoogle}
+                disabled={connectingGoogle}
+                title="Conectar Google Calendar"
+              >
+                {connectingGoogle ? <Loader2Icon className="size-3.5 animate-spin" /> : <FcGoogle className="size-3.5" />}
+                Conectar
+              </Button>
+            )}
             <Button variant="ghost" size="icon" className="size-7" onClick={() => setCurrentDate((d) => subMonths(d, 1))}>
               <ChevronLeftIcon className="size-4" />
             </Button>

@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation"
 import { formatDistanceToNow } from "date-fns"
 import { es } from "date-fns/locale"
 import { ExternalLinkIcon, Loader2Icon, MailIcon } from "lucide-react"
+import { SiGmail } from "react-icons/si"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { ScrollDownHint } from "./ScrollDownHint"
 import { useScrollHint } from "@/hooks/useScrollHint"
 import { cn } from "@/lib/utils"
+import { integrationNotify } from "@/lib/notify"
 import { integrationService } from "@/services/integration.service"
 import type { GmailThreadSummaryRaw } from "@/types/integration"
 
@@ -36,9 +38,36 @@ export function MailPreviewCard() {
   const [loading, setLoading] = React.useState(true)
   const [loadingMore, setLoadingMore] = React.useState(false)
   const [connected, setConnected] = React.useState(true)
+  const [connecting, setConnecting] = React.useState(false)
   const [integrationId, setIntegrationId] = React.useState<number | null>(null)
   const [pageToken, setPageToken] = React.useState<string | undefined>(undefined)
   const { ref: scrollRef, canScrollDown, scrollStep, onScroll } = useScrollHint<HTMLDivElement>([threads])
+
+  // Reutilizable para volver a cargar después de conectar Gmail desde el botón — a
+  // diferencia del efecto de montaje (abajo), esta sí se puede llamar con setLoading(true)
+  // síncrono porque corre desde un handler de evento, no desde un efecto.
+  function loadMail() {
+    setLoading(true)
+    integrationService.getWorkspaceIntegrations()
+      .then((connections) => {
+        const conn = connections.find((c) => c.provider_key === "gmail" && c.is_active)
+        if (!conn) {
+          setConnected(false)
+          setLoading(false)
+          return
+        }
+        setConnected(true)
+        setIntegrationId(conn.id)
+        return integrationService.getGmailThreads(conn.id, { labelId: "INBOX", maxResults: MAX_RESULTS })
+          .then((page) => {
+            setThreads(page.threads)
+            setPageToken(page.nextPageToken)
+          })
+          .catch(() => setThreads([]))
+          .finally(() => setLoading(false))
+      })
+      .catch(() => { setConnected(false); setLoading(false) })
+  }
 
   React.useEffect(() => {
     let cancelled = false
@@ -49,6 +78,8 @@ export function MailPreviewCard() {
           if (!cancelled) { setConnected(false); setLoading(false) }
           return
         }
+        if (cancelled) return
+        setConnected(true)
         setIntegrationId(conn.id)
         return integrationService.getGmailThreads(conn.id, { labelId: "INBOX", maxResults: MAX_RESULTS })
           .then((page) => {
@@ -62,6 +93,37 @@ export function MailPreviewCard() {
       .catch(() => { if (!cancelled) { setConnected(false); setLoading(false) } })
     return () => { cancelled = true }
   }, [])
+
+  // Escucha el mismo aviso que ya usa la página de Configuración → Integraciones cuando
+  // el popup de Google termina el OAuth (ver src/app/(public)/auth/gmail/callback).
+  React.useEffect(() => {
+    function handleMessage(event: MessageEvent) {
+      if (event.origin !== window.location.origin) return
+      if (event.data?.type === "GMAIL_AUTH_SUCCESS") {
+        integrationNotify.connected("Gmail")
+        loadMail()
+      } else if (event.data?.type === "GMAIL_AUTH_ERROR") {
+        integrationNotify.error(event.data.message ?? "No se pudo conectar Gmail.")
+      }
+    }
+    window.addEventListener("message", handleMessage)
+    return () => window.removeEventListener("message", handleMessage)
+  }, [loadMail])
+
+  async function handleConnect() {
+    setConnecting(true)
+    try {
+      const authUrl = await integrationService.getGmailAuthUrl()
+      const popup = window.open(authUrl, "gmail-oauth", "width=520,height=650")
+      if (!popup) {
+        integrationNotify.error("El navegador bloqueó la ventana emergente. Habilita los popups para este sitio e intenta de nuevo.")
+      }
+    } catch (error) {
+      integrationNotify.error((error as { message?: string })?.message ?? "No se pudo iniciar la conexión con Gmail.")
+    } finally {
+      setConnecting(false)
+    }
+  }
 
   function loadMore() {
     if (!integrationId || !pageToken) return
@@ -91,9 +153,13 @@ export function MailPreviewCard() {
             {Array.from({ length: 4 }).map((_, i) => <MailSkeleton key={i} />)}
           </div>
         ) : !connected ? (
-          <p className="flex-1 py-8 text-center text-sm text-muted-foreground">
-            Conecta tu correo en Configuración → Integraciones.
-          </p>
+          <div className="flex flex-1 flex-col items-center justify-center gap-3 py-8 text-center">
+            <p className="text-sm text-muted-foreground">Conecta tu correo para ver la bandeja acá.</p>
+            <Button size="sm" className="gap-1.5" onClick={handleConnect} disabled={connecting}>
+              {connecting ? <Loader2Icon className="size-3.5 animate-spin" /> : <SiGmail className="size-3.5" />}
+              Conectar con Gmail
+            </Button>
+          </div>
         ) : threads.length === 0 ? (
           <p className="flex-1 py-8 text-center text-sm text-muted-foreground">Sin correos en la bandeja.</p>
         ) : (

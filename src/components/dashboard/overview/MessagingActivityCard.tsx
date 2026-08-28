@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation"
 import { formatDistanceToNow } from "date-fns"
 import { es } from "date-fns/locale"
 import { ExternalLinkIcon, Loader2Icon, MessagesSquareIcon } from "lucide-react"
+import { SiWhatsapp } from "react-icons/si"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { CHANNEL_LABELS, ChannelBadge } from "@/components/dashboard/messaging/ChannelBadge"
 import type { ConversationChannel } from "@/components/dashboard/messaging/data"
+import { WhatsAppIntegrationSheet } from "@/components/settings/integrations/WhatsAppIntegrationSheet"
 import { ScrollDownHint } from "./ScrollDownHint"
 import { useScrollHint } from "@/hooks/useScrollHint"
 import { cn } from "@/lib/utils"
@@ -124,6 +126,30 @@ export function MessagingActivityCard() {
   const [hasMore, setHasMore] = React.useState({ whatsapp: false, instagram: false, facebook: false })
   const anyHasMore = hasMore.whatsapp || hasMore.instagram || hasMore.facebook
 
+  const [whatsappConnected, setWhatsappConnected] = React.useState(true)
+  const [whatsappSheetOpen, setWhatsappSheetOpen] = React.useState(false)
+
+  // Reutilizable para volver a cargar después de conectar WhatsApp desde el botón — a
+  // diferencia del efecto de montaje (abajo), esta sí se puede llamar con setLoading(true)
+  // síncrono porque corre desde un handler de evento, no desde un efecto.
+  function loadConversations() {
+    setLoading(true)
+    Promise.all([
+      whatsappService.listConversations({ limit: TAKE, offset: 0 }).then((rows) => rows.map(mapWhatsApp)).catch(() => []),
+      instagramService.listConversations({ limit: TAKE, offset: 0 }).then((rows) => rows.map(mapInstagram)).catch(() => []),
+      facebookService.listConversations({ limit: TAKE, offset: 0 }).then((rows) => rows.map(mapFacebook)).catch(() => []),
+    ])
+      .then(([wa, ig, fb]) => {
+        offsets.current = { whatsapp: wa.length, instagram: ig.length, facebook: fb.length }
+        setHasMore({ whatsapp: wa.length === TAKE, instagram: ig.length === TAKE, facebook: fb.length === TAKE })
+        const merged = [...wa, ...ig, ...fb].sort(
+          (a, b) => new Date(b.lastActivityAt).getTime() - new Date(a.lastActivityAt).getTime()
+        )
+        setConversations(merged)
+      })
+      .finally(() => setLoading(false))
+  }
+
   React.useEffect(() => {
     let cancelled = false
     Promise.all([
@@ -142,6 +168,12 @@ export function MessagingActivityCard() {
       })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
+  }, [])
+
+  React.useEffect(() => {
+    whatsappService.getMetaConfig()
+      .then((config) => setWhatsappConnected(!!config))
+      .catch(() => setWhatsappConnected(false))
   }, [])
 
   function loadMore() {
@@ -190,7 +222,17 @@ export function MessagingActivityCard() {
             {Array.from({ length: 4 }).map((_, i) => <ConversationSkeleton key={i} />)}
           </div>
         ) : conversations.length === 0 ? (
-          <p className="flex-1 py-8 text-center text-sm text-muted-foreground">Sin conversaciones recientes.</p>
+          <div className="flex flex-1 flex-col items-center justify-center gap-3 py-8 text-center">
+            <p className="text-sm text-muted-foreground">
+              {whatsappConnected ? "Sin conversaciones recientes." : "Conecta WhatsApp para ver tus conversaciones acá."}
+            </p>
+            {!whatsappConnected && (
+              <Button size="sm" className="gap-1.5" onClick={() => setWhatsappSheetOpen(true)}>
+                <SiWhatsapp className="size-3.5" />
+                Conectar WhatsApp
+              </Button>
+            )}
+          </div>
         ) : (
           <div className="relative flex-1 overflow-hidden">
             <div ref={scrollRef} onScroll={onScroll} className="h-full divide-y overflow-y-auto scrollbar-hide [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -240,6 +282,15 @@ export function MessagingActivityCard() {
           </div>
         )}
       </CardContent>
+
+      <WhatsAppIntegrationSheet
+        open={whatsappSheetOpen}
+        onOpenChange={setWhatsappSheetOpen}
+        onSuccess={() => {
+          setWhatsappConnected(true)
+          loadConversations()
+        }}
+      />
     </Card>
   )
 }
