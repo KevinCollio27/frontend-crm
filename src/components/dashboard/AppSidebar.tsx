@@ -12,6 +12,7 @@ import {
   CloudUpload,
   ExternalLinkIcon,
   FileTextIcon,
+  LayoutDashboardIcon,
   LifeBuoyIcon,
   MailIcon,
   MegaphoneIcon,
@@ -95,6 +96,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarContent>
         <SidebarGroup>
           <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton render={<Link href="/dashboard" />} tooltip="Dashboard">
+                <LayoutDashboardIcon />
+                <span>Dashboard</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
             <SidebarMenuItem>
               <SidebarMenuButton render={<Link href="/chat" />} tooltip="Chat IA">
                 <Sparkle />
