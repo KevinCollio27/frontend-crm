@@ -15,7 +15,10 @@ export function FunnelOverviewSection() {
   const [flows, setFlows] = React.useState<Flow[]>([])
   const [flowId, setFlowId] = React.useState<number | null>(null)
   const [stats, setStats] = React.useState<DashboardStatsRaw | null>(null)
-  const [loading, setLoading] = React.useState(true)
+  // loading se deriva comparando contra el embudo ya resuelto — evita un setState síncrono
+  // al inicio del efecto (react-hooks/set-state-in-effect).
+  const [resolvedFlowId, setResolvedFlowId] = React.useState<number | null>(null)
+  const loading = flowId === null || flowId !== resolvedFlowId
 
   React.useEffect(() => {
     flowService.all()
@@ -31,11 +34,9 @@ export function FunnelOverviewSection() {
   React.useEffect(() => {
     if (flowId === null) return
     let cancelled = false
-    setLoading(true)
     dashboardService.getStats({ flowId })
-      .then((res) => { if (!cancelled) setStats(res) })
-      .catch(() => { if (!cancelled) setStats(null) })
-      .finally(() => { if (!cancelled) setLoading(false) })
+      .then((res) => { if (cancelled) return; setStats(res); setResolvedFlowId(flowId) })
+      .catch(() => { if (cancelled) return; setStats(null); setResolvedFlowId(flowId) })
     return () => { cancelled = true }
   }, [flowId])
 

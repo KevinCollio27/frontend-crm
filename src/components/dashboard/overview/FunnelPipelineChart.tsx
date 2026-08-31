@@ -5,6 +5,7 @@ import { STATUS_CONFIG } from "@/components/dashboard/funnels/shared/status"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { niceStep } from "@/lib/chart-utils"
 import type { Flow } from "@/types/flow"
 import type { DashboardStatsRaw } from "@/types/dashboard"
 
@@ -38,19 +39,6 @@ const PAD_TOP = 10
 const PAD_BOTTOM = 26
 const INNER_H = CHART_H - PAD_TOP - PAD_BOTTOM
 const BAR_GAP = 16
-
-// Paso "lindo" para el eje Y (1/2/5 × una potencia de 10) — el tope fijo anterior
-// (nunca más de 20) se rompía con embudos grandes (ej. una feria con 920 postulaciones):
-// terminaba generando ~47 marcas de "20 en 20" amontonadas e ilegibles. Este algoritmo
-// escala sin límite apuntando a ~5 marcas, sea el máximo 11 o 920.
-function niceStep(maxValue: number, targetTicks = 5): number {
-  if (maxValue <= 0) return 1
-  const roughStep = maxValue / targetTicks
-  const magnitude = 10 ** Math.floor(Math.log10(roughStep))
-  const normalized = roughStep / magnitude
-  const niceNormalized = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10
-  return niceNormalized * magnitude
-}
 
 interface Props {
   flows: Flow[]

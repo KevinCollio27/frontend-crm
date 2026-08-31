@@ -30,6 +30,9 @@ import { ReferenceCardExample13 } from "@/components/dashboard/overview/Referenc
 import { ReferenceCardExample14 } from "@/components/dashboard/overview/ReferenceCardExample14"
 import { ReferenceCardExample15 } from "@/components/dashboard/overview/ReferenceCardExample15"
 import { ReferenceCardExample16 } from "@/components/dashboard/overview/ReferenceCardExample16"
+import { ReferenceCardExample17 } from "@/components/dashboard/overview/ReferenceCardExample17"
+import { SalesOpportunitiesSection } from "@/components/dashboard/overview/SalesOpportunitiesSection"
+import { SalesQuotationsSection } from "@/components/dashboard/overview/SalesQuotationsSection"
 import { SimpleStatCard } from "@/components/dashboard/overview/SimpleStatCard"
 import { TeamMembersCard } from "@/components/dashboard/overview/TeamMembersCard"
 import { WorkspaceHistoryCard } from "@/components/dashboard/overview/WorkspaceHistoryCard"
@@ -63,9 +66,18 @@ function DashboardPageContent() {
   const tabParam = searchParams.get("tab")
   const activeTab = tabParam && VALID_TABS.has(tabParam) ? tabParam : "general"
 
+  const ventasSubTabParam = searchParams.get("ventasTab")
+  const activeVentasSubTab = ventasSubTabParam === "cotizaciones" ? "cotizaciones" : "oportunidades"
+
   function handleTabChange(value: string) {
     const params = new URLSearchParams(searchParams.toString())
     params.set("tab", value)
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+  }
+
+  function handleVentasSubTabChange(value: string) {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set("ventasTab", value)
     router.replace(`${pathname}?${params.toString()}`, { scroll: false })
   }
 
@@ -141,7 +153,22 @@ function DashboardPageContent() {
             {/* <FollowUpTableCard /> */}
           </TabsContent>
 
-          <TabsContent value="ventas"><ComingSoon /></TabsContent>
+          <TabsContent value="ventas" className="flex flex-col gap-4">
+            <Tabs value={activeVentasSubTab} onValueChange={handleVentasSubTabChange} className="flex flex-1 flex-col gap-4">
+              <TabsList variant="line" className="w-fit">
+                <TabsTrigger value="oportunidades">Por Oportunidades</TabsTrigger>
+                <TabsTrigger value="cotizaciones">Por Cotizaciones</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="oportunidades" className="flex flex-col gap-4">
+                <SalesOpportunitiesSection />
+              </TabsContent>
+
+              <TabsContent value="cotizaciones" className="flex flex-col gap-4">
+                <SalesQuotationsSection />
+              </TabsContent>
+            </Tabs>
+          </TabsContent>
           <TabsContent value="seguimiento"><ComingSoon /></TabsContent>
 
           <TabsContent value="referencias" className="flex flex-col gap-4">
@@ -177,6 +204,7 @@ function DashboardPageContent() {
                 <ReferenceCardExample15 />
                 <ReferenceCardExample16 />
               </div>
+              <ReferenceCardExample17 />
             </div>
           </TabsContent>
         </Tabs>
