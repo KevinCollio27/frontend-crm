@@ -23,6 +23,21 @@ import {
 } from "@/components/dashboard/forms/shared/form-state"
 import type { ClassicBaseConfig, FormSubmitPayload, PublicCustomField } from "@/types/public-form"
 import { PublicFormShell } from "@/components/public-widget/PublicFormShell"
+import { FileDropZone, isUploadedFileValue, type UploadedFileValue } from "@/components/public-widget/FileDropZone"
+
+// ─── File accept mapping (classic custom fields) ───────────────────────────────
+
+const CLASSIC_FILE_ACCEPT_MIME: Record<string, string> = {
+  pdf:    "application/pdf",
+  images: "image/*",
+  word:   ".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  excel:  ".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+}
+
+function classicFileAccept(keys?: string[]): string | undefined {
+  if (!keys || keys.length === 0) return undefined
+  return keys.map((k) => CLASSIC_FILE_ACCEPT_MIME[k]).filter(Boolean).join(",") || undefined
+}
 
 // ─── Regex ────────────────────────────────────────────────────────────────────
 
@@ -45,7 +60,7 @@ function formatRut(raw: string): string {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Values = Record<string, string | boolean | string[]>
+type Values = Record<string, string | boolean | string[] | UploadedFileValue>
 type Errors = Record<string, string>
 type Status = "idle" | "loading" | "success" | "error"
 
@@ -531,7 +546,7 @@ export function ClassicRenderer({ slug, name, description, config, customFields,
             ) : f.type === "INFO" ? (
               <p key={f.id} className="rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">{f.label}</p>
             ) : (
-              <CustomFieldInput key={f.id} field={f} value={values[`cf_${f.id}`]} error={errors[`cf_${f.id}`]} radius={DESIGN.radius}
+              <CustomFieldInput key={f.id} field={f} slug={slug} value={values[`cf_${f.id}`]} error={errors[`cf_${f.id}`]} radius={DESIGN.radius}
                 onChange={(v) => setValues((prev) => ({ ...prev, [`cf_${f.id}`]: v }))}
               />
             )
@@ -546,13 +561,14 @@ export function ClassicRenderer({ slug, name, description, config, customFields,
 
 interface CustomFieldInputProps {
   field:    PublicCustomField
-  value:    string | boolean | string[] | undefined
+  slug:     string
+  value:    string | boolean | string[] | UploadedFileValue | undefined
   error?:   string
   radius:   number
-  onChange: (v: string | boolean | string[]) => void
+  onChange: (v: string | boolean | string[] | UploadedFileValue) => void
 }
 
-function CustomFieldInput({ field, value, error, radius, onChange }: CustomFieldInputProps) {
+function CustomFieldInput({ field, slug, value, error, radius, onChange }: CustomFieldInputProps) {
   const strVal = String(value ?? "")
   const radiusStyle: React.CSSProperties = { borderRadius: radius }
   const htmlFor = `cf_${field.id}`
@@ -625,6 +641,16 @@ function CustomFieldInput({ field, value, error, radius, onChange }: CustomField
         <Input id={htmlFor} type="text" inputMode="numeric" placeholder={field.placeholder} value={strVal} onChange={(e) => onChange(digitsOnly(e.target.value))} style={radiusStyle} />
       ) : field.type === "ADDRESS" ? (
         <AddressAutocomplete value={strVal} onChange={onChange} placeholder={field.placeholder} />
+      ) : field.type === "FILE" ? (
+        <FileDropZone
+          id={htmlFor}
+          slug={slug}
+          value={isUploadedFileValue(value) ? value : null}
+          accept={classicFileAccept(field.accept)}
+          error={!!error}
+          radiusStyle={radiusStyle}
+          onChange={(v) => onChange(v ?? "")}
+        />
       ) : (
         <Input
           id={htmlFor}

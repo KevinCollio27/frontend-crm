@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { CheckCircle2Icon, InfoIcon, TriangleAlertIcon, UploadCloudIcon } from "lucide-react"
+import { CheckCircle2Icon, InfoIcon, TriangleAlertIcon } from "lucide-react"
 import { useTheme } from "next-themes"
 import { isValidPhoneNumber } from "react-phone-number-input"
 import { PhoneInput } from "@/components/phone-input"
@@ -19,10 +19,11 @@ import { cn } from "@/lib/utils"
 import type { BlocksBaseConfig, FormSubmitPayload } from "@/types/public-form"
 import type { FileAccept, FormBlock } from "@/components/dashboard/forms/shared/blocks"
 import { PublicFormShell } from "@/components/public-widget/PublicFormShell"
+import { FileDropZone, isUploadedFileValue, type UploadedFileValue } from "@/components/public-widget/FileDropZone"
 
 // ─── Value helpers ────────────────────────────────────────────────────────────
 
-type Values = Record<string, string | string[]>
+type Values = Record<string, string | string[] | UploadedFileValue>
 
 function valueKey(block: FormBlock): string {
   if (block.type === "base_field") return `${block.data.entity}.${block.data.key}`
@@ -63,8 +64,12 @@ function buildPayload(blocks: FormBlock[], values: Values): FormSubmitPayload {
     const key = valueKey(block)
     if (!key) continue
     const raw = values[key] ?? ""
-    const val = block.type === "field" && block.data.allowOther ? resolveOtherValue(raw, values, key) : raw
-    const str = Array.isArray(val) ? val.join(", ") : val
+    const val = block.type === "field" && block.data.allowOther
+      ? resolveOtherValue(raw as string | string[], values, key)
+      : raw
+    // base_field nunca es de tipo archivo — solo los custom "field" pueden serlo,
+    // y esos usan `val` directo (más abajo), no `str`.
+    const str = Array.isArray(val) ? val.join(", ") : typeof val === "string" ? val : ""
 
     if (block.type === "base_field") {
       const { entity, key: fk } = block.data
@@ -217,77 +222,11 @@ const FILE_ACCEPT_MIME: Record<FileAccept, string | undefined> = {
   any: undefined,
 }
 
-function FileDropZone({
-  id,
-  fileName,
-  accept,
-  error,
-  radiusStyle,
-  onChange,
-}: {
-  id: string
-  fileName: string
-  accept?: string
-  error?: boolean
-  radiusStyle: React.CSSProperties
-  onChange: (f: File | null) => void
-}) {
-  const [dragging, setDragging] = React.useState(false)
-  const inputRef = React.useRef<HTMLInputElement>(null)
-
-  return (
-    <div
-      onClick={() => inputRef.current?.click()}
-      onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
-      onDragLeave={() => setDragging(false)}
-      onDrop={(e) => {
-        e.preventDefault()
-        setDragging(false)
-        const f = e.dataTransfer.files[0]
-        if (f) onChange(f)
-      }}
-      style={radiusStyle}
-      className={cn(
-        "flex cursor-pointer items-center gap-3 border-2 border-dashed p-3 transition-colors select-none",
-        dragging ? "border-ring bg-muted/50"
-        : fileName ? "border-ring/40 bg-muted/20"
-        : "border-input hover:border-muted-foreground/40 hover:bg-muted/20",
-        error && "border-destructive"
-      )}
-    >
-      <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted">
-        <UploadCloudIcon className="size-4.5 text-muted-foreground/60" />
-      </div>
-      <div className="min-w-0 flex-1">
-        {fileName ? (
-          <p className="truncate text-sm font-medium">{fileName} · haz clic para cambiar</p>
-        ) : (
-          <>
-            <p className="text-sm font-medium">Arrastra un archivo o haz clic</p>
-            <p className="text-xs text-muted-foreground">o suéltalo aquí</p>
-          </>
-        )}
-      </div>
-      <input
-        ref={inputRef}
-        id={id}
-        type="file"
-        accept={accept}
-        className="hidden"
-        onChange={(e) => {
-          const f = e.target.files?.[0]
-          onChange(f ?? null)
-          e.target.value = ""
-        }}
-      />
-    </div>
-  )
-}
-
 // ─── Block input ──────────────────────────────────────────────────────────────
 
 function BlockInput({
   block,
+  slug,
   value,
   onChange,
   error,
@@ -298,8 +237,9 @@ function BlockInput({
   onOtherChange,
 }: {
   block: FormBlock
-  value: string | string[]
-  onChange: (v: string | string[]) => void
+  slug: string
+  value: string | string[] | UploadedFileValue
+  onChange: (v: string | string[] | UploadedFileValue) => void
   error?: string
   radius: number
   accent: string
@@ -464,15 +404,17 @@ function BlockInput({
     }
 
     if (fieldType === "file") {
+      const fileVal = isUploadedFileValue(value) ? value : null
       return (
         <FieldWrapper label={label} required={required} helper={helper} error={error} htmlFor={block.id}>
           <FileDropZone
             id={block.id}
-            fileName={str}
+            slug={slug}
+            value={fileVal}
             accept={FILE_ACCEPT_MIME[block.data.accept]}
             error={!!error}
             radiusStyle={radiusStyle}
-            onChange={(f) => onChange(f?.name ?? "")}
+            onChange={(v) => onChange(v ?? "")}
           />
         </FieldWrapper>
       )
@@ -619,7 +561,7 @@ export function BlocksRenderer({ slug, name, config }: BlocksRendererProps) {
     return () => { clearInterval(tick); clearTimeout(reset) }
   }, [status, resetForm])
 
-  function setValue(key: string, val: string | string[]) {
+  function setValue(key: string, val: string | string[] | UploadedFileValue) {
     setValues((p) => ({ ...p, [key]: val }))
     setErrors((p) => { const n = { ...p }; delete n[key]; return n })
   }
@@ -664,6 +606,7 @@ export function BlocksRenderer({ slug, name, config }: BlocksRendererProps) {
               <BlockInput
                 key={block.id}
                 block={block}
+                slug={slug}
                 value={values[k] ?? ""}
                 onChange={(v) => setValue(k, v)}
                 error={errors[k]}
