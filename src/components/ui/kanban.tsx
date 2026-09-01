@@ -37,7 +37,10 @@ function KanbanColumn({
   children,
 }: KanbanColumnProps, ref) {
   return (
-    <div ref={ref} className={cn("flex w-72 shrink-0 flex-col rounded-xl bg-muted/50", className)}>
+    // bg-muted/50 se ve bien en oscuro (buen contraste contra el fondo), pero en claro
+    // --muted ya es casi idéntico al fondo blanco — diluido al 50% la columna
+    // desaparecía. En claro se usa sin diluir para que la columna siga siendo visible.
+    <div ref={ref} className={cn("flex w-72 shrink-0 flex-col rounded-xl bg-muted dark:bg-muted/50", className)}>
       <div className="flex shrink-0 items-center justify-between px-3 pt-3 pb-1.5">
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold">{title}</span>

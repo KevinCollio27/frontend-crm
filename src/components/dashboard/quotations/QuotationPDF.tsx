@@ -3,6 +3,7 @@ import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/render
 import { generateQuotationCode } from '@/lib/quotation-utils';
 import { ResolvedTemplateBlock, ParsedBlock, TextNode } from '@/types/pdfTemplate';
 import { resolveFieldKey } from './shared/resolve-field-key';
+import { getUnitLabel } from './shared/units';
 
 // Función para formatear valores de Cargo (extraer solo el nombre)
 const formatCargoValue = (value: any, labelType: string) => {
@@ -586,7 +587,7 @@ const QuotationPDF: React.FC<QuotationPDFProps> = ({ quotation, resolvedBlocks =
 
   // Obtener label de unidad de medida
   const getMeasurementUnitLabel = (value: string) => {
-    return value || 'Por Unidad';
+    return value ? getUnitLabel(value) : 'Por Unidad';
   };
 
   // Función para truncar textos largos (ej: direcciones)

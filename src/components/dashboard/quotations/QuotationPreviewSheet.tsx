@@ -15,6 +15,7 @@ import type { QuotationRaw } from "@/types/quotation"
 import { rawToForm } from "./shared/quotation-from-raw"
 import { formatMoney } from "./shared/currency"
 import { displayFieldValue } from "./shared/quotation-display"
+import { getUnitLabel } from "./shared/units"
 import { isAcceptedStatus } from "./shared/send-to-cargo"
 import { STATUS_CONFIG } from "./shared/status"
 
@@ -186,7 +187,7 @@ function QuotationPreview({ entity, onClose, onEdit, onDownload, downloading, on
                         </TableCell>
                       ))}
                       <TableCell className="text-sm tabular-nums">{formatMoney(price, form.currency)}</TableCell>
-                      <TableCell className="text-sm">{row.unit}</TableCell>
+                      <TableCell className="text-sm">{getUnitLabel(row.unit)}</TableCell>
                       <TableCell className="text-sm tabular-nums">{qty}</TableCell>
                       {form.applyDiscounts && <TableCell className="text-sm tabular-nums">{row.discount || 0}%</TableCell>}
                       <TableCell className="text-sm font-semibold tabular-nums text-emerald-600">
@@ -210,7 +211,7 @@ function QuotationPreview({ entity, onClose, onEdit, onDownload, downloading, on
                     <span>
                       {a.label}{" "}
                       <span className="text-muted-foreground">
-                        ({qty} {a.unit} × {formatMoney(amount, form.currency)})
+                        ({qty} {getUnitLabel(a.unit)} × {formatMoney(amount, form.currency)})
                       </span>
                     </span>
                     <span className="font-semibold tabular-nums text-emerald-600">

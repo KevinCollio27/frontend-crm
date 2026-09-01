@@ -17,6 +17,12 @@
 		},
 		{
 			"path": "../../../../goxt-prohabla"
+		},
+		{
+			"path": "../../../../goxt-docs"
+		},
+		{
+			"path": "../../../../../../../Downloads/dashboard-shell-01"
 		}
 	]
 }
