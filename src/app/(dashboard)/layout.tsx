@@ -3,6 +3,7 @@ import { AppSidebar } from "@/components/dashboard/AppSidebar";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { WelcomeToast } from "@/components/home/WelcomeToast";
+import { WorkspaceLinkHandler } from "@/components/home/WorkspaceLinkHandler";
 
 export default async function DashboardLayout({
   children,
@@ -15,6 +16,7 @@ export default async function DashboardLayout({
   return (
     <SidebarProvider defaultOpen={defaultOpen} className="h-svh overflow-hidden">
       <WelcomeToast />
+      <WorkspaceLinkHandler />
       <AppSidebar />
       <SidebarInset className="overflow-hidden">
         <DashboardShell>{children}</DashboardShell>
