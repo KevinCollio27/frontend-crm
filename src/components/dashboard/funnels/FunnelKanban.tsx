@@ -515,13 +515,26 @@ export function FunnelKanban() {
   }, [flows, flowId])
 
   // ── Fetch flows + auto-select default ────────────────────────────────────────
+  // Si el flow marcado is_default quedó desactivado (queda fuera de la lista que
+  // trae flow/all, que solo devuelve flows activos), no hay que dejar flowId en
+  // null — cae al primer flow activo para que el Board nunca se quede sin stages.
   React.useEffect(() => {
     flowService.all().then((list) => {
       setFlows(list)
-      const def = list.find((f) => f.is_default)
-      if (def) setFlowId(def.id)
+      const chosen = list.find((f) => f.is_default) ?? list[0]
+      if (chosen) setFlowId(chosen.id)
     }).catch(() => {})
   }, [])
+
+  // El Board (a diferencia de Lista) no puede renderizar "Todas" — sus columnas
+  // salen de las stages de un único flow, así que si el usuario venía de Lista con
+  // flowId en null, al entrar a Board hay que forzar uno real.
+  React.useEffect(() => {
+    if (view === "board" && flowId === null && flows.length > 0) {
+      const chosen = flows.find((f) => f.is_default) ?? flows[0]
+      if (chosen) setFlowId(chosen.id)
+    }
+  }, [view, flowId, flows])
 
   // ── Fetch kanban opportunities por etapa (paginado) cuando cambia flowId/refreshKey ──
   // Un fetch independiente por columna, no uno solo para todo el flow — así ninguna
@@ -597,8 +610,10 @@ export function FunnelKanban() {
   }, [flowId, refreshKey])
 
   // ── Filter options ───────────────────────────────────────────────────────────
+  // "Todas" solo es una opción válida en Lista — el Board no tiene forma de
+  // renderizar columnas sin un flow puntual, así que ahí solo se listan flows reales.
   const flowOptions = React.useMemo<SingleSelectOption[]>(() => [
-    { value: "all", label: "Todas" },
+    ...(view === "board" ? [] : [{ value: "all", label: "Todas" }]),
     ...flows.map((f) => ({
       value: String(f.id),
       label: f.name,
@@ -606,7 +621,7 @@ export function FunnelKanban() {
         ? <span className="ml-auto text-[10px] text-muted-foreground">default</span>
         : undefined,
     })),
-  ], [flows])
+  ], [flows, view])
 
   const statusOptions = React.useMemo<SingleSelectOption[]>(
     () => STATUS_FILTERS.map((f) => ({ value: f.key, label: f.label })),
@@ -638,7 +653,14 @@ export function FunnelKanban() {
 
   function resetFilters() {
     setSearch("")
-    setFlowId(null)
+    // En Board no hay "Todas" al que volver — restablece al flow predeterminado
+    // (o el primero) en vez de dejar el board sin stages.
+    if (view === "board") {
+      const chosen = flows.find((f) => f.is_default) ?? flows[0]
+      setFlowId(chosen ? chosen.id : null)
+    } else {
+      setFlowId(null)
+    }
     setStatusFilter("all")
     setResponsibleFilter([])
   }
