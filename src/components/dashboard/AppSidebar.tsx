@@ -8,12 +8,12 @@ import {
   BotIcon,
   BuildingIcon,
   CalendarHeart,
+  CircleHelpIcon,
   ClipboardListIcon,
   CloudUpload,
   ExternalLinkIcon,
   FileTextIcon,
   LayoutDashboardIcon,
-  LifeBuoyIcon,
   MailIcon,
   MegaphoneIcon,
   MessagesSquareIcon,
@@ -141,7 +141,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 render={<a href={`${process.env.NEXT_PUBLIC_WIDGET_BASE_URL}/widget/form/formulario-de-soporte`} target="_blank" rel="noreferrer" />}
                 tooltip="Soporte / Ayuda"
               >
-                <LifeBuoyIcon />
+                <CircleHelpIcon />
                 <span>Soporte / Ayuda</span>
                 <ExternalLinkIcon className="ml-auto size-3 opacity-60" />
               </SidebarMenuButton>
