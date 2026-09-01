@@ -29,10 +29,26 @@ export function SalesQuotationsKpis({ pendingValue, totalSales, avgDealValue, de
   }
 
   const tiles: Tile[] = [
-    { icon: ClockIcon, title: "Cotizaciones Pendientes", subtitle: pendingValue?.description ?? "", value: pendingValue?.value ?? "$0", trend: pendingValue?.trend, trendFooter: "vs. periodo anterior" },
-    { icon: CircleDollarSignIcon, title: "Ventas Aceptadas", subtitle: totalSales?.description ?? "", value: totalSales?.value ?? "$0", trend: totalSales?.trend, trendFooter: "vs. periodo anterior" },
-    { icon: ReceiptIcon, title: "Ticket Promedio", subtitle: avgDealValue?.description ?? "", value: avgDealValue?.value ?? "$0", trend: avgDealValue?.trend, trendFooter: "vs. periodo anterior" },
-    { icon: FileCheckIcon, title: "Cotizaciones Aceptadas", subtitle: deals?.description ?? "", value: deals?.value ?? "0", trend: deals?.trend, trendFooter: "vs. periodo anterior" },
+    {
+      icon: ClockIcon, title: "Cotizaciones Pendientes", subtitle: "Sin resolver",
+      value: pendingValue?.value ?? "$0", trend: pendingValue?.trend, trendFooter: "vs. periodo anterior",
+      tooltip: "Monto de cotizaciones enviadas que aún no fueron aceptadas ni rechazadas."
+    },
+    {
+      icon: CircleDollarSignIcon, title: "Ventas Aceptadas", subtitle: "Cotizaciones aceptadas",
+      value: totalSales?.value ?? "$0", trend: totalSales?.trend, trendFooter: "vs. periodo anterior",
+      tooltip: "Monto total de las cotizaciones aceptadas por el cliente en el período."
+    },
+    {
+      icon: ReceiptIcon, title: "Ticket Promedio", subtitle: avgDealValue?.description ?? "",
+      value: avgDealValue?.value ?? "$0", trend: avgDealValue?.trend, trendFooter: "vs. periodo anterior",
+      tooltip: "Monto promedio por cotización aceptada."
+    },
+    {
+      icon: FileCheckIcon, title: "Cotizaciones Aceptadas", subtitle: deals?.description ?? "",
+      value: deals?.value ?? "0", trend: deals?.trend, trendFooter: "vs. periodo anterior",
+      tooltip: "Cantidad de cotizaciones aceptadas — no el monto (ver \"Ventas Aceptadas\")."
+    },
   ]
 
   return (

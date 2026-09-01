@@ -25,10 +25,26 @@ export function SalesOpportunitiesKpis({ pipeline, totalSales, avgDealValue, con
   }
 
   const tiles: Tile[] = [
-    { icon: WalletIcon, title: "Pipeline Abierto", subtitle: pipeline?.description ?? "Oportunidades vigentes", value: pipeline?.value ?? "$0", trend: pipeline?.trend, trendFooter: "vs. mes anterior" },
-    { icon: CircleDollarSignIcon, title: "Ventas Ganadas", subtitle: totalSales?.description ?? "", value: totalSales?.value ?? "$0", trend: totalSales?.trend, trendFooter: "vs. periodo anterior" },
-    { icon: ReceiptIcon, title: "Ticket Promedio", subtitle: avgDealValue?.description ?? "", value: avgDealValue?.value ?? "$0", trend: avgDealValue?.trend, trendFooter: "vs. periodo anterior" },
-    { icon: TargetIcon, title: "Tasa de Conversión", subtitle: conversionRate?.description ?? "", value: conversionRate?.value ?? "0,0%", trend: conversionRate?.trend, trendFooter: "vs. periodo anterior" },
+    {
+      icon: WalletIcon, title: "Pipeline Abierto", subtitle: pipeline?.description ?? "Oportunidades vigentes",
+      value: pipeline?.value ?? "$0", trend: pipeline?.trend, trendFooter: "vs. mes anterior",
+      tooltip: "Valor de las oportunidades abiertas ahora mismo — no depende del período seleccionado."
+    },
+    {
+      icon: CircleDollarSignIcon, title: "Ventas Ganadas", subtitle: "Oportunidades ganadas",
+      value: totalSales?.value ?? "$0", trend: totalSales?.trend, trendFooter: "vs. periodo anterior",
+      tooltip: "Monto de las oportunidades cerradas como venta en el período seleccionado."
+    },
+    {
+      icon: ReceiptIcon, title: "Ticket Promedio", subtitle: avgDealValue?.description ?? "",
+      value: avgDealValue?.value ?? "$0", trend: avgDealValue?.trend, trendFooter: "vs. periodo anterior",
+      tooltip: "Monto promedio por oportunidad ganada (ventas ÷ cantidad)."
+    },
+    {
+      icon: TargetIcon, title: "Tasa de Conversión", subtitle: "Ganadas vs. perdidas",
+      value: conversionRate?.value ?? "0,0%", trend: conversionRate?.trend, trendFooter: "vs. periodo anterior",
+      tooltip: conversionRate?.description ? `${conversionRate.description} en el período.` : undefined
+    },
   ]
 
   return (

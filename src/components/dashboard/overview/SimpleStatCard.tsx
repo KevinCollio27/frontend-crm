@@ -45,11 +45,11 @@ export function SimpleStatCard({ title, kpiKey, icon: Icon, goodDirection, trend
 
   return (
     <div className="flex flex-col gap-4 rounded-xl bg-white px-6 py-5 ring-1 ring-foreground/10 dark:bg-[#131313] dark:ring-0">
-      <div className="flex items-center gap-2.5">
-        <Icon className="size-8 text-muted-foreground dark:text-neutral-400" />
-        <div>
-          <p className="text-sm text-muted-foreground dark:text-neutral-400">{title}</p>
-          <p className="text-base font-semibold text-foreground dark:text-white">{loading ? "…" : (kpi?.description ?? "")}</p>
+      <div className="flex min-w-0 items-center gap-2.5">
+        <Icon className="size-8 shrink-0 text-muted-foreground dark:text-neutral-400" />
+        <div className="min-w-0">
+          <p className="truncate text-sm text-muted-foreground dark:text-neutral-400">{title}</p>
+          <p className="truncate text-base font-semibold text-foreground dark:text-white">{loading ? "…" : (kpi?.description ?? "")}</p>
         </div>
       </div>
       <div className="flex flex-col gap-1">

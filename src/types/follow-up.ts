@@ -17,3 +17,16 @@ export interface FollowUpPage {
   data: FollowUpOpportunityRaw[]
   total: number
 }
+
+export interface FollowUpKpi {
+  value: string
+  description: string
+}
+
+export interface FollowUpStats {
+  avgDaysWithoutContact: FollowUpKpi
+  atRiskOpportunities: FollowUpKpi
+  overdueTasks: FollowUpKpi
+  neverContacted: FollowUpKpi
+  riskBreakdown: { onTrack: number; atRisk: number; critical: number }
+}

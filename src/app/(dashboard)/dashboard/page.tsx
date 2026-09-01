@@ -6,7 +6,9 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { ActivityIcon, Building2Icon, FileTextIcon, LayoutDashboardIcon, TrophyIcon, UsersIcon, XCircleIcon } from "lucide-react"
 import { PageHeader } from "@/components/dashboard/PageHeader"
 import { DotMatrixStatCard } from "@/components/dashboard/overview/DotMatrixStatCard"
-// import { FollowUpTableCard } from "@/components/dashboard/overview/FollowUpTableCard" // oculto por ahora
+import { FollowUpKpis } from "@/components/dashboard/overview/FollowUpKpis"
+import { FollowUpRiskSummary } from "@/components/dashboard/overview/FollowUpRiskSummary"
+import { FollowUpTableCard } from "@/components/dashboard/overview/FollowUpTableCard"
 import { FormAnswersCard } from "@/components/dashboard/overview/FormAnswersCard"
 import { FunnelOverviewSection } from "@/components/dashboard/overview/FunnelOverviewSection"
 import { MailPreviewCard } from "@/components/dashboard/overview/MailPreviewCard"
@@ -37,28 +39,24 @@ import { SimpleStatCard } from "@/components/dashboard/overview/SimpleStatCard"
 import { TeamMembersCard } from "@/components/dashboard/overview/TeamMembersCard"
 import { WorkspaceHistoryCard } from "@/components/dashboard/overview/WorkspaceHistoryCard"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useIsPlatformAdmin } from "@/hooks/useIsPlatformAdmin"
 
-const TABS = [
+const BASE_TABS = [
   { value: "general",     label: "General"     },
   { value: "ventas",      label: "Ventas"      },
   { value: "seguimiento", label: "Seguimiento" },
-  { value: "referencias", label: "Referencias" },
 ]
-const VALID_TABS = new Set(TABS.map((t) => t.value))
-
-function ComingSoon() {
-  return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-1 py-16 text-center">
-      <p className="text-sm font-medium">Próximamente</p>
-      <p className="text-xs text-muted-foreground">Estamos trabajando en esta funcionalidad.</p>
-    </div>
-  )
-}
 
 function DashboardPageContent() {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+
+  // "Referencias" son mockups de diseño sin datos reales — no le sirven al cliente
+  // (le importa General/Ventas/Seguimiento), quedan solo para el admin de plataforma.
+  const isPlatformAdmin = useIsPlatformAdmin()
+  const TABS = isPlatformAdmin ? [...BASE_TABS, { value: "referencias", label: "Referencias" }] : BASE_TABS
+  const VALID_TABS = new Set(TABS.map((t) => t.value))
 
   // La pestaña activa vive en la URL (?tab=ventas), no en un estado interno — así un
   // F5 (o compartir el link) vuelve exactamente a donde estabas. Mismo patrón que el
@@ -105,6 +103,7 @@ function DashboardPageContent() {
                 icon={TrophyIcon}
                 goodDirection="up"
                 barHeights={[2, 3, 2, 4, 3, 5, 4, 6, 6]}
+                tooltip="Monto ganado este mes."
               />
               <DotMatrixStatCard
                 title="Oportunidades Perdidas"
@@ -169,44 +168,54 @@ function DashboardPageContent() {
               </TabsContent>
             </Tabs>
           </TabsContent>
-          <TabsContent value="seguimiento"><ComingSoon /></TabsContent>
-
-          <TabsContent value="referencias" className="flex flex-col gap-4">
-            {/* Mockups para consulta futura (diseño), no son datos reales — quedan
-                acá aparte para no mezclarse con el contenido real del Dashboard. */}
-            <p className="text-xs text-muted-foreground">
-              Referencias visuales guardadas para uso futuro — no son datos reales.
-            </p>
-            <div className="flex flex-col gap-3">
-              <ReferenceCardExample />
-              <ReferenceCardExample2 />
-              <ReferenceCardExample3 />
-              <ReferenceCardExample4 />
-              <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
-                <ReferenceCardExample5 />
-                <ReferenceCardExample6 />
-              </div>
-              <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-                <ReferenceCardExample7 />
-                <ReferenceCardExample8 />
-                <ReferenceCardExample9 />
-              </div>
-              <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-                <ReferenceCardExample10 />
-                <ReferenceCardExample11 />
-              </div>
-              <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                <ReferenceCardExample12 />
-                <ReferenceCardExample13 />
-              </div>
-              <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-                <ReferenceCardExample14 />
-                <ReferenceCardExample15 />
-                <ReferenceCardExample16 />
-              </div>
-              <ReferenceCardExample17 />
+          <TabsContent value="seguimiento" className="flex flex-col gap-4">
+            <FollowUpKpis />
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+              <FollowUpTableCard />
+              <FollowUpRiskSummary />
             </div>
           </TabsContent>
+
+          {isPlatformAdmin && (
+            <TabsContent value="referencias" className="flex flex-col gap-4">
+              {/* Mockups para consulta futura (diseño), no son datos reales — quedan
+                  acá aparte para no mezclarse con el contenido real del Dashboard.
+                  Tab visible solo para el admin de plataforma (ver useIsPlatformAdmin) —
+                  al cliente no le sirve, son referencias de diseño para uso interno. */}
+              <p className="text-xs text-muted-foreground">
+                Referencias visuales guardadas para uso futuro — no son datos reales.
+              </p>
+              <div className="flex flex-col gap-3">
+                <ReferenceCardExample />
+                <ReferenceCardExample2 />
+                <ReferenceCardExample3 />
+                <ReferenceCardExample4 />
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+                  <ReferenceCardExample5 />
+                  <ReferenceCardExample6 />
+                </div>
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+                  <ReferenceCardExample7 />
+                  <ReferenceCardExample8 />
+                  <ReferenceCardExample9 />
+                </div>
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+                  <ReferenceCardExample10 />
+                  <ReferenceCardExample11 />
+                </div>
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                  <ReferenceCardExample12 />
+                  <ReferenceCardExample13 />
+                </div>
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+                  <ReferenceCardExample14 />
+                  <ReferenceCardExample15 />
+                  <ReferenceCardExample16 />
+                </div>
+                <ReferenceCardExample17 />
+              </div>
+            </TabsContent>
+          )}
         </Tabs>
       </main>
     </>

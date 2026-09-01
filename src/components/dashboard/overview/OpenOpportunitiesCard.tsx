@@ -29,12 +29,12 @@ export function OpenOpportunitiesCard() {
 
   return (
     <div className="flex items-center justify-between gap-6 rounded-xl bg-white px-6 py-5 ring-1 ring-foreground/10 dark:bg-[#131313] dark:ring-0">
-      <div className="flex flex-col gap-4">
-        <div className="flex items-center gap-2.5">
-          <BriefcaseIcon className="size-8 text-muted-foreground dark:text-neutral-400" />
-          <div>
-            <p className="text-sm text-muted-foreground dark:text-neutral-400">Oportunidades Abiertas</p>
-            <p className="text-base font-semibold text-foreground dark:text-white">{loading ? "…" : (kpi?.description ?? "Pipeline vigente")}</p>
+      <div className="flex min-w-0 flex-col gap-4">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <BriefcaseIcon className="size-8 shrink-0 text-muted-foreground dark:text-neutral-400" />
+          <div className="min-w-0">
+            <p className="truncate text-sm text-muted-foreground dark:text-neutral-400">Oportunidades Abiertas</p>
+            <p className="truncate text-base font-semibold text-foreground dark:text-white">{loading ? "…" : (kpi?.description ?? "Pipeline vigente")}</p>
           </div>
         </div>
         <div className="flex flex-col gap-1">

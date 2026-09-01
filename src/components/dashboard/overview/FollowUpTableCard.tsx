@@ -159,6 +159,61 @@ const columns: ColumnDef<FollowUpOpportunityRaw>[] = [
 
 const SKELETON_ROWS = Array.from({ length: TAKE })
 
+// Skeleton por columna, calcado de la forma real de cada celda — igual que ContactsTable
+// (skeletonCell). Un mismo bar h-4 genérico en las 5 columnas queda más bajo que el
+// contenido real (avatar+2 líneas, estrellas, barra+texto), así que al llegar la data la
+// fila crece de golpe. Con la forma real, la altura no salta.
+const SKELETON_CELL: Record<string, React.ReactNode> = {
+  responsible: (
+    <div className="flex items-center gap-2">
+      <div className="size-8 shrink-0 animate-pulse rounded-full bg-muted" />
+      <div className="flex flex-col gap-1.5">
+        <div className="h-3.5 w-24 animate-pulse rounded bg-muted" />
+        <div className="h-3 w-16 animate-pulse rounded bg-muted" />
+      </div>
+    </div>
+  ),
+  organization: <div className="h-4 w-20 animate-pulse rounded bg-muted" />,
+  name: (
+    <div className="flex items-stretch gap-2.5">
+      <div className="w-1 shrink-0 animate-pulse rounded-full bg-muted" />
+      <div className="h-4 w-32 animate-pulse rounded bg-muted" />
+    </div>
+  ),
+  stage: (
+    <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-0.5">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="size-3.5 animate-pulse rounded-full bg-muted" />
+        ))}
+      </div>
+      <div className="h-3 w-6 animate-pulse rounded bg-muted" />
+    </div>
+  ),
+  contact: (
+    <div className="flex flex-col gap-1.5">
+      <div className="h-1.5 w-20 animate-pulse rounded-full bg-muted" />
+      <div className="h-3 w-20 animate-pulse rounded bg-muted" />
+    </div>
+  ),
+}
+
+// Placeholder invisible para rellenar filas — la última página casi nunca trae TAKE filas
+// completas (37 oportunidades / 5 por página = última con 2), y sin esto la card se
+// achica en esa página, quedando un salto de altura raro frente a las otras cards de la
+// misma fila (que sí tienen altura fija). Ocupa el mismo espacio que una fila real, invisible.
+const FILLER_ROW: FollowUpOpportunityRaw = {
+  id: -1,
+  name: "—",
+  lastActivity: new Date().toISOString(),
+  daysSinceContact: 0,
+  alert: "on_track",
+  organizationName: "—",
+  responsible: { name: "—", avatarUrl: null, role: "member" },
+  stageOrder: 1,
+  stageTotal: 1,
+}
+
 export function FollowUpTableCard() {
   const [rows, setRows] = React.useState<FollowUpOpportunityRaw[]>([])
   const [total, setTotal] = React.useState(0)
@@ -240,7 +295,7 @@ export function FollowUpTableCard() {
                   <TableRow key={i}>
                     {table.getVisibleLeafColumns().map((col) => (
                       <TableCell key={col.id} className={COLUMN_WIDTH[col.id]}>
-                        <div className="h-4 w-3/4 animate-pulse rounded bg-muted" />
+                        {SKELETON_CELL[col.id] ?? <div className="h-4 w-3/4 animate-pulse rounded bg-muted" />}
                       </TableCell>
                     ))}
                   </TableRow>
@@ -252,15 +307,35 @@ export function FollowUpTableCard() {
                   </TableCell>
                 </TableRow>
               ) : (
-                table.getRowModel().rows.map((row) => (
-                  <TableRow key={row.id}>
-                    {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id} className={COLUMN_WIDTH[cell.column.id]}>
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))
+                <>
+                  {table.getRowModel().rows.map((row) => (
+                    <TableRow key={row.id}>
+                      {row.getVisibleCells().map((cell) => (
+                        <TableCell key={cell.id} className={COLUMN_WIDTH[cell.column.id]}>
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))}
+                  {Array.from({ length: Math.max(0, TAKE - rows.length) }).map((_, i) => (
+                    <TableRow key={`filler-${i}`} className="pointer-events-none opacity-0 select-none">
+                      {table.getVisibleLeafColumns().map((col) => (
+                        <TableCell key={col.id} className={COLUMN_WIDTH[col.id]}>
+                          {col.id === "responsible" && <ResponsibleCell responsible={FILLER_ROW.responsible} />}
+                          {col.id === "organization" && <span className="text-sm">{FILLER_ROW.organizationName}</span>}
+                          {col.id === "name" && (
+                            <div className="flex items-stretch gap-2.5">
+                              <EntityAccentBar seed={0} />
+                              <span className="text-sm font-medium">{FILLER_ROW.name}</span>
+                            </div>
+                          )}
+                          {col.id === "stage" && <StageStars order={FILLER_ROW.stageOrder} total={FILLER_ROW.stageTotal} />}
+                          {col.id === "contact" && <ContactSeverityBar days={FILLER_ROW.daysSinceContact} alert={FILLER_ROW.alert} />}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))}
+                </>
               )}
             </TableBody>
           </Table>
