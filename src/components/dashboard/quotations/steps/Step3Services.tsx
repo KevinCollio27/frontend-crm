@@ -8,6 +8,7 @@ import {
   SelectContent,
   SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
@@ -34,8 +35,7 @@ import {
 } from "../shared/cargo-labels"
 import type { AdditionalItem, QuotationFormState, ServiceRow } from "../shared/form-state"
 import type { ProductLabelRaw, ProductRaw } from "@/types/product"
-
-const UNIT_OPTIONS = ["unidad", "viaje", "hora", "kg", "m³"]
+import { UNIT_GROUPS, getUnitLabel } from "../shared/units"
 
 function emptyRow(): ServiceRow {
   return { id: crypto.randomUUID(), values: {}, unitPrice: "", unit: "unidad", quantity: "1", discount: "0" }
@@ -286,14 +286,17 @@ export function Step3Services({ form, setForm, products }: Step3ServicesProps) {
                   <TableCell>
                     <Select value={row.unit} onValueChange={(v) => updateRow(row.id, { unit: v ?? "unidad" })}>
                       <SelectTrigger size="sm" className="w-24" aria-label="Unidad de medida">
-                        <SelectValue />
+                        <SelectValue>{(v: string) => getUnitLabel(v)}</SelectValue>
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectGroup>
-                          {UNIT_OPTIONS.map((u) => (
-                            <SelectItem key={u} value={u}>{u}</SelectItem>
-                          ))}
-                        </SelectGroup>
+                        {UNIT_GROUPS.map((group) => (
+                          <SelectGroup key={group.label}>
+                            <SelectLabel>{group.label}</SelectLabel>
+                            {group.options.map((u) => (
+                              <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>
+                            ))}
+                          </SelectGroup>
+                        ))}
                       </SelectContent>
                     </Select>
                   </TableCell>
@@ -378,14 +381,17 @@ export function Step3Services({ form, setForm, products }: Step3ServicesProps) {
                 />
                 <Select value={a.unit} onValueChange={(v) => updateAdditional(a.id, { unit: v ?? "unidad" })}>
                   <SelectTrigger size="sm" className="w-24" aria-label="Unidad de medida">
-                    <SelectValue />
+                    <SelectValue>{(v: string) => getUnitLabel(v)}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectGroup>
-                      {UNIT_OPTIONS.map((u) => (
-                        <SelectItem key={u} value={u}>{u}</SelectItem>
-                      ))}
-                    </SelectGroup>
+                    {UNIT_GROUPS.map((group) => (
+                      <SelectGroup key={group.label}>
+                        <SelectLabel>{group.label}</SelectLabel>
+                        {group.options.map((u) => (
+                          <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>
+                        ))}
+                      </SelectGroup>
+                    ))}
                   </SelectContent>
                 </Select>
                 <Input

@@ -1,8 +1,7 @@
 import type { QuotationRaw } from "@/types/quotation"
 import type { QuotationFormState, QuotationType, ServiceRow, AdditionalItem } from "./form-state"
 import { resolveFieldKey } from "./resolve-field-key"
-
-const UNIT_NORMALIZE: Record<string, string> = { unit: "unidad" }
+import { normalizeUnit } from "./units"
 
 export function rawToForm(q: QuotationRaw): QuotationFormState {
   // ─── Rows: agrupar quotation_fields por service_index ─────────────────────
@@ -29,7 +28,7 @@ export function rawToForm(q: QuotationRaw): QuotationFormState {
     if (field.quantity != null) byIndex[idx].quantity  = String(field.quantity)
     if (field.discount != null) byIndex[idx].discount  = String(field.discount)
     if (field.measurement_unit) {
-      byIndex[idx].unit = UNIT_NORMALIZE[field.measurement_unit] ?? field.measurement_unit
+      byIndex[idx].unit = normalizeUnit(field.measurement_unit)
     }
   }
 
@@ -46,7 +45,7 @@ export function rawToForm(q: QuotationRaw): QuotationFormState {
   const additionals: AdditionalItem[] = (q.quotation_additionals ?? []).map((a) => ({
     id:       crypto.randomUUID(),
     label:    a.service_name,
-    unit:     a.measurement_unit ? (UNIT_NORMALIZE[a.measurement_unit] ?? a.measurement_unit) : "unidad",
+    unit:     a.measurement_unit ? normalizeUnit(a.measurement_unit) : "unidad",
     quantity: a.quantity != null ? String(a.quantity) : "1",
     amount:   String(Math.round(a.rate ?? a.amount)),
   }))
