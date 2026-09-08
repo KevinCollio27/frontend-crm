@@ -24,7 +24,7 @@ export function rawToForm(q: QuotationRaw): QuotationFormState {
 
     byIndex[idx].values[resolveFieldKey(field.field_key, labels)] = field.field_value ?? ""
 
-    if (field.rate     != null) byIndex[idx].unitPrice = String(Math.round(field.rate))
+    if (field.rate     != null) byIndex[idx].unitPrice = String(field.rate)
     if (field.quantity != null) byIndex[idx].quantity  = String(field.quantity)
     if (field.discount != null) byIndex[idx].discount  = String(field.discount)
     if (field.measurement_unit) {
@@ -47,7 +47,7 @@ export function rawToForm(q: QuotationRaw): QuotationFormState {
     label:    a.service_name,
     unit:     a.measurement_unit ? normalizeUnit(a.measurement_unit) : "unidad",
     quantity: a.quantity != null ? String(a.quantity) : "1",
-    amount:   String(Math.round(a.rate ?? a.amount)),
+    amount:   String(a.rate ?? a.amount),
   }))
 
   // ─── Global discount ──────────────────────────────────────────────────────

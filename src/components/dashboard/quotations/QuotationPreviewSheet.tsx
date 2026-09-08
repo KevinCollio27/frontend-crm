@@ -174,7 +174,7 @@ function QuotationPreview({ entity, onClose, onEdit, onDownload, downloading, on
               </TableHeader>
               <TableBody>
                 {form.rows.map((row) => {
-                  const price = parseInt(row.unitPrice || "0", 10) || 0
+                  const price = parseFloat(row.unitPrice || "0") || 0
                   const qty   = parseInt(row.quantity  || "0", 10) || 0
                   const gross = price * qty
                   const pct   = form.applyDiscounts ? Math.min(100, Math.max(0, parseInt(row.discount || "0", 10) || 0)) : 0
@@ -205,7 +205,7 @@ function QuotationPreview({ entity, onClose, onEdit, onDownload, downloading, on
               <p className="text-xs font-medium tracking-wider text-muted-foreground">ADICIONALES</p>
               {form.additionals.map((a) => {
                 const qty    = parseInt(a.quantity || "0", 10) || 0
-                const amount = parseInt(a.amount   || "0", 10) || 0
+                const amount = parseFloat(a.amount   || "0") || 0
                 return (
                   <div key={a.id} className="flex items-center justify-between text-sm">
                     <span>
@@ -229,7 +229,7 @@ function QuotationPreview({ entity, onClose, onEdit, onDownload, downloading, on
               <span className="font-medium">
                 {form.globalDiscountType === "percentage"
                   ? `${form.globalDiscountValue}%`
-                  : formatMoney(parseInt(form.globalDiscountValue, 10) || 0, form.currency)}
+                  : formatMoney(parseFloat(form.globalDiscountValue) || 0, form.currency)}
               </span>
             </div>
           )}

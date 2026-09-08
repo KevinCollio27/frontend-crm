@@ -36,6 +36,7 @@ import {
   XIcon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { getCurrencyDecimals } from "./shared/currency"
 import { getSortIcon, getInitials, OVERDUE_BADGE_CLASS } from "@/lib/table-utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -204,7 +205,8 @@ const MOBILE_COLUMN_VISIBILITY: VisibilityState = {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatCurrency(amount: number, symbol: string) {
-  const n = new Intl.NumberFormat("es-CL", { maximumFractionDigits: 0 }).format(amount)
+  const decimals = getCurrencyDecimals(symbol)
+  const n = new Intl.NumberFormat("es-CL", { minimumFractionDigits: 0, maximumFractionDigits: decimals }).format(amount)
   return symbol === "CLP" ? `$${n}` : `${symbol} ${n}`
 }
 

@@ -2,7 +2,7 @@ import type { QuotationFormState, ServiceRow } from "./form-state"
 import type { ProductRaw } from "@/types/product"
 
 function rowTotal(row: ServiceRow, applyDiscounts: boolean): number {
-  const price = parseInt(row.unitPrice || "0", 10) || 0
+  const price = parseFloat(row.unitPrice || "0") || 0
   const qty   = parseInt(row.quantity  || "0", 10) || 0
   const gross = price * qty
   if (!applyDiscounts) return gross
@@ -19,7 +19,7 @@ export function buildQuotationPayload(form: QuotationFormState, product: Product
       field_value:      row.values[label.key] ?? null,
       field_type:       label.type,
       service_index:    i,
-      rate:             parseInt(row.unitPrice, 10) || 0,
+      rate:             parseFloat(row.unitPrice) || 0,
       quantity:         parseInt(row.quantity,  10) || 1,
       discount:         form.applyDiscounts ? (parseInt(row.discount, 10) || 0) : null,
       final_amount:     rowTotal(row, form.applyDiscounts),
@@ -29,20 +29,21 @@ export function buildQuotationPayload(form: QuotationFormState, product: Product
 
   const subtotal         = form.rows.reduce((s, r) => s + rowTotal(r, form.applyDiscounts), 0)
   const additionalsTotal = form.additionals.reduce((s, a) => {
-    return s + (parseInt(a.quantity, 10) || 0) * (parseInt(a.amount, 10) || 0)
+    return s + (parseInt(a.quantity, 10) || 0) * (parseFloat(a.amount) || 0)
   }, 0)
   const globalDiscountAmount = (() => {
     if (!form.applyDiscounts || !form.globalDiscountValue) return 0
-    const raw = parseInt(form.globalDiscountValue, 10) || 0
-    return form.globalDiscountType === "percentage"
-      ? subtotal * (Math.min(100, Math.max(0, raw)) / 100)
-      : raw
+    if (form.globalDiscountType === "percentage") {
+      const pct = Math.min(100, Math.max(0, parseInt(form.globalDiscountValue, 10) || 0))
+      return subtotal * (pct / 100)
+    }
+    return parseFloat(form.globalDiscountValue) || 0
   })()
   const total = subtotal - globalDiscountAmount + additionalsTotal
 
   const quotation_additionals = form.additionals.map((a) => {
     const quantity = parseInt(a.quantity, 10) || 0
-    const rate     = parseInt(a.amount, 10) || 0
+    const rate     = parseFloat(a.amount) || 0
     return {
       service_name:     a.label,
       rate,
@@ -55,7 +56,7 @@ export function buildQuotationPayload(form: QuotationFormState, product: Product
   const globalDiscountRaw = form.applyDiscounts && form.globalDiscountValue
     ? (form.globalDiscountType === "percentage"
         ? Math.min(100, parseInt(form.globalDiscountValue, 10) || 0)
-        : parseInt(form.globalDiscountValue, 10) || 0)
+        : parseFloat(form.globalDiscountValue) || 0)
     : null
 
   return {

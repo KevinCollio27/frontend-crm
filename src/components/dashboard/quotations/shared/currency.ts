@@ -22,19 +22,29 @@ export const CURRENCY_SYMBOL: Record<string, string> = {
   MXN: "$",
 }
 
+// Monedas cuyo símbolo/código no es un peso — necesitan decimales (ej. UF, cuyo valor
+// se cotiza como "1,5 UF"). El resto del sistema (CLP, USD, etc.) sigue en enteros,
+// igual que siempre. `currency` acá es el símbolo tal cual lo definió el workspace
+// (no hay un campo "code" separado en la tabla currency), por eso se compara así.
+export function getCurrencyDecimals(currency: string): number {
+  return currency?.trim().toUpperCase() === "UF" ? 2 : 0
+}
+
 // Formatea dígitos crudos con separador de miles, sin símbolo — para mostrar dentro de un input.
 export function formatNumber(raw: string, currency: string): string {
   if (!raw) return ""
-  const num = parseInt(raw, 10)
+  const num = parseFloat(raw)
   if (isNaN(num)) return ""
   const locale = CURRENCY_LOCALE[currency] ?? "es-CL"
-  return new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(num)
+  const decimals = getCurrencyDecimals(currency)
+  return new Intl.NumberFormat(locale, { minimumFractionDigits: 0, maximumFractionDigits: decimals }).format(num)
 }
 
 // Formatea un monto ya calculado con símbolo — para texto de solo lectura (Total, Resumen).
 export function formatMoney(amount: number, currency: string): string {
   const locale = CURRENCY_LOCALE[currency] ?? "es-CL"
-  const symbol = CURRENCY_SYMBOL[currency] ?? "$"
-  const n = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(Math.round(amount))
+  const symbol = CURRENCY_SYMBOL[currency] ?? currency
+  const decimals = getCurrencyDecimals(currency)
+  const n = new Intl.NumberFormat(locale, { minimumFractionDigits: 0, maximumFractionDigits: decimals }).format(amount)
   return `${symbol}${n}`
 }

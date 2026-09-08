@@ -4,6 +4,7 @@ import { generateQuotationCode } from '@/lib/quotation-utils';
 import { ResolvedTemplateBlock, ParsedBlock, TextNode } from '@/types/pdfTemplate';
 import { resolveFieldKey } from './shared/resolve-field-key';
 import { getUnitLabel } from './shared/units';
+import { getCurrencyDecimals } from './shared/currency';
 
 // Función para formatear valores de Cargo (extraer solo el nombre)
 const formatCargoValue = (value: any, labelType: string) => {
@@ -520,11 +521,13 @@ const QuotationPDF: React.FC<QuotationPDFProps> = ({ quotation, resolvedBlocks =
 
   // Formatear moneda con símbolo
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('es-CL').format(value);
+    return new Intl.NumberFormat('es-CL', { minimumFractionDigits: 0, maximumFractionDigits: getCurrencyDecimals(currencyCode) }).format(value);
   };
 
-  // Formatear moneda con código
+  // Formatear moneda con código — UF se cotiza con decimales y sin "$" (ej. "1,5 UF"),
+  // el resto de las monedas mantiene el signo peso de siempre.
   const formatCurrencyWithCode = (value: number) => {
+    if (currencyCode === 'UF') return `${formatCurrency(value)} UF`;
     return `$${formatCurrency(value)} ${currencyCode}`;
   };
 
@@ -724,7 +727,7 @@ const QuotationPDF: React.FC<QuotationPDFProps> = ({ quotation, resolvedBlocks =
               const quantity = service.quantity || 1;
               const baseAmount = rate * quantity;
               const discount = service.discount || 0;
-              const totalWithDiscount = Math.round(baseAmount - (baseAmount * discount / 100));
+              const totalWithDiscount = baseAmount - (baseAmount * discount / 100);
 
               return (
                 <View key={index} style={styles.serviceCard} wrap={false}>

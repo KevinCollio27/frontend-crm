@@ -24,7 +24,7 @@ import {
 import { Field } from "@/components/ui/field"
 import { Section } from "@/components/ui/section"
 import { SearchableSelect, type SearchableSelectOption } from "@/components/ui/searchable-select"
-import { CURRENCY_SYMBOL, formatMoney, formatNumber } from "../shared/currency"
+import { CURRENCY_SYMBOL, formatMoney, formatNumber, getCurrencyDecimals } from "../shared/currency"
 import {
   buildCargoValue,
   fetchCargoOptions,
@@ -42,12 +42,24 @@ function emptyRow(): ServiceRow {
 }
 
 function rowTotal(row: ServiceRow, applyDiscounts: boolean): number {
-  const price = parseInt(row.unitPrice || "0", 10) || 0
+  const price = parseFloat(row.unitPrice || "0") || 0
   const qty = parseInt(row.quantity || "0", 10) || 0
   const gross = price * qty
   if (!applyDiscounts) return gross
   const pct = Math.min(100, Math.max(0, parseInt(row.discount || "0", 10) || 0))
   return gross - gross * (pct / 100)
+}
+
+// Permite un punto decimal cuando la moneda lo admite (ej. UF: "1.5") — para el resto
+// (CLP, USD, etc.) se mantiene el comportamiento de siempre, solo dígitos.
+function sanitizeMoneyInput(value: string, decimals: number): string {
+  if (decimals === 0) return value.replace(/\D/g, "")
+  const cleaned = value.replace(/[^\d.]/g, "")
+  const dotIndex = cleaned.indexOf(".")
+  if (dotIndex === -1) return cleaned
+  const intPart = cleaned.slice(0, dotIndex)
+  const decPart = cleaned.slice(dotIndex + 1).replace(/\./g, "").slice(0, decimals)
+  return `${intPart}.${decPart}`
 }
 
 function emptyAdditional(): AdditionalItem {
@@ -56,7 +68,7 @@ function emptyAdditional(): AdditionalItem {
 
 function additionalTotal(a: AdditionalItem): number {
   const qty = parseInt(a.quantity || "0", 10) || 0
-  const amount = parseInt(a.amount || "0", 10) || 0
+  const amount = parseFloat(a.amount || "0") || 0
   return qty * amount
 }
 
@@ -202,14 +214,15 @@ export function Step3Services({ form, setForm, products }: Step3ServicesProps) {
     setForm((f) => ({ ...f, additionals: f.additionals.map((a) => (a.id === id ? { ...a, ...patch } : a)) }))
   }
 
-  const symbol = CURRENCY_SYMBOL[form.currency] ?? "$"
+  const symbol = CURRENCY_SYMBOL[form.currency] ?? form.currency
+  const decimals = getCurrencyDecimals(form.currency)
   const subtotal = form.rows.reduce((sum, r) => sum + rowTotal(r, form.applyDiscounts), 0)
   const additionalsTotal = form.additionals.reduce((sum, a) => sum + additionalTotal(a), 0)
   const globalDiscountAmount =
     form.applyDiscounts && form.globalDiscountValue
       ? form.globalDiscountType === "percentage"
         ? subtotal * (Math.min(100, Math.max(0, parseInt(form.globalDiscountValue, 10) || 0)) / 100)
-        : parseInt(form.globalDiscountValue, 10) || 0
+        : parseFloat(form.globalDiscountValue) || 0
       : 0
   const total = subtotal - globalDiscountAmount + additionalsTotal
 
@@ -278,8 +291,8 @@ export function Step3Services({ form, setForm, products }: Step3ServicesProps) {
                         type="text"
                         inputMode="numeric"
                         placeholder="0"
-                        value={formatNumber(row.unitPrice, form.currency)}
-                        onChange={(e) => updateRow(row.id, { unitPrice: e.target.value.replace(/\D/g, "") })}
+                        value={decimals > 0 ? row.unitPrice : formatNumber(row.unitPrice, form.currency)}
+                        onChange={(e) => updateRow(row.id, { unitPrice: sanitizeMoneyInput(e.target.value, decimals) })}
                       />
                     </InputGroup>
                   </TableCell>
@@ -410,8 +423,8 @@ export function Step3Services({ form, setForm, products }: Step3ServicesProps) {
                     type="text"
                     inputMode="numeric"
                     placeholder="0"
-                    value={formatNumber(a.amount, form.currency)}
-                    onChange={(e) => updateAdditional(a.id, { amount: e.target.value.replace(/\D/g, "") })}
+                    value={decimals > 0 ? a.amount : formatNumber(a.amount, form.currency)}
+                    onChange={(e) => updateAdditional(a.id, { amount: sanitizeMoneyInput(e.target.value, decimals) })}
                   />
                 </InputGroup>
                 <span className="w-24 shrink-0 text-right text-sm font-semibold tabular-nums text-emerald-600">
@@ -484,9 +497,9 @@ export function Step3Services({ form, setForm, products }: Step3ServicesProps) {
                       type="text"
                       inputMode="numeric"
                       placeholder="0"
-                      value={formatNumber(form.globalDiscountValue, form.currency)}
+                      value={decimals > 0 ? form.globalDiscountValue : formatNumber(form.globalDiscountValue, form.currency)}
                       onChange={(e) =>
-                        setForm((f) => ({ ...f, globalDiscountValue: e.target.value.replace(/\D/g, "") }))
+                        setForm((f) => ({ ...f, globalDiscountValue: sanitizeMoneyInput(e.target.value, decimals) }))
                       }
                     />
                   </>

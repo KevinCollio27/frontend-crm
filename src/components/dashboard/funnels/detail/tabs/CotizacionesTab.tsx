@@ -15,6 +15,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { EntityAccentBar } from "@/components/ui/entity-accent-bar"
 import { ChevronDown, CopyIcon, DownloadIcon, EyeIcon, FileSearchIcon, FileTextIcon, HistoryIcon, Loader2Icon, MailIcon, MoreHorizontalIcon, PencilIcon, PlusIcon, ShipIcon, Trash2Icon } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { getCurrencyDecimals } from "@/components/dashboard/quotations/shared/currency"
 import { getSortIcon, getInitials } from "@/lib/table-utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -159,7 +160,8 @@ const MOBILE_COLUMN_VISIBILITY: VisibilityState = {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatCurrency(amount: number, symbol: string) {
-  const n = new Intl.NumberFormat("es-CL", { maximumFractionDigits: 0 }).format(amount)
+  const decimals = getCurrencyDecimals(symbol)
+  const n = new Intl.NumberFormat("es-CL", { minimumFractionDigits: 0, maximumFractionDigits: decimals }).format(amount)
   return symbol === "CLP" ? `$${n}` : `${symbol} ${n}`
 }
 
