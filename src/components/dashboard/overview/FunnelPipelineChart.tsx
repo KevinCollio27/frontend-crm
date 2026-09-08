@@ -37,8 +37,21 @@ const PAD_LEFT = 30
 const PAD_RIGHT = 50
 const PAD_TOP = 10
 const PAD_BOTTOM = 26
-const INNER_H = CHART_H - PAD_TOP - PAD_BOTTOM
 const BAR_GAP = 16
+
+// Cuando la banda por etapa no alcanza para el nombre completo en horizontal (embudos
+// con muchas etapas, ej. 7 etapas con nombres de ~30 caracteres — validado con datos
+// reales de prod), las etiquetas rotan en vez de solaparse. Con pocas etapas (el caso
+// que ya se veía bien) nunca se activa: sigue exactamente igual que antes.
+const CHAR_W_ESTIMATE = 6.5 // ancho aprox. por caracter, en unidades del viewBox, a text-[11px]
+const LABEL_MARGIN = 10
+// El extremo lejano del texto rotado (el primer caracter, con textAnchor="end") se
+// aleja del punto de anclaje tanto a la izquierda como hacia abajo — con 18 caracteres
+// se pasaba del borde inferior del viewBox y esa parte quedaba recortada ("Levantamiento"
+// se veía como "evantamiento"). Menos caracteres + más padding inferior le dan margen real.
+const PAD_BOTTOM_ROTATED = 90
+const ROTATED_MAX_CHARS = 14
+const ROTATION_DEG = -35
 
 interface Props {
   flows: Flow[]
@@ -63,8 +76,24 @@ export function FunnelPipelineChart({ flows, flowId, onFlowIdChange, flowName, s
   const bandWidth = stages.length > 0 ? innerW / stages.length : innerW
   const barWidth = Math.max(16, bandWidth - BAR_GAP)
 
+  // ¿Entra el nombre más largo en horizontal, en la banda que le toca a cada etapa?
+  // Si no, se rota — gateado por el ancho real disponible, no por un número fijo de
+  // etapas, así se auto-ajusta sin importar cuántas etapas haya o qué tan largos sean
+  // los nombres.
+  const longestLabelLen = stages.reduce((max, s) => Math.max(max, s.stage.length), 0)
+  const useRotatedLabels = longestLabelLen * CHAR_W_ESTIMATE + LABEL_MARGIN > bandWidth
+
+  const bottomPad = useRotatedLabels ? PAD_BOTTOM_ROTATED : PAD_BOTTOM
+  const innerH = CHART_H - PAD_TOP - bottomPad
+  const labelY = CHART_H - bottomPad + (useRotatedLabels ? 10 : 20)
+
   function scaleY(v: number) {
-    return PAD_TOP + INNER_H - (v / yMax) * INNER_H
+    return PAD_TOP + innerH - (v / yMax) * innerH
+  }
+
+  function stageLabel(name: string) {
+    if (!useRotatedLabels || name.length <= ROTATED_MAX_CHARS) return name
+    return `${name.slice(0, ROTATED_MAX_CHARS - 1)}…`
   }
 
   return (
@@ -139,8 +168,15 @@ export function FunnelPipelineChart({ flows, flowId, onFlowIdChange, flowName, s
                         />
                       )
                     })}
-                    <text x={x + barWidth / 2} y={CHART_H - 6} textAnchor="middle" className="fill-muted-foreground text-[11px]">
-                      {stage.stage}
+                    <text
+                      x={x + barWidth / 2}
+                      y={labelY}
+                      textAnchor={useRotatedLabels ? "end" : "middle"}
+                      transform={useRotatedLabels ? `rotate(${ROTATION_DEG} ${x + barWidth / 2} ${labelY})` : undefined}
+                      className="fill-muted-foreground text-[11px]"
+                    >
+                      {stageLabel(stage.stage)}
+                      {useRotatedLabels && stage.stage.length > ROTATED_MAX_CHARS && <title>{stage.stage}</title>}
                     </text>
                   </g>
                 )
