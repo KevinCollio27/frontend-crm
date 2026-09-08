@@ -8,16 +8,12 @@ const STATS_TTL_MS = 30 * 1000
 type StatsParams = { flowId?: number; datePreset?: string } | undefined
 
 const opportunitiesStatsCache = createParamCache<StatsParams, SalesOpportunitiesStats>(async (params) => {
-  const t0 = performance.now()
   const res = await api.get<never, { stats: SalesOpportunitiesStats }>("sales-stats/opportunities", { params })
-  console.log(`[sales] getOpportunitiesStats(${JSON.stringify(params ?? {})}) → ${(performance.now() - t0).toFixed(1)}ms`)
   return res.stats
 }, STATS_TTL_MS)
 
 const quotationsStatsCache = createParamCache<StatsParams, SalesQuotationsStats>(async (params) => {
-  const t0 = performance.now()
   const res = await api.get<never, { stats: SalesQuotationsStats }>("sales-stats/quotations", { params })
-  console.log(`[sales] getQuotationsStats(${JSON.stringify(params ?? {})}) → ${(performance.now() - t0).toFixed(1)}ms`)
   return res.stats
 }, STATS_TTL_MS)
 

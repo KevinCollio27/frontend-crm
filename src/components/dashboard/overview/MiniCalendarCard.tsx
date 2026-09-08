@@ -202,9 +202,9 @@ export function MiniCalendarCard() {
   }
 
   return (
-    <Card>
-      <CardContent className="flex flex-col gap-3">
-        <div className="flex items-center justify-between gap-2">
+    <Card className="h-92">
+      <CardContent className="flex h-full flex-col gap-3 overflow-hidden">
+        <div className="flex shrink-0 items-center justify-between gap-2">
           <div className="flex items-center gap-2.5">
             <CalendarDaysIcon className="size-8 shrink-0 text-muted-foreground" />
             <div>
@@ -235,7 +235,7 @@ export function MiniCalendarCard() {
           </div>
         </div>
 
-        <div className="grid grid-cols-7 gap-y-1.5">
+        <div className="grid flex-1 auto-rows-fr grid-cols-7 content-center gap-y-1.5 overflow-y-auto">
           {WEEKDAYS.map((d) => (
             <div key={d} className="text-center text-[10px] font-medium text-muted-foreground">{d}</div>
           ))}

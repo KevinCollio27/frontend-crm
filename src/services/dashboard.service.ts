@@ -10,9 +10,7 @@ const STATS_TTL_MS = 30 * 1000
 type StatsParams = { flowId?: number; datePreset?: string } | undefined
 
 const statsCache = createParamCache<StatsParams, DashboardStatsRaw>(async (params) => {
-  const t0 = performance.now()
   const res = await api.get<never, { stats: DashboardStatsRaw }>("dashboard-stats/stats", { params })
-  console.log(`[dashboard] getStats(${JSON.stringify(params ?? {})}) → ${(performance.now() - t0).toFixed(1)}ms`)
   return res.stats
 }, STATS_TTL_MS)
 

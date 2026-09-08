@@ -7,16 +7,12 @@ import { createParamCache } from "@/lib/param-cache"
 const STATS_TTL_MS = 30 * 1000
 
 const statsCache = createParamCache<{ flowId?: number } | undefined, FollowUpStats>(async (params) => {
-  const t0 = performance.now()
   const res = await api.get<never, { stats: FollowUpStats }>("follow-up-stats/stats", { params })
-  console.log(`[follow-up] getStats(${JSON.stringify(params ?? {})}) → ${(performance.now() - t0).toFixed(1)}ms`)
   return res.stats
 }, STATS_TTL_MS)
 
 const daysWithoutContactCache = createParamCache<{ page?: number; take?: number; flowId?: number } | undefined, FollowUpPage>(async (params) => {
-  const t0 = performance.now()
   const res = await api.get<never, { opportunities: FollowUpPage }>("follow-up-stats/days-without-contact", { params })
-  console.log(`[follow-up] daysWithoutContact(${JSON.stringify(params ?? {})}) → ${(performance.now() - t0).toFixed(1)}ms`)
   return res.opportunities
 }, STATS_TTL_MS)
 
