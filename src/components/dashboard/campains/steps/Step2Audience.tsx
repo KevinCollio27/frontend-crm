@@ -1,13 +1,21 @@
 "use client"
 
 import * as React from "react"
-import { CheckCheckIcon, ListIcon, Loader2Icon, PlusIcon, SearchIcon, Trash2Icon, UsersIcon } from "lucide-react"
+import { CheckCheckIcon, ChevronDownIcon, ListIcon, Loader2Icon, PlusCircleIcon, PlusIcon, SearchIcon, Trash2Icon, UsersIcon } from "lucide-react"
 import { notify } from "@/lib/notify"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { OrgAsyncSelect } from "@/components/shared/OrgAsyncSelect"
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {
   Table,
   TableBody,
@@ -19,12 +27,26 @@ import {
 import { getInitials } from "@/lib/table-utils"
 import { cn } from "@/lib/utils"
 import { Section } from "@/components/ui/section"
-import { contactService } from "@/services/contact.service"
+import { contactService, type CountryCount } from "@/services/contact.service"
 import type { Person } from "@/types/contact"
 import type { AudienceMode, CampaignFormState, CrmFilter, CustomRecipient } from "../shared/form-state"
 
 const PAGE_SIZE = 10
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+const COUNTRY_LABELS: Record<string, string> = {
+  CL: "Chile",
+  AR: "Argentina",
+  CO: "Colombia",
+  MX: "México",
+  PE: "Perú",
+  BR: "Brasil",
+  UY: "Uruguay",
+  EC: "Ecuador",
+  VE: "Venezuela",
+  BO: "Bolivia",
+  PY: "Paraguay",
+}
 
 function isValidEmail(value: string) {
   return EMAIL_RE.test(value.trim())
@@ -55,12 +77,21 @@ export function Step2Audience({ form, setForm }: Step2AudienceProps) {
   const [selectingAll, setSelectingAll] = React.useState(false)
   const [search, setSearch] = React.useState("")
   const [debouncedSearch, setDebouncedSearch] = React.useState("")
+  const [countryCounts, setCountryCounts] = React.useState<CountryCount[]>([])
+  const [blockNumber, setBlockNumber] = React.useState(1)
+  const [blockSize, setBlockSize] = React.useState(3000)
+  const [selectingBlock, setSelectingBlock] = React.useState(false)
 
   // Debounce search
   React.useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 400)
     return () => clearTimeout(t)
   }, [search])
+
+  // Conteos por país para el filtro — se piden una sola vez
+  React.useEffect(() => {
+    contactService.countryCounts().then(setCountryCounts).catch(() => {})
+  }, [])
 
   function buildListParams(pageNum: number, take: number): Parameters<typeof contactService.list>[0] {
     const params: Parameters<typeof contactService.list>[0] = {
@@ -75,7 +106,19 @@ export function Step2Audience({ form, setForm }: Step2AudienceProps) {
     if (form.crmFilter === "organization" && form.crmFilterOrganizationId) {
       params.organization_id = form.crmFilterOrganizationId
     }
+    if (form.crmFilterCountries.length > 0) {
+      params.country = form.crmFilterCountries
+    }
     return params
+  }
+
+  function toggleCountry(code: string) {
+    setForm((f) => {
+      const set = new Set(f.crmFilterCountries)
+      if (set.has(code)) set.delete(code)
+      else set.add(code)
+      return { ...f, crmFilterCountries: Array.from(set) }
+    })
   }
 
   // Load contacts page 1 whenever filter/search changes
@@ -96,7 +139,31 @@ export function Step2Audience({ form, setForm }: Step2AudienceProps) {
 
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.audienceMode, form.crmFilter, form.crmFilterOrganizationId, debouncedSearch])
+  }, [form.audienceMode, form.crmFilter, form.crmFilterOrganizationId, form.crmFilterCountries, debouncedSearch])
+
+  // Selección por bloques — para audiencias grandes que exceden el límite por campaña
+  // (ej: 16.000 contactos de Chile hay que mandarlos en tandas de a 3.000 en días distintos).
+  // Bloque 1 = los primeros `blockSize` que matchean el filtro actual, Bloque 2 = los siguientes, etc.
+  async function selectBlock() {
+    if (blockNumber < 1 || blockSize < 1) return
+    setSelectingBlock(true)
+    try {
+      const res = await contactService.list(buildListParams(blockNumber, blockSize))
+      if (res.data.length === 0) {
+        notify.error({ title: "Bloque vacío", description: "No hay contactos en ese rango con el filtro actual." })
+        return
+      }
+      setForm((f) => ({ ...f, selectedContactIds: res.data.map((c) => c.id) }))
+      notify.success({
+        title: `${res.data.length} contactos seleccionados`,
+        description: `Bloque ${blockNumber} de ${blockSize} — reemplazó la selección anterior.`,
+      })
+    } catch {
+      notify.error({ title: "No se pudo seleccionar el bloque", description: "Intenta de nuevo." })
+    } finally {
+      setSelectingBlock(false)
+    }
+  }
 
   function handleLoadMore() {
     const nextPage = page + 1
@@ -275,6 +342,73 @@ export function Step2Audience({ form, setForm }: Step2AudienceProps) {
                 />
               </div>
             )}
+
+            <DropdownMenu>
+              <DropdownMenuTrigger render={<Button type="button" variant="outline" size="sm" className="border-dashed" />}>
+                <PlusCircleIcon className="size-3.5" />
+                País
+                {form.crmFilterCountries.length > 0 && (
+                  <Badge variant="secondary" className="ml-1 px-1.5 py-0 text-xs">
+                    {form.crmFilterCountries.length}
+                  </Badge>
+                )}
+                <ChevronDownIcon className="size-3.5 text-muted-foreground" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="min-w-44">
+                {countryCounts.map((c) => (
+                  <DropdownMenuCheckboxItem
+                    key={c.code}
+                    checked={form.crmFilterCountries.includes(c.code)}
+                    onCheckedChange={() => toggleCountry(c.code)}
+                  >
+                    <span>{COUNTRY_LABELS[c.code] ?? c.code}</span>
+                    <span className="ml-auto tabular-nums text-xs text-muted-foreground">{c.count}</span>
+                  </DropdownMenuCheckboxItem>
+                ))}
+                {form.crmFilterCountries.length > 0 && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <button
+                      type="button"
+                      className="w-full px-2 py-1.5 text-center text-xs text-muted-foreground transition-colors hover:text-foreground"
+                      onClick={() => setForm((f) => ({ ...f, crmFilterCountries: [] }))}
+                    >
+                      Limpiar filtro
+                    </button>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-dashed p-2.5">
+            <span className="text-xs text-muted-foreground">
+              Audiencias grandes: selecciona en tandas para respetar los límites de envío.
+            </span>
+            <div className="ml-auto flex items-center gap-1.5">
+              <span className="text-xs text-muted-foreground">Bloque</span>
+              <Input
+                type="number"
+                min={1}
+                className="h-8 w-16"
+                value={blockNumber}
+                onChange={(e) => setBlockNumber(Math.max(1, Number(e.target.value) || 1))}
+              />
+              <span className="text-xs text-muted-foreground">de tamaño</span>
+              <Input
+                type="number"
+                min={1}
+                className="h-8 w-24"
+                value={blockSize}
+                onChange={(e) => setBlockSize(Math.max(1, Number(e.target.value) || 1))}
+              />
+              <Button type="button" variant="outline" size="sm" onClick={selectBlock} disabled={selectingBlock}>
+                {selectingBlock
+                  ? <><Loader2Icon className="size-3.5 animate-spin" /> Seleccionando...</>
+                  : "Seleccionar bloque"
+                }
+              </Button>
+            </div>
           </div>
 
           <div className="overflow-x-auto rounded-md border">

@@ -20,6 +20,7 @@ export interface CampaignFormState {
   crmFilter: CrmFilter
   crmFilterOrganization: string
   crmFilterOrganizationId: number | null
+  crmFilterCountries: string[]
   selectedContactIds: number[]
   customRecipients: CustomRecipient[]
   contentMode: ContentMode
@@ -40,6 +41,7 @@ export function createEmptyCampaignForm(): CampaignFormState {
     crmFilter: "all",
     crmFilterOrganization: "",
     crmFilterOrganizationId: null,
+    crmFilterCountries: [],
     selectedContactIds: [],
     customRecipients: [],
     contentMode: "blocks",
