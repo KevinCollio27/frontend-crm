@@ -11,6 +11,7 @@ interface AddressAutocompleteProps {
   onChange: (value: string) => void
   placeholder?: string
   className?: string
+  disabled?: boolean
 }
 
 export function AddressAutocomplete({
@@ -18,6 +19,7 @@ export function AddressAutocomplete({
   onChange,
   placeholder = "Ingresa una dirección",
   className,
+  disabled,
 }: AddressAutocompleteProps) {
   const [suggestions, setSuggestions] = React.useState<google.maps.places.AutocompleteSuggestion[]>([])
   const [open, setOpen] = React.useState(false)
@@ -114,6 +116,7 @@ export function AddressAutocomplete({
           onChange={(e) => handleInputChange(e.target.value)}
           onFocus={handleFocus}
           autoComplete="off"
+          disabled={disabled}
         />
       </InputGroup>
 

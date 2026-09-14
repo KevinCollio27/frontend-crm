@@ -95,6 +95,16 @@ export function getQuotationPdfBlob(id: number): Promise<Blob> {
 }
 
 /**
+ * Datos crudos de la cotización (con opportunity.person.person_detail incluido) — usado
+ * por el sheet de "Enviar correo" para prellenar el "Para" con el contacto de la
+ * oportunidad. Comparte caché con PDF/descarga: si el dropdown de acciones ya la
+ * precargó (warmPdfCache), esto no dispara una segunda llamada.
+ */
+export function getQuotationRaw(id: number): Promise<any> {
+  return getQuotationPromise(id)
+}
+
+/**
  * Call when the default template of an opportunity changes — afecta a todas las
  * cotizaciones de esa oportunidad que no tengan su propio override, no solo a una.
  */

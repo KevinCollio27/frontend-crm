@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react"
 import { Controller, useForm } from "react-hook-form"
 import { z } from "zod"
 
+import { AddressAutocomplete } from "@/components/ui/address-autocomplete"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -585,11 +586,16 @@ export function WorkspaceForm() {
 
             <div className="space-y-1.5">
               <Label htmlFor="fiscalAddress">Dirección Fiscal</Label>
-              <Textarea
-                id="fiscalAddress"
-                rows={3}
-                disabled={!editingLegal}
-                {...legalForm.register("fiscalAddress")}
+              <Controller
+                control={legalForm.control}
+                name="fiscalAddress"
+                render={({ field }) => (
+                  <AddressAutocomplete
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                    disabled={!editingLegal}
+                  />
+                )}
               />
             </div>
           </CardContent>

@@ -19,8 +19,19 @@ import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/
 import { getInitials } from "@/lib/table-utils"
 import { contactService } from "@/services/contact.service"
 import { quotationService } from "@/services/quotation.service"
-import { generatePdfBase64 } from "@/components/dashboard/quotations/shared/download-pdf"
+import { generatePdfBase64, getQuotationRaw } from "@/components/dashboard/quotations/shared/download-pdf"
 import { notify } from "@/lib/notify"
+
+// getQuotationRaw (getQuotationByIdForPDF en el backend) trae person_detail sin la
+// relación label incluida (a diferencia de contactService, que sí la trae) — así que
+// acá no se puede filtrar por label.key. Mismo criterio que ya usa QuotationPDF.tsx
+// para el mismo dato: detectar el email por formato del valor, no por su etiqueta.
+function extractPersonEmail(person: any): { name: string; email: string } | null {
+  const detail = person?.person_detail?.find(
+    (d: any) => typeof d.value === "string" && d.value.includes("@"),
+  )
+  return detail ? { name: person.name, email: detail.value } : null
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -109,8 +120,16 @@ function EmailChipInput({
 
   React.useEffect(() => {
     function handler(e: MouseEvent) {
-      const target = e.target as Node
-      if (!containerRef.current?.contains(target) && !dropRef.current?.contains(target)) {
+      // composedPath() (no e.target) porque seleccionar un contacto dispara un
+      // re-render sincrónico (chips cambia → la búsqueda se reinicia → searching=true
+      // reemplaza el botón clickeado por el spinner) ANTES de que este listener nativo
+      // termine de procesar el mismo mousedown — para cuando llega acá, e.target ya no
+      // está en el DOM y el .contains() de siempre daba "afuera" con el click de adentro.
+      // composedPath() congela la ruta real del click al momento del evento, sin ese problema.
+      const path = e.composedPath()
+      const insideContainer = !!containerRef.current && path.includes(containerRef.current)
+      const insideDrop = !!dropRef.current && path.includes(dropRef.current)
+      if (!insideContainer && !insideDrop) {
         setFocused(false)
       }
     }
@@ -124,6 +143,15 @@ function EmailChipInput({
       setDropStyle({ top: r.bottom + 4, left: r.left, width: r.width })
     }
   }
+
+  // Agregar un chip cambia el alto/ancho real del contenedor (el pill ocupa espacio, a
+  // veces fuerza el input a otra línea) — sin esto, el dropdown quedaba con la posición
+  // vieja (calculada antes del chip) y aunque los resultados de la siguiente búsqueda
+  // sí llegaban, se veían en el lugar equivocado — el buscador parecía "trabado" hasta
+  // hacer click afuera y adentro de nuevo (eso sí forzaba onFocus → updateDrop()).
+  React.useLayoutEffect(() => {
+    if (focused) updateDrop()
+  }, [chips.length, focused])
 
   function addContact(c: ContactResult) {
     onChange([...chips, { id: c.id, name: c.name, email: c.email }])
@@ -273,20 +301,37 @@ export function SendQuotationSheet({
   const fileInputRef                = React.useRef<HTMLInputElement>(null)
 
   React.useEffect(() => {
-    if (open) {
-      const initial: EmailChip[] = contactEmail
-        ? [{ name: contactName ?? contactEmail, email: contactEmail }]
-        : []
-      setTo(initial)
-      setCc([])
-      setBcc([])
-      setShowCc(false)
-      setShowBcc(false)
-      setIncludePdf(true)
-      setFiles([])
-      setSending(false)
+    if (!open) return
+
+    const initial: EmailChip[] = contactEmail
+      ? [{ name: contactName ?? contactEmail, email: contactEmail }]
+      : []
+    setTo(initial)
+    setCc([])
+    setBcc([])
+    setShowCc(false)
+    setShowBcc(false)
+    setIncludePdf(true)
+    setFiles([])
+    setSending(false)
+
+    // Si no vino explícito por prop, se busca el contacto de la oportunidad de esta
+    // cotización (mismo criterio que "correo" en el detalle de una Oportunidad) — solo
+    // si tiene uno cargado; si no, el campo queda vacío y el usuario ingresa uno a mano.
+    // Comparte caché con el PDF (warmPdfCache ya la precarga al abrir el menú de
+    // acciones), así que normalmente no dispara una llamada extra.
+    if (!contactEmail) {
+      let cancelled = false
+      getQuotationRaw(quotationId)
+        .then((raw) => {
+          if (cancelled) return
+          const contact = extractPersonEmail(raw?.opportunity?.person)
+          if (contact) setTo((prev) => (prev.length === 0 ? [contact] : prev))
+        })
+        .catch(() => {})
+      return () => { cancelled = true }
     }
-  }, [open])
+  }, [open, quotationId, contactEmail, contactName])
 
   async function searchContacts(query: string, exclude: string[]): Promise<ContactResult[]> {
     const res = await contactService.list({ filter: query || undefined, take: 20 })
