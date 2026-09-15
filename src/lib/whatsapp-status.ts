@@ -7,10 +7,13 @@ import type { MetaConfigRaw } from "@/types/whatsapp"
 
 const BLOCKING_STATUSES = new Set(["DISCONNECTED", "MIGRATED", "BANNED", "RESTRICTED"])
 
+// code_verification_status queda "no verificado" indefinidamente en varios números
+// conectados por Embedded Signup o migrados desde otro flujo, aunque envíen y reciban
+// mensajes sin problema (falso negativo conocido de la Cloud API) — por eso no cuenta
+// como bloqueo duro acá, solo como advertencia informativa (ver reasons en el sheet).
 export function hasWhatsAppBlockingIssue(config: MetaConfigRaw): boolean {
   const status = (config.status || "").toUpperCase()
-  const verification = (config.code_verification_status || "").toUpperCase()
-  return (status !== "" && BLOCKING_STATUSES.has(status)) || (verification !== "" && verification !== "VERIFIED")
+  return status !== "" && BLOCKING_STATUSES.has(status)
 }
 
 export function isWhatsAppOperational(config: MetaConfigRaw | null): boolean {
