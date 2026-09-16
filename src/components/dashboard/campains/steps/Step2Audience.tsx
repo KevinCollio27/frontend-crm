@@ -81,6 +81,11 @@ export function Step2Audience({ form, setForm }: Step2AudienceProps) {
   const [blockNumber, setBlockNumber] = React.useState(1)
   const [blockSize, setBlockSize] = React.useState(3000)
   const [selectingBlock, setSelectingBlock] = React.useState(false)
+  // Lista personalizada puede traer cientos/miles de destinatarios precargados (ej:
+  // seguimiento desde una campaña) — cada fila es un <Input> editable, así que
+  // pintarlas todas de una satura el DOM igual que pasaba en Seguimiento.
+  const CUSTOM_PAGE_SIZE = 20
+  const [customVisibleCount, setCustomVisibleCount] = React.useState(CUSTOM_PAGE_SIZE)
 
   // Debounce search
   React.useEffect(() => {
@@ -228,6 +233,7 @@ export function Step2Audience({ form, setForm }: Step2AudienceProps) {
 
   function addRecipient() {
     setForm((f) => ({ ...f, customRecipients: [...f.customRecipients, emptyRecipient()] }))
+    setCustomVisibleCount((v) => v + 1)
   }
   function removeRecipient(id: string) {
     setForm((f) => ({ ...f, customRecipients: f.customRecipients.filter((r) => r.id !== id) }))
@@ -505,7 +511,10 @@ export function Step2Audience({ form, setForm }: Step2AudienceProps) {
       )}
 
       {form.audienceMode === "custom" && (
-        <Section title="Lista personalizada" description="Agrega destinatarios que no están en tu CRM.">
+        <Section
+          title={`Lista personalizada (${form.customRecipients.length})`}
+          description="Agrega destinatarios que no están en tu CRM."
+        >
           {form.customRecipients.length > 0 && (
             <div className="flex items-center gap-2 px-0.5 text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
               <span className="flex-1">Nombre (opcional)</span>
@@ -513,7 +522,7 @@ export function Step2Audience({ form, setForm }: Step2AudienceProps) {
               <span className="w-7" />
             </div>
           )}
-          {form.customRecipients.map((r) => {
+          {form.customRecipients.slice(0, customVisibleCount).map((r) => {
             const emailInvalid = r.email.trim().length > 0 && !isValidEmail(r.email)
             return (
               <div key={r.id} className="flex items-start gap-2">
@@ -547,6 +556,18 @@ export function Step2Audience({ form, setForm }: Step2AudienceProps) {
               </div>
             )
           })}
+          {customVisibleCount < form.customRecipients.length && (
+            <div className="flex justify-center py-1">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setCustomVisibleCount((v) => v + CUSTOM_PAGE_SIZE)}
+              >
+                Cargar más ({form.customRecipients.length - customVisibleCount} restantes)
+              </Button>
+            </div>
+          )}
           <Button type="button" variant="outline" size="sm" onClick={addRecipient}>
             <PlusIcon className="size-3.5" /> Agregar destinatario
           </Button>
