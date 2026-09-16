@@ -4,6 +4,7 @@ import * as React from "react"
 import { CheckIcon, MailIcon, MousePointerClickIcon, RefreshCwIcon, XIcon } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
 import { getInitials } from "@/lib/table-utils"
@@ -12,7 +13,11 @@ import type { CampaignRaw } from "@/types/campaign"
 import { CAMPAIGN_STATUS_CONFIG } from "./shared/status"
 
 type PreviewTab = "general" | "metricas" | "seguimiento"
-type SeguimientoFilter = "todos" | "abrieron" | "click" | "no_abrieron"
+type SeguimientoFilter = "todos" | "entregados" | "abrieron" | "click" | "no_abrieron"
+
+// Segmentos desde los que tiene sentido armar un seguimiento — "No abrieron" queda
+// afuera porque el pixel de apertura no es confiable (Apple MPP, bloqueo de imágenes).
+const FOLLOWUP_FILTERS = new Set<SeguimientoFilter>(["entregados", "abrieron", "click"])
 
 const audienceLabel: Record<string, string> = {
   all:          "General (todos los contactos)",
@@ -47,14 +52,15 @@ interface CampaignPreviewSheetProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onResend: (campaign: CampaignRaw) => void
+  onCreateFollowUp: (recipients: { name: string; email: string }[], originalCampaignName: string) => void
 }
 
-export function CampaignPreviewSheet({ campaignId, open, onOpenChange, onResend }: CampaignPreviewSheetProps) {
+export function CampaignPreviewSheet({ campaignId, open, onOpenChange, onResend, onCreateFollowUp }: CampaignPreviewSheetProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" showCloseButton={false} style={{ maxWidth: 500, padding: 0, gap: 0 }} className="w-full!">
         {open && campaignId != null && (
-          <CampaignPreviewBody campaignId={campaignId} onClose={() => onOpenChange(false)} onResend={onResend} />
+          <CampaignPreviewBody campaignId={campaignId} onClose={() => onOpenChange(false)} onResend={onResend} onCreateFollowUp={onCreateFollowUp} />
         )}
       </SheetContent>
     </Sheet>
@@ -63,10 +69,11 @@ export function CampaignPreviewSheet({ campaignId, open, onOpenChange, onResend 
 
 // ─── Body ─────────────────────────────────────────────────────────────────────
 
-function CampaignPreviewBody({ campaignId, onClose, onResend }: {
+function CampaignPreviewBody({ campaignId, onClose, onResend, onCreateFollowUp }: {
   campaignId: number
   onClose: () => void
   onResend: (c: CampaignRaw) => void
+  onCreateFollowUp: (recipients: { name: string; email: string }[], originalCampaignName: string) => void
 }) {
   const [campaign, setCampaign] = React.useState<CampaignRaw | null>(null)
   const [loading, setLoading] = React.useState(true)
@@ -96,7 +103,13 @@ function CampaignPreviewBody({ campaignId, onClose, onResend }: {
       <div className="flex-1 overflow-y-auto">
         {tab === "general"    && <GeneralTab campaign={campaign} />}
         {tab === "metricas"   && <MetricasTab campaign={campaign} />}
-        {tab === "seguimiento"&& <SeguimientoTab campaignId={campaignId} />}
+        {tab === "seguimiento"&& (
+          <SeguimientoTab
+            campaignId={campaignId}
+            campaignName={campaign.name}
+            onCreateFollowUp={onCreateFollowUp}
+          />
+        )}
       </div>
 
       <div className="flex items-center justify-between border-t px-5 py-3.5">
@@ -291,29 +304,64 @@ function MetricasTab({ campaign }: { campaign: CampaignRaw }) {
 
 const filterLabels: { id: SeguimientoFilter; label: string }[] = [
   { id: "todos",        label: "Todos"         },
+  { id: "entregados",   label: "Entregados"    },
   { id: "abrieron",     label: "Abrieron"      },
   { id: "click",        label: "Hicieron click" },
   { id: "no_abrieron",  label: "No abrieron"   },
 ]
 
-function SeguimientoTab({ campaignId }: { campaignId: number }) {
+function SeguimientoTab({ campaignId, campaignName, onCreateFollowUp }: {
+  campaignId: number
+  campaignName: string
+  onCreateFollowUp: (recipients: { name: string; email: string }[], originalCampaignName: string) => void
+}) {
   const [contacts, setContacts] = React.useState<CampaignContactEvent[]>([])
   const [loading, setLoading] = React.useState(true)
   const [filter, setFilter] = React.useState<SeguimientoFilter>("todos")
+  const [selected, setSelected] = React.useState<Set<string>>(new Set())
 
   React.useEffect(() => {
     setLoading(true)
     campaignService.getEvents(campaignId).then(setContacts).finally(() => setLoading(false))
   }, [campaignId])
 
+  function changeFilter(f: SeguimientoFilter) {
+    setFilter(f)
+    setSelected(new Set())
+  }
+
   const filtered = React.useMemo(() => {
     switch (filter) {
+      case "entregados":  return contacts.filter((c) => c.events.includes("delivered"))
       case "abrieron":    return contacts.filter((c) => c.events.includes("open"))
       case "click":       return contacts.filter((c) => c.events.includes("click"))
       case "no_abrieron": return contacts.filter((c) => c.events.includes("delivered") && !c.events.includes("open"))
       default:            return contacts
     }
   }, [contacts, filter])
+
+  const canFollowUp = FOLLOWUP_FILTERS.has(filter)
+  const allVisibleSelected = filtered.length > 0 && filtered.every((c) => selected.has(c.email))
+
+  function toggleOne(email: string) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(email)) next.delete(email)
+      else next.add(email)
+      return next
+    })
+  }
+
+  function toggleAllVisible() {
+    setSelected(allVisibleSelected ? new Set() : new Set(filtered.map((c) => c.email)))
+  }
+
+  function handleCreateFollowUp() {
+    const recipients = filtered
+      .filter((c) => selected.has(c.email))
+      .map((c) => ({ name: c.name ?? "", email: c.email }))
+    onCreateFollowUp(recipients, campaignName)
+  }
 
   if (loading) return (
     <div className="p-5 space-y-3">
@@ -337,7 +385,7 @@ function SeguimientoTab({ campaignId }: { campaignId: number }) {
           <button
             key={f.id}
             type="button"
-            onClick={() => setFilter(f.id)}
+            onClick={() => changeFilter(f.id)}
             className={cn(
               "shrink-0 rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
               filter === f.id
@@ -352,6 +400,33 @@ function SeguimientoTab({ campaignId }: { campaignId: number }) {
           {filtered.length}
         </span>
       </div>
+
+      {/* Selección + acción de seguimiento */}
+      {canFollowUp && filtered.length > 0 && (
+        <div className="flex items-center gap-2 border-b bg-muted/30 px-5 py-2.5">
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Checkbox
+              aria-label="Seleccionar todos los visibles"
+              checked={allVisibleSelected}
+              onCheckedChange={toggleAllVisible}
+            />
+            Seleccionar todos los visibles ({filtered.length})
+          </label>
+          <div className="ml-auto flex items-center gap-2">
+            {selected.size > 0 && (
+              <span className="text-xs text-muted-foreground tabular-nums">{selected.size} seleccionados</span>
+            )}
+            <Button
+              type="button"
+              size="sm"
+              disabled={selected.size === 0}
+              onClick={handleCreateFollowUp}
+            >
+              <MailIcon className="size-3.5" /> Crear campaña de seguimiento
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Lista */}
       {filtered.length === 0 ? (
@@ -370,13 +445,22 @@ function SeguimientoTab({ campaignId }: { campaignId: number }) {
         <div className="divide-y">
           {filtered.map((c) => (
             <div key={c.email} className="flex items-start gap-3 px-5 py-3">
+              {canFollowUp && (
+                <Checkbox
+                  aria-label={`Seleccionar a ${c.email}`}
+                  className="mt-1.5 shrink-0"
+                  checked={selected.has(c.email)}
+                  onCheckedChange={() => toggleOne(c.email)}
+                />
+              )}
               <img
                 src="https://github.com/shadcn.png"
                 alt={c.email}
                 className="size-8 shrink-0 rounded-full object-cover"
               />
               <div className="flex-1 min-w-0">
-                <p className="truncate text-sm font-medium">{c.email}</p>
+                <p className="truncate text-sm font-medium">{c.name || c.email}</p>
+                {c.name && <p className="truncate text-xs text-muted-foreground">{c.email}</p>}
                 <p className="text-xs text-muted-foreground">
                   {new Date(c.last_at).toLocaleDateString("es-CL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
                 </p>

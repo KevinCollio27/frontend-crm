@@ -436,6 +436,19 @@ function audienceFilterToForm(c: CampaignRaw): Partial<CampaignFormState> {
   }
 }
 
+// Seguimiento a un segmento (abrieron/clic/entregados) de una campaña ya enviada —
+// arranca en blanco (nombre + audiencia precargados), el contenido es nuevo a propósito.
+function followUpAudienceForm(
+  recipients: { name: string; email: string }[],
+  originalCampaignName: string
+): Partial<CampaignFormState> {
+  return {
+    name: `Seguimiento — ${originalCampaignName}`,
+    audienceMode: "custom",
+    customRecipients: recipients.map((r, i) => ({ id: `followup-${i}`, name: r.name, email: r.email })),
+  }
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 type Channel = "email" | "whatsapp"
@@ -471,6 +484,12 @@ export function CampaignsTable() {
   const handleResend = React.useCallback(async (id: number) => {
     const campaign = await campaignService.getById(id)
     setResendForm(audienceFilterToForm(campaign))
+    setCreateOpen(true)
+  }, [])
+
+  const handleCreateFollowUp = React.useCallback((recipients: { name: string; email: string }[], originalCampaignName: string) => {
+    setPreviewOpen(false)
+    setResendForm(followUpAudienceForm(recipients, originalCampaignName))
     setCreateOpen(true)
   }, [])
 
@@ -717,6 +736,7 @@ export function CampaignsTable() {
           setResendForm(audienceFilterToForm(c))
           setCreateOpen(true)
         }}
+        onCreateFollowUp={handleCreateFollowUp}
       />
 
       {/* Table */}

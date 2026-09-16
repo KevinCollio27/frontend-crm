@@ -4,6 +4,7 @@ import type { CampaignPage, CampaignRaw } from "@/types/campaign"
 export interface CampaignContactEvent {
   email: string
   person_id: number | null
+  name: string | null
   events: string[]
   last_at: string
 }
