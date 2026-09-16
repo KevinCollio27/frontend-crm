@@ -15,9 +15,10 @@ import { CAMPAIGN_STATUS_CONFIG } from "./shared/status"
 type PreviewTab = "general" | "metricas" | "seguimiento"
 type SeguimientoFilter = "todos" | "entregados" | "abrieron" | "click" | "no_abrieron"
 
-// Segmentos desde los que tiene sentido armar un seguimiento — "No abrieron" queda
-// afuera porque el pixel de apertura no es confiable (Apple MPP, bloqueo de imágenes).
-const FOLLOWUP_FILTERS = new Set<SeguimientoFilter>(["entregados", "abrieron", "click"])
+// Segmentos desde los que tiene sentido armar un seguimiento. "No abrieron" exige
+// el evento "delivered" (ver filtro más abajo), así que un rebote nunca cae ahí —
+// un bounce no genera "delivered", entonces ya queda excluido sin filtrado extra.
+const FOLLOWUP_FILTERS = new Set<SeguimientoFilter>(["entregados", "abrieron", "click", "no_abrieron"])
 
 const audienceLabel: Record<string, string> = {
   all:          "General (todos los contactos)",
@@ -341,7 +342,16 @@ function SeguimientoTab({ campaignId, campaignName, onCreateFollowUp }: {
   }, [contacts, filter])
 
   const canFollowUp = FOLLOWUP_FILTERS.has(filter)
-  const allVisibleSelected = filtered.length > 0 && filtered.every((c) => selected.has(c.email))
+
+  // Un correo puede tener "bounce" junto con "delivered"/"open"/"click" en la misma
+  // campaña (reintento, duplicado de contacto, rebote tardío) — nunca es candidato
+  // a seguimiento aunque haya calzado con otro filtro.
+  const isBounced = (c: CampaignContactEvent) => c.events.includes("bounce")
+  const followUpEligible = React.useMemo(
+    () => filtered.filter((c) => !isBounced(c)),
+    [filtered]
+  )
+  const allVisibleSelected = followUpEligible.length > 0 && followUpEligible.every((c) => selected.has(c.email))
 
   function toggleOne(email: string) {
     setSelected((prev) => {
@@ -353,11 +363,11 @@ function SeguimientoTab({ campaignId, campaignName, onCreateFollowUp }: {
   }
 
   function toggleAllVisible() {
-    setSelected(allVisibleSelected ? new Set() : new Set(filtered.map((c) => c.email)))
+    setSelected(allVisibleSelected ? new Set() : new Set(followUpEligible.map((c) => c.email)))
   }
 
   function handleCreateFollowUp() {
-    const recipients = filtered
+    const recipients = followUpEligible
       .filter((c) => selected.has(c.email))
       .map((c) => ({ name: c.name ?? "", email: c.email }))
     onCreateFollowUp(recipients, campaignName)
@@ -447,9 +457,10 @@ function SeguimientoTab({ campaignId, campaignName, onCreateFollowUp }: {
             <div key={c.email} className="flex items-start gap-3 px-5 py-3">
               {canFollowUp && (
                 <Checkbox
-                  aria-label={`Seleccionar a ${c.email}`}
+                  aria-label={isBounced(c) ? `${c.email} rebotó — no disponible para seguimiento` : `Seleccionar a ${c.email}`}
                   className="mt-1.5 shrink-0"
                   checked={selected.has(c.email)}
+                  disabled={isBounced(c)}
                   onCheckedChange={() => toggleOne(c.email)}
                 />
               )}
