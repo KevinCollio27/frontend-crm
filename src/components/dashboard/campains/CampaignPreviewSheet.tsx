@@ -15,6 +15,12 @@ import { CAMPAIGN_STATUS_CONFIG } from "./shared/status"
 type PreviewTab = "general" | "metricas" | "seguimiento"
 type SeguimientoFilter = "todos" | "entregados" | "abrieron" | "click" | "no_abrieron"
 
+// Cuántas filas se pintan en el DOM a la vez en Seguimiento — con campañas de miles
+// de envíos, renderizar todo el segmento filtrado de una sola vez es lo que pega al
+// cambiar de tab. "Seleccionar todos" sigue operando sobre el segmento completo, no
+// solo sobre lo que está pintado (ver followUpEligible más abajo).
+const SEGUIMIENTO_PAGE_SIZE = 20
+
 // Segmentos desde los que tiene sentido armar un seguimiento. "No abrieron" exige
 // el evento "delivered" (ver filtro más abajo), así que un rebote nunca cae ahí —
 // un bounce no genera "delivered", entonces ya queda excluido sin filtrado extra.
@@ -320,6 +326,7 @@ function SeguimientoTab({ campaignId, campaignName, onCreateFollowUp }: {
   const [loading, setLoading] = React.useState(true)
   const [filter, setFilter] = React.useState<SeguimientoFilter>("todos")
   const [selected, setSelected] = React.useState<Set<string>>(new Set())
+  const [visibleCount, setVisibleCount] = React.useState(SEGUIMIENTO_PAGE_SIZE)
 
   React.useEffect(() => {
     setLoading(true)
@@ -329,6 +336,7 @@ function SeguimientoTab({ campaignId, campaignName, onCreateFollowUp }: {
   function changeFilter(f: SeguimientoFilter) {
     setFilter(f)
     setSelected(new Set())
+    setVisibleCount(SEGUIMIENTO_PAGE_SIZE)
   }
 
   const filtered = React.useMemo(() => {
@@ -351,7 +359,14 @@ function SeguimientoTab({ campaignId, campaignName, onCreateFollowUp }: {
     () => filtered.filter((c) => !isBounced(c)),
     [filtered]
   )
-  const allVisibleSelected = followUpEligible.length > 0 && followUpEligible.every((c) => selected.has(c.email))
+  // Selecciona sobre TODO el segmento filtrado, no solo sobre lo que está pintado
+  // en pantalla — independiente de cuántas filas haya cargado "Cargar más".
+  const allSelected = followUpEligible.length > 0 && followUpEligible.every((c) => selected.has(c.email))
+
+  // Solo se pinta una tanda a la vez en el DOM, aunque `filtered`/`followUpEligible`
+  // ya tengan el segmento completo en memoria.
+  const visibleRows = filtered.slice(0, visibleCount)
+  const hasMoreRows = visibleCount < filtered.length
 
   function toggleOne(email: string) {
     setSelected((prev) => {
@@ -362,8 +377,8 @@ function SeguimientoTab({ campaignId, campaignName, onCreateFollowUp }: {
     })
   }
 
-  function toggleAllVisible() {
-    setSelected(allVisibleSelected ? new Set() : new Set(followUpEligible.map((c) => c.email)))
+  function toggleSelectAll() {
+    setSelected(allSelected ? new Set() : new Set(followUpEligible.map((c) => c.email)))
   }
 
   function handleCreateFollowUp() {
@@ -416,11 +431,11 @@ function SeguimientoTab({ campaignId, campaignName, onCreateFollowUp }: {
         <div className="flex items-center gap-2 border-b bg-muted/30 px-5 py-2.5">
           <label className="flex items-center gap-2 text-xs text-muted-foreground">
             <Checkbox
-              aria-label="Seleccionar todos los visibles"
-              checked={allVisibleSelected}
-              onCheckedChange={toggleAllVisible}
+              aria-label="Seleccionar todos"
+              checked={allSelected}
+              onCheckedChange={toggleSelectAll}
             />
-            Seleccionar todos los visibles ({filtered.length})
+            Seleccionar todos ({followUpEligible.length})
           </label>
           <div className="ml-auto flex items-center gap-2">
             {selected.size > 0 && (
@@ -453,7 +468,7 @@ function SeguimientoTab({ campaignId, campaignName, onCreateFollowUp }: {
         </div>
       ) : (
         <div className="divide-y">
-          {filtered.map((c) => (
+          {visibleRows.map((c) => (
             <div key={c.email} className="flex items-start gap-3 px-5 py-3">
               {canFollowUp && (
                 <Checkbox
@@ -490,6 +505,13 @@ function SeguimientoTab({ campaignId, campaignName, onCreateFollowUp }: {
               </div>
             </div>
           ))}
+          {hasMoreRows && (
+            <div className="flex justify-center p-3">
+              <Button type="button" variant="outline" size="sm" onClick={() => setVisibleCount((v) => v + SEGUIMIENTO_PAGE_SIZE)}>
+                Cargar más ({filtered.length - visibleCount} restantes)
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </div>
