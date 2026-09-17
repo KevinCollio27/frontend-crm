@@ -59,6 +59,10 @@ function getEmail(contact: Person): string {
   return detail?.value ?? ""
 }
 
+function hasEmail(contact: Person): boolean {
+  return getEmail(contact).trim().length > 0
+}
+
 function emptyRecipient(): CustomRecipient {
   return { id: crypto.randomUUID(), name: "", email: "" }
 }
@@ -158,10 +162,14 @@ export function Step2Audience({ form, setForm }: Step2AudienceProps) {
         notify.error({ title: "Bloque vacío", description: "No hay contactos en ese rango con el filtro actual." })
         return
       }
-      setForm((f) => ({ ...f, selectedContactIds: res.data.map((c) => c.id) }))
+      const withEmail = res.data.filter(hasEmail)
+      const skipped = res.data.length - withEmail.length
+      setForm((f) => ({ ...f, selectedContactIds: withEmail.map((c) => c.id) }))
       notify.success({
-        title: `${res.data.length} contactos seleccionados`,
-        description: `Bloque ${blockNumber} de ${blockSize} — reemplazó la selección anterior.`,
+        title: `${withEmail.length} contactos seleccionados`,
+        description: `Bloque ${blockNumber} de ${blockSize} — reemplazó la selección anterior.${
+          skipped > 0 ? ` ${skipped} sin correo fueron excluidos.` : ""
+        }`,
       })
     } catch {
       notify.error({ title: "No se pudo seleccionar el bloque", description: "Intenta de nuevo." })
@@ -183,10 +191,12 @@ export function Step2Audience({ form, setForm }: Step2AudienceProps) {
   }
 
   const selectedSet = new Set(form.selectedContactIds)
-  const allLoadedSelected = contacts.length > 0 && contacts.every((c) => selectedSet.has(c.id))
+  const selectableContacts = contacts.filter(hasEmail)
+  const allLoadedSelected = selectableContacts.length > 0 && selectableContacts.every((c) => selectedSet.has(c.id))
   const hasMore = contacts.length < total
 
-  function toggleContact(id: number) {
+  function toggleContact(id: number, contact: Person) {
+    if (!hasEmail(contact)) return
     setForm((f) => {
       const set = new Set(f.selectedContactIds)
       if (set.has(id)) set.delete(id)
@@ -198,7 +208,7 @@ export function Step2Audience({ form, setForm }: Step2AudienceProps) {
   function selectAllLoaded() {
     setForm((f) => {
       const set = new Set(f.selectedContactIds)
-      contacts.forEach((c) => set.add(c.id))
+      selectableContacts.forEach((c) => set.add(c.id))
       return { ...f, selectedContactIds: Array.from(set) }
     })
   }
@@ -219,11 +229,18 @@ export function Step2Audience({ form, setForm }: Step2AudienceProps) {
     setSelectingAll(true)
     try {
       const res = await contactService.list(buildListParams(1, total))
+      const withEmail = res.data.filter(hasEmail)
+      const skipped = res.data.length - withEmail.length
       setForm((f) => ({
         ...f,
-        selectedContactIds: Array.from(new Set([...f.selectedContactIds, ...res.data.map((c) => c.id)])),
+        selectedContactIds: Array.from(new Set([...f.selectedContactIds, ...withEmail.map((c) => c.id)])),
       }))
-      notify.success({ title: `${res.data.length} contactos seleccionados`, description: "Se seleccionaron todos los que coinciden con el filtro actual." })
+      notify.success({
+        title: `${withEmail.length} contactos seleccionados`,
+        description: skipped > 0
+          ? `Se seleccionaron los que coinciden con el filtro actual. ${skipped} sin correo fueron excluidos.`
+          : "Se seleccionaron todos los que coinciden con el filtro actual.",
+      })
     } catch {
       notify.error({ title: "No se pudo seleccionar todo", description: "Intenta de nuevo." })
     } finally {
@@ -446,13 +463,15 @@ export function Step2Audience({ form, setForm }: Step2AudienceProps) {
                   <>
                     {contacts.map((c) => {
                       const email = getEmail(c)
+                      const emailMissing = !email
                       return (
-                        <TableRow key={c.id}>
+                        <TableRow key={c.id} className={cn(emailMissing && "opacity-60")}>
                           <TableCell>
                             <Checkbox
                               aria-label={`Seleccionar a ${c.name}`}
                               checked={selectedSet.has(c.id)}
-                              onCheckedChange={() => toggleContact(c.id)}
+                              disabled={emailMissing}
+                              onCheckedChange={() => toggleContact(c.id, c)}
                             />
                           </TableCell>
                           <TableCell>
@@ -467,7 +486,11 @@ export function Step2Audience({ form, setForm }: Step2AudienceProps) {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <span className="text-sm text-muted-foreground">{email || "—"}</span>
+                            {emailMissing ? (
+                              <Badge variant="outline" className="text-xs text-muted-foreground">Sin correo</Badge>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">{email}</span>
+                            )}
                           </TableCell>
                           <TableCell>
                             <span className="text-sm text-muted-foreground">
