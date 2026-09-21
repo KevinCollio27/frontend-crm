@@ -118,3 +118,8 @@ export interface FormSubmitPayload {
   custom_answers: Record<string, unknown>
   turnstileToken?: string
 }
+
+export interface VacancyRef {
+  id: string
+  label?: string
+}

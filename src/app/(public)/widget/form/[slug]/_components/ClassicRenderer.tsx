@@ -21,8 +21,9 @@ import {
   DEFAULT_ORGANIZATION_ORDER,
   DEFAULT_OPPORTUNITY_ORDER,
 } from "@/components/dashboard/forms/shared/form-state"
-import type { ClassicBaseConfig, FormSubmitPayload, PublicCustomField } from "@/types/public-form"
+import type { ClassicBaseConfig, FormSubmitPayload, PublicCustomField, VacancyRef } from "@/types/public-form"
 import { PublicFormShell } from "@/components/public-widget/PublicFormShell"
+import { VacancyRefBanner } from "@/components/public-widget/VacancyRefBanner"
 import { FileDropZone, isUploadedFileValue, type UploadedFileValue } from "@/components/public-widget/FileDropZone"
 
 // ─── File accept mapping (classic custom fields) ───────────────────────────────
@@ -135,7 +136,8 @@ function validate(
 
 function buildPayload(
   values: Values,
-  customFields: PublicCustomField[]
+  customFields: PublicCustomField[],
+  vacancyRef?: VacancyRef
 ): FormSubmitPayload {
   const str = (k: string) => String(values[k] ?? "").trim() || null
 
@@ -144,6 +146,7 @@ function buildPayload(
     const v = values[`cf_${f.id}`]
     if (v !== undefined && v !== "") custom_answers[f.id] = v
   }
+  if (vacancyRef) custom_answers.ref = vacancyRef.id
 
   return {
     name:               String(values.contact_name ?? "").trim(),
@@ -208,6 +211,8 @@ interface ClassicRendererProps {
   description?: string
   config:       ClassicBaseConfig
   customFields: PublicCustomField[]
+  /** Vacante desde la que se llegó (?ref=); se guarda en `custom_answers.ref`. */
+  vacancyRef?:  VacancyRef
   /** Vista previa dentro del builder — valida pero no envía nada de verdad. */
   preview?:     boolean
 }
@@ -218,7 +223,7 @@ function initialValues(config: ClassicBaseConfig): Values {
   return init
 }
 
-export function ClassicRenderer({ slug, name, description, config, customFields, preview = false }: ClassicRendererProps) {
+export function ClassicRenderer({ slug, name, description, config, customFields, vacancyRef, preview = false }: ClassicRendererProps) {
   const [values,   setValues]   = React.useState<Values>(() => initialValues(config))
   const [errors,   setErrors]   = React.useState<Errors>({})
   const [status,   setStatus]   = React.useState<Status>("idle")
@@ -271,7 +276,7 @@ export function ClassicRenderer({ slug, name, description, config, customFields,
       const res = await fetch(`/api/proxy/widget/form/${slug}/submit`, {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify(buildPayload(values, customFields)),
+        body:    JSON.stringify(buildPayload(values, customFields, vacancyRef)),
       })
       const data = await res.json()
       if (!data.success) throw new Error(data.message ?? "Error al enviar")
@@ -494,6 +499,8 @@ export function ClassicRenderer({ slug, name, description, config, customFields,
       onSubmit={handleSubmit}
       embedded={preview}
     >
+      {vacancyRef?.label && <VacancyRefBanner label={vacancyRef.label} />}
+
       {/* Contact */}
       <FieldRow label={contact.name?.label ?? "Nombre Completo"} required error={errors.contact_name} htmlFor="contact_name">
         <Input

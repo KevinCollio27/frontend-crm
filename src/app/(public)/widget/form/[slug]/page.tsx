@@ -1,6 +1,6 @@
 import { CircleHelpIcon, LockIcon } from "lucide-react"
 import type { Metadata } from "next"
-import type { BlocksBaseConfig, ClassicBaseConfig, PublicFormConfig } from "@/types/public-form"
+import type { BlocksBaseConfig, ClassicBaseConfig, PublicFormConfig, VacancyRef } from "@/types/public-form"
 import { isBlocksFormat } from "@/types/public-form"
 import { ClassicRenderer } from "./_components/ClassicRenderer"
 import { BlocksRenderer } from "./_components/BlocksRenderer"
@@ -19,6 +19,13 @@ async function fetchForm(slug: string): Promise<PublicFormConfig | null> {
   } catch {
     return null
   }
+}
+
+function parseVacancyRef(searchParams: Record<string, string | string[] | undefined>): VacancyRef | undefined {
+  const id = [searchParams.ref].flat()[0]
+  if (!id || !/^\d+$/.test(id)) return undefined
+  const label = [searchParams.ref_label].flat()[0]?.trim().slice(0, 120)
+  return { id, label: label || undefined }
 }
 
 // ─── Metadata ─────────────────────────────────────────────────────────────────
@@ -40,10 +47,13 @@ export async function generateMetadata({
 
 export default async function PublicFormPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>
+  searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
   const { slug } = await params
+  const vacancyRef = parseVacancyRef(await searchParams)
   const form = await fetchForm(slug)
 
   if (!form) return <FormNotFound />
@@ -57,6 +67,7 @@ export default async function PublicFormPage({
         slug={form.slug}
         name={form.name}
         config={form.base_config as BlocksBaseConfig}
+        vacancyRef={vacancyRef}
       />
     )
   }
@@ -70,6 +81,7 @@ export default async function PublicFormPage({
       name={form.name}
       config={config}
       customFields={form.custom_fields}
+      vacancyRef={vacancyRef}
     />
   )
 }

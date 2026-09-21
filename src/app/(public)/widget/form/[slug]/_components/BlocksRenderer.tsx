@@ -16,9 +16,10 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
-import type { BlocksBaseConfig, FormSubmitPayload } from "@/types/public-form"
+import type { BlocksBaseConfig, FormSubmitPayload, VacancyRef } from "@/types/public-form"
 import type { FileAccept, FormBlock } from "@/components/dashboard/forms/shared/blocks"
 import { PublicFormShell } from "@/components/public-widget/PublicFormShell"
+import { VacancyRefBanner } from "@/components/public-widget/VacancyRefBanner"
 import { FileDropZone, isUploadedFileValue, type UploadedFileValue } from "@/components/public-widget/FileDropZone"
 
 // ─── Value helpers ────────────────────────────────────────────────────────────
@@ -56,7 +57,7 @@ function resolveOtherValue(val: string | string[], values: Values, key: string):
 
 // ─── Payload builder ──────────────────────────────────────────────────────────
 
-function buildPayload(blocks: FormBlock[], values: Values): FormSubmitPayload {
+function buildPayload(blocks: FormBlock[], values: Values, vacancyRef?: VacancyRef): FormSubmitPayload {
   const custom_answers: Record<string, unknown> = {}
   const payload: FormSubmitPayload = { name: "", emails: [], phones: [], custom_answers }
 
@@ -96,6 +97,8 @@ function buildPayload(blocks: FormBlock[], values: Values): FormSubmitPayload {
       custom_answers[block.id] = val
     }
   }
+
+  if (vacancyRef) custom_answers.ref = vacancyRef.id
 
   return payload
 }
@@ -531,11 +534,12 @@ interface BlocksRendererProps {
   slug: string
   name: string
   config: BlocksBaseConfig
+  vacancyRef?: VacancyRef
 }
 
 type Status = "idle" | "loading" | "success" | "error"
 
-export function BlocksRenderer({ slug, name, config }: BlocksRendererProps) {
+export function BlocksRenderer({ slug, name, config, vacancyRef }: BlocksRendererProps) {
   const { blocks, design: d } = config
   const { resolvedTheme } = useTheme()
   const [mounted, setMounted] = React.useState(false)
@@ -575,7 +579,7 @@ export function BlocksRenderer({ slug, name, config }: BlocksRendererProps) {
       const res = await fetch(`/api/proxy/widget/form/${slug}/submit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(buildPayload(blocks, values)),
+        body: JSON.stringify(buildPayload(blocks, values, vacancyRef)),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       setStatus("success")
@@ -594,6 +598,7 @@ export function BlocksRenderer({ slug, name, config }: BlocksRendererProps) {
       onReset={resetForm}
       onSubmit={handleSubmit}
     >
+      {vacancyRef?.label && <VacancyRefBanner label={vacancyRef.label} />}
       {blocks.length === 0 ? (
         <p className="py-8 text-center text-sm text-muted-foreground">
           Este formulario no tiene campos configurados.
