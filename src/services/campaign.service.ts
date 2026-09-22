@@ -9,6 +9,13 @@ export interface CampaignContactEvent {
   last_at: string
 }
 
+export interface PersonCampaignActivity {
+  campaign_id: number
+  name: string
+  sent_at: string | null
+  events: string[]
+}
+
 interface BackendResponse {
   campaigns: CampaignRaw[]
   pagination: { total: number; page: number; limit: number; totalPages: number }
@@ -71,5 +78,10 @@ export const campaignService = {
 
   async delete(id: number): Promise<void> {
     await api.delete(`marketing/campaigns/${id}`)
+  },
+
+  async getPersonActivity(personId: number): Promise<PersonCampaignActivity[]> {
+    const res = await api.get<never, { campaigns: PersonCampaignActivity[] }>(`marketing/contacts/${personId}/activity`)
+    return res.campaigns ?? []
   },
 }

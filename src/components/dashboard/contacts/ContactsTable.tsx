@@ -1125,6 +1125,7 @@ export function ContactsTable() {
         open={sheetOpen}
         onOpenChange={setSheetOpen}
         onViewDetails={selectedContact ? () => router.push(`/crm/contacts/${selectedContact.id}`) : undefined}
+        onDelete={(contact) => { setSheetOpen(false); handleDeleteClick(contact) }}
       />
 
       <CreateContactSheet
