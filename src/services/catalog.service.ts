@@ -65,6 +65,12 @@ export const catalogService = {
     return fetchLabelOptions(keys)
   },
 
+  // La caché no distingue workspace — llamar al cambiar de workspace, o las opciones
+  // del anterior se siguen sirviendo hasta que venza el TTL.
+  invalidateCache() {
+    invalidateLabelCache()
+  },
+
   async createOption(params: { value: string; labelId: number; orderNumber: number }): Promise<CreatedOptionRaw> {
     const res = await api.post<never, { data: CreatedOptionRaw }>("label/option", {
       value: params.value,

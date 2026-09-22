@@ -43,6 +43,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { EntityAccentBar } from "@/components/ui/entity-accent-bar"
 import { PositionBadge } from "@/components/ui/position-badge"
 import { SourceBadge } from "@/components/ui/source-badge"
+import { TagBadgeList } from "@/components/ui/tag-badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -75,7 +76,8 @@ import { ContactsImportExportSheet } from "./ContactsImportExportSheet"
 import { MoveContactsSheet } from "./MoveContactsSheet"
 import { SendTemplateSheet } from "./SendTemplateSheet"
 import { SendEmailSheet } from "./SendEmailSheet"
-import { contactService, type CountryCount } from "@/services/contact.service"
+import { contactService, type CountryCount, type TagCount } from "@/services/contact.service"
+import { catalogService, activeOptions } from "@/services/catalog.service"
 import { organizationService, type OrganizationOption } from "@/services/organization.service"
 import { contactConfirm } from "@/lib/confirm"
 import { notify } from "@/lib/notify"
@@ -99,6 +101,7 @@ export interface Contact {
   origin: string
   createdAt: string
   internalPosition: string
+  tags: string[]
 }
 
 function mapPerson(p: Person): Contact {
@@ -120,6 +123,7 @@ function mapPerson(p: Person): Contact {
     origin: p.origin ?? "CRM",
     createdAt: (p.created_at ?? "").slice(0, 10),
     internalPosition: p.internal_position ?? "",
+    tags: p.person_detail?.filter((d) => d.label?.key === "tag" && d.option).map((d) => d.option) ?? [],
   }
 }
 
@@ -144,6 +148,7 @@ const columnLabels: Record<string, string> = {
   phone: "Teléfono",
   country: "País",
   source: "Fuente",
+  tags: "Etiquetas",
   createdAt: "Creado",
   internalPosition: "Cargo",
 }
@@ -151,6 +156,7 @@ const columnLabels: Record<string, string> = {
 const DEFAULT_COLUMN_VISIBILITY: VisibilityState = {
   createdAt: false,
   internalPosition: false,
+  tags: false,
 }
 
 // En mobile no hay espacio para columnas de más — solo Nombre queda visible por
@@ -162,6 +168,7 @@ const MOBILE_COLUMN_VISIBILITY: VisibilityState = {
   phone: false,
   country: false,
   source: false,
+  tags: false,
   createdAt: false,
 }
 
@@ -305,6 +312,19 @@ function getColumns(
       ),
     },
     {
+      id: "tags",
+      accessorFn: (row) => row.tags.join(", "),
+      enableSorting: false,
+      // El filtro por etiquetas se resuelve en el servidor (query.tagIds) — sin esto
+      // el filtro de tanstack intentaría filtrar de nuevo las filas ya filtradas.
+      filterFn: () => true,
+      header: "Etiquetas",
+      cell: ({ row }) =>
+        row.original.tags.length > 0
+          ? <TagBadgeList tags={row.original.tags} />
+          : <span className="text-sm text-muted-foreground">—</span>,
+    },
+    {
       accessorKey: "createdAt",
       header: ({ column }) => (
         <Button variant="ghost" className="-ml-3" onClick={() => column.toggleSorting()}>
@@ -440,6 +460,7 @@ const skeletonCell: Record<string, React.ReactNode> = {
     </div>
   ),
   source:    <div className="h-4 w-20 animate-pulse rounded bg-muted" />,
+  tags:      <div className="h-5 w-28 animate-pulse rounded-full bg-muted" />,
   createdAt: <div className="h-4 w-20 animate-pulse rounded bg-muted" />,
   actions:   <div className="size-8 animate-pulse rounded bg-muted" />,
 }
@@ -601,6 +622,7 @@ interface QueryState {
   search: string
   orgId: number | null
   countries: string[]
+  tagIds: string[]
   sortBy: string | undefined
   sortOrder: "asc" | "desc" | undefined
 }
@@ -617,6 +639,7 @@ export function ContactsTable() {
     search: "",
     orgId: null,
     countries: [],
+    tagIds: [],
     sortBy: undefined,
     sortOrder: undefined,
   })
@@ -647,6 +670,8 @@ export function ContactsTable() {
   const { connections: integrationConnections } = useIntegrations()
   const googleContactsIntegration = integrationConnections.find((c) => c.provider_key === "google-contacts")
   const [countryCounts, setCountryCounts] = React.useState<CountryCount[]>([])
+  const [tagCatalog, setTagCatalog] = React.useState<{ id: number; value: string }[]>([])
+  const [tagCounts, setTagCounts] = React.useState<TagCount[]>([])
   const [sendEmailContact, setSendEmailContact] = React.useState<Contact | null>(null)
   const { canSendTemplate, approvedTemplates, gmailConnection } = useSendActions()
 
@@ -667,10 +692,11 @@ export function ContactsTable() {
   }, [searchInput])
 
   React.useEffect(() => {
-    const selected = (columnFilters.find((f) => f.id === "country")?.value as string[]) ?? []
+    const countries = (columnFilters.find((f) => f.id === "country")?.value as string[]) ?? []
+    const tagIds = (columnFilters.find((f) => f.id === "tags")?.value as string[]) ?? []
     setQuery((q) => {
-      if (JSON.stringify(q.countries) === JSON.stringify(selected)) return q
-      return { ...q, page: 1, countries: selected }
+      if (JSON.stringify(q.countries) === JSON.stringify(countries) && JSON.stringify(q.tagIds) === JSON.stringify(tagIds)) return q
+      return { ...q, page: 1, countries, tagIds }
     })
   }, [columnFilters])
 
@@ -685,6 +711,7 @@ export function ContactsTable() {
         filter: query.search || undefined,
         organization_id: query.orgId ?? undefined,
         country: query.countries.length > 0 ? query.countries : undefined,
+        tag: query.tagIds.length > 0 ? query.tagIds : undefined,
         sortBy: query.sortBy,
         sortOrder: query.sortOrder,
       })
@@ -705,6 +732,14 @@ export function ContactsTable() {
 
   React.useEffect(() => {
     contactService.countryCounts().then(setCountryCounts).catch(() => {})
+    contactService.tagCounts().then(setTagCounts).catch(() => {})
+    catalogService
+      .getLabelOptions("tag")
+      .then((labels) => {
+        const tag = labels.find((l) => l.key === "tag")
+        if (tag) setTagCatalog(activeOptions(tag))
+      })
+      .catch(() => {})
   }, [])
 
   const countryOptions = React.useMemo(
@@ -727,6 +762,16 @@ export function ContactsTable() {
   const countryCountsMap = React.useMemo(
     () => new Map(countryCounts.map((c) => [c.code, c.count])),
     [countryCounts]
+  )
+
+  const tagOptions = React.useMemo(
+    () => tagCatalog.map((o) => ({ label: o.value, value: String(o.id) })),
+    [tagCatalog]
+  )
+
+  const tagCountsMap = React.useMemo(
+    () => new Map(tagCounts.map((t) => [String(t.option_id), t.count])),
+    [tagCounts]
   )
 
   const pagination: PaginationState = { pageIndex: query.page - 1, pageSize: query.pageSize }
@@ -1009,6 +1054,15 @@ export function ContactsTable() {
                 title="País"
                 options={countryOptions}
                 counts={countryCountsMap}
+              />
+            </div>
+
+            <div className="[&_button]:w-full md:[&_button]:w-auto">
+              <DataTableFacetedFilter
+                column={table.getColumn("tags")!}
+                title="Etiquetas"
+                options={tagOptions}
+                counts={tagCountsMap}
               />
             </div>
           </div>

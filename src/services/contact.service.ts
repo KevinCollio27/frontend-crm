@@ -17,12 +17,18 @@ export interface ContactListParams {
   filter?: string
   organization_id?: number
   country?: string[]
+  tag?: string[]
   sortBy?: string
   sortOrder?: "asc" | "desc"
 }
 
 export interface CountryCount {
   code: string
+  count: number
+}
+
+export interface TagCount {
+  option_id: number
   count: number
 }
 
@@ -220,5 +226,10 @@ export const contactService = {
     const res = await api.get<never, { countries: CountryCount[] }>("person/countries")
     console.log(`[contact] countryCounts ${res.countries?.length ?? 0} países → ${(performance.now() - t0).toFixed(1)}ms`)
     return res.countries ?? []
+  },
+
+  async tagCounts(): Promise<TagCount[]> {
+    const res = await api.get<never, { tags: TagCount[] }>("person/tag-counts")
+    return res.tags ?? []
   },
 }

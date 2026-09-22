@@ -6,6 +6,7 @@ import { ChevronsUpDownIcon, PlusIcon, SearchIcon, ShieldIcon } from "lucide-rea
 import { useSessionStore } from "@/store/session.store"
 import { saveLastWorkspace } from "@/lib/workspace-pref"
 import { flowService } from "@/services/flow.service"
+import { catalogService } from "@/services/catalog.service"
 import { workspaceService, type PlatformAdminWorkspaceOverview } from "@/services/workspace.service"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import {
@@ -102,6 +103,7 @@ export function TeamSwitcher() {
     })
     if (user) saveLastWorkspace(user.id, ws.workspace_id)
     flowService.invalidateCache()
+    catalogService.invalidateCache()
     useSessionStore.getState().setSession(user!, ws.workspace_id)
   }
 
@@ -114,6 +116,7 @@ export function TeamSwitcher() {
       body: JSON.stringify({ workspaceId: ws.id }),
     })
     flowService.invalidateCache()
+    catalogService.invalidateCache()
     useSessionStore.getState().enterAsPlatformAdmin({ id: ws.id, name: ws.name })
     setEnteringId(null)
     closePanel()

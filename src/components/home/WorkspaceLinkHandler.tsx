@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useSessionStore } from "@/store/session.store";
 import { saveLastWorkspace } from "@/lib/workspace-pref";
 import { flowService } from "@/services/flow.service";
+import { catalogService } from "@/services/catalog.service";
 
 // Los correos de bienvenida (crear workspace, invitación) llevan ?workspace_id=
 // en el link — sin esto, el navegador se queda con el workspace que ya tenía
@@ -38,6 +39,7 @@ export const WorkspaceLinkHandler = () => {
         });
         if (user) saveLastWorkspace(user.id, targetId);
         flowService.invalidateCache();
+        catalogService.invalidateCache();
         useSessionStore.getState().setSession(user!, targetId);
       }
 
