@@ -17,6 +17,7 @@ import {
   EyeIcon,
   GitBranchIcon,
   Link2Icon,
+  MessageCircleIcon,
   MoreHorizontal,
   SearchIcon,
   SlidersHorizontalIcon,
@@ -56,10 +57,12 @@ import { getSortIcon } from "@/lib/table-utils"
 import { cn } from "@/lib/utils"
 import { formService } from "@/services/form.service"
 import { flowService } from "@/services/flow.service"
+import { useSendActions } from "@/hooks/useSendActions"
 import type { FormRaw } from "@/types/form"
 import type { Flow } from "@/types/flow"
 import { CreateFormSheet } from "./CreateFormSheet"
 import { FormIntegrateSheet } from "./FormIntegrateSheet"
+import { FormAutoReplySheet } from "./FormAutoReplySheet"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -153,7 +156,8 @@ const skeletonCell: Record<string, React.ReactNode> = {
 function buildColumns(
   onEdit: (raw: FormRaw) => void,
   onDelete: (id: number) => void,
-  onIntegrate: (raw: FormRaw) => void
+  onIntegrate: (raw: FormRaw) => void,
+  onAutoReply: ((raw: FormRaw) => void) | null
 ): ColumnDef<Form>[] {
   return [
   {
@@ -290,6 +294,11 @@ function buildColumns(
               <DropdownMenuItem onClick={() => onIntegrate(form.raw)}>
                 <Code2Icon /> Integrar formulario
               </DropdownMenuItem>
+              {onAutoReply && (
+                <DropdownMenuItem onClick={() => onAutoReply(form.raw)}>
+                  <MessageCircleIcon /> Respuesta automática
+                </DropdownMenuItem>
+              )}
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem
@@ -328,6 +337,8 @@ export function FormsTable({ viewToggle }: { viewToggle?: React.ReactNode } = {}
   const [sheetOpen, setSheetOpen] = React.useState(false)
   const [editForm, setEditForm] = React.useState<FormRaw | null>(null)
   const [integrateForm, setIntegrateForm] = React.useState<FormRaw | null>(null)
+  const [autoReplyForm, setAutoReplyForm] = React.useState<FormRaw | null>(null)
+  const { canSendTemplate } = useSendActions()
   const [flows, setFlows] = React.useState<Flow[]>([])
   const [flowFilter, setFlowFilter] = React.useState<string>("all")
   const [filtersOpen, setFiltersOpen] = React.useState(false)
@@ -344,6 +355,14 @@ export function FormsTable({ viewToggle }: { viewToggle?: React.ReactNode } = {}
 
   const handleIntegrate = React.useCallback((raw: FormRaw) => {
     setIntegrateForm(raw)
+  }, [])
+
+  const handleAutoReply = React.useCallback((raw: FormRaw) => {
+    setAutoReplyForm(raw)
+  }, [])
+
+  const handleAutoReplySuccess = React.useCallback((updated: FormRaw) => {
+    setData((prev) => prev.map((f) => (f.id === updated.id ? { ...f, raw: updated } : f)))
   }, [])
 
   const handleDelete = React.useCallback(async (id: number) => {
@@ -366,7 +385,10 @@ export function FormsTable({ viewToggle }: { viewToggle?: React.ReactNode } = {}
     }
   }, [])
 
-  const columns = React.useMemo(() => buildColumns(handleEdit, handleDelete, handleIntegrate), [handleEdit, handleDelete, handleIntegrate])
+  const columns = React.useMemo(
+    () => buildColumns(handleEdit, handleDelete, handleIntegrate, canSendTemplate ? handleAutoReply : null),
+    [handleEdit, handleDelete, handleIntegrate, handleAutoReply, canSendTemplate]
+  )
 
   React.useEffect(() => {
     let cancelled = false
@@ -561,6 +583,13 @@ export function FormsTable({ viewToggle }: { viewToggle?: React.ReactNode } = {}
         open={!!integrateForm}
         onOpenChange={(open) => { if (!open) setIntegrateForm(null) }}
         form={integrateForm}
+      />
+
+      <FormAutoReplySheet
+        open={!!autoReplyForm}
+        onOpenChange={(open) => { if (!open) setAutoReplyForm(null) }}
+        form={autoReplyForm}
+        onSuccess={handleAutoReplySuccess}
       />
 
       {/* Table */}

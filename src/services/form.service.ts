@@ -41,6 +41,11 @@ export const formService = {
     await api.delete(`widget-forms/${id}`)
   },
 
+  async updateWhatsAppAutoReply(id: number, payload: { whatsapp_auto_reply_enabled: boolean; whatsapp_template_id: number | null }): Promise<FormRaw> {
+    const res = await api.patch<never, { form: FormRaw }>(`widget-forms/${id}`, payload)
+    return res.form
+  },
+
   async listAllAnswers(params: { cursor?: string; take?: number; form_id?: number } = {}): Promise<FormAnswerListResult> {
     const res = await api.get<never, FormAnswerListResult>("widget-forms/answers", { params })
     return res

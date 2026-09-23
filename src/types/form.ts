@@ -11,6 +11,8 @@ export interface FormRaw {
   slug: string
   base_config: unknown
   is_active: boolean
+  whatsapp_auto_reply_enabled: boolean
+  whatsapp_template_id: number | null
   created_at: string
   updated_at: string
   flow: FormFlow
