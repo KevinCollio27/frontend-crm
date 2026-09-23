@@ -95,6 +95,7 @@ export interface PublicFormConfig {
   base_config: PublicBaseConfig
   custom_fields: PublicCustomField[]
   flow: { id: number; name: string }
+  workspace: { name: string | null; logo: string | null; website: string | null }
 }
 
 // ─── Submit payload ───────────────────────────────────────────────────────────

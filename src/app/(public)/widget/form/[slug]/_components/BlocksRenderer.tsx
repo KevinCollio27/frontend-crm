@@ -335,11 +335,9 @@ function BlockInput({
       const showOther = allowOther && str === "Otro"
       return (
         <FieldWrapper label={label} required={required} helper={helper} error={error}>
-          <Select value={str} onValueChange={(v) => onChange(v ?? "")}>
+          <Select value={str || undefined} onValueChange={(v) => onChange(v ?? "")}>
             <SelectTrigger className="w-full" style={radiusStyle}>
-              <SelectValue placeholder={placeholder || "Selecciona una opción"}>
-                {(v: string) => v}
-              </SelectValue>
+              <SelectValue placeholder={placeholder || "Selecciona una opción"} />
             </SelectTrigger>
             <SelectContent>
               {opts.map((o, i) => (
@@ -535,11 +533,15 @@ interface BlocksRendererProps {
   name: string
   config: BlocksBaseConfig
   vacancyRef?: VacancyRef
+  /** Logo del workspace dueño del formulario — null/undefined usa el de GOxT. */
+  logoUrl?: string | null
+  /** Sitio web del workspace — el logo enlaza acá cuando hay logo propio; si no, a goxt.io. */
+  websiteUrl?: string | null
 }
 
 type Status = "idle" | "loading" | "success" | "error"
 
-export function BlocksRenderer({ slug, name, config, vacancyRef }: BlocksRendererProps) {
+export function BlocksRenderer({ slug, name, config, vacancyRef, logoUrl, websiteUrl }: BlocksRendererProps) {
   const { blocks, design: d } = config
   const { resolvedTheme } = useTheme()
   const [mounted, setMounted] = React.useState(false)
@@ -597,6 +599,8 @@ export function BlocksRenderer({ slug, name, config, vacancyRef }: BlocksRendere
       countdown={countdown}
       onReset={resetForm}
       onSubmit={handleSubmit}
+      logoUrl={logoUrl}
+      websiteUrl={websiteUrl}
     >
       {vacancyRef?.label && <VacancyRefBanner label={vacancyRef.label} />}
       {blocks.length === 0 ? (

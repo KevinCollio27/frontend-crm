@@ -215,6 +215,10 @@ interface ClassicRendererProps {
   vacancyRef?:  VacancyRef
   /** Vista previa dentro del builder — valida pero no envía nada de verdad. */
   preview?:     boolean
+  /** Logo del workspace dueño del formulario — null/undefined usa el de GOxT. */
+  logoUrl?:     string | null
+  /** Sitio web del workspace — el logo enlaza acá cuando hay logo propio; si no, a goxt.io. */
+  websiteUrl?:  string | null
 }
 
 function initialValues(config: ClassicBaseConfig): Values {
@@ -223,7 +227,7 @@ function initialValues(config: ClassicBaseConfig): Values {
   return init
 }
 
-export function ClassicRenderer({ slug, name, description, config, customFields, vacancyRef, preview = false }: ClassicRendererProps) {
+export function ClassicRenderer({ slug, name, description, config, customFields, vacancyRef, preview = false, logoUrl, websiteUrl }: ClassicRendererProps) {
   const [values,   setValues]   = React.useState<Values>(() => initialValues(config))
   const [errors,   setErrors]   = React.useState<Errors>({})
   const [status,   setStatus]   = React.useState<Status>("idle")
@@ -344,9 +348,9 @@ export function ClassicRenderer({ slug, name, description, config, customFields,
       case "source":
         return contact.source?.enabled && contact.source.options.length > 0 && (
           <FieldRow key={key} label={contact.source.label ?? "¿Cómo nos conociste?"} required={contact.source.required} error={errors.contact_source} htmlFor="contact_source">
-            <Select value={String(values.contact_source ?? "")} onValueChange={(v) => setValues((prev) => ({ ...prev, contact_source: v ?? "" }))}>
+            <Select value={values.contact_source ? String(values.contact_source) : undefined} onValueChange={(v) => setValues((prev) => ({ ...prev, contact_source: v ?? "" }))}>
               <SelectTrigger id="contact_source" className="w-full" style={radiusStyle}>
-                <SelectValue placeholder={contact.source.placeholder || "Selecciona una opción"}>{(v: string) => v}</SelectValue>
+                <SelectValue placeholder={contact.source.placeholder || "Selecciona una opción"} />
               </SelectTrigger>
               <SelectContent>
                 {contact.source.options.map((opt) => (
@@ -498,6 +502,8 @@ export function ClassicRenderer({ slug, name, description, config, customFields,
       onReset={resetForm}
       onSubmit={handleSubmit}
       embedded={preview}
+      logoUrl={logoUrl}
+      websiteUrl={websiteUrl}
     >
       {vacancyRef?.label && <VacancyRefBanner label={vacancyRef.label} />}
 
@@ -631,9 +637,9 @@ function CustomFieldInput({ field, slug, value, error, radius, onChange }: Custo
             })}
           </div>
         ) : (
-          <Select value={strVal} onValueChange={(v) => onChange(v ?? "")}>
+          <Select value={strVal || undefined} onValueChange={(v) => onChange(v ?? "")}>
             <SelectTrigger id={htmlFor} className="w-full" style={radiusStyle}>
-              <SelectValue placeholder="Selecciona una opción">{(v: string) => v}</SelectValue>
+              <SelectValue placeholder="Selecciona una opción" />
             </SelectTrigger>
             <SelectContent>
               {field.options.map((opt) => (

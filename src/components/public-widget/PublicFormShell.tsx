@@ -4,6 +4,7 @@ import * as React from "react"
 import { CheckCircle2Icon, Loader2Icon, LockIcon, MoonIcon, ShieldCheckIcon, SunIcon } from "lucide-react"
 import { useTheme } from "next-themes"
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 import type { FormDesignState } from "@/components/dashboard/forms/shared/form-state"
 import { FONT_FAMILY } from "@/components/dashboard/forms/shared/form-state"
 
@@ -58,6 +59,54 @@ export interface PublicFormShellProps {
   /** Renderizado dentro de un contenedor (ej. vista previa del builder) — sin
    * elementos "fixed"/de página completa (toggle de tema, logo, panel de imagen). */
   embedded?: boolean
+  /** Logo propio del workspace dueño del formulario — si no hay, se usa el de GOxT.
+   * El "Powered by GOxT" del footer queda fijo siempre, es atribución de la
+   * plataforma, no del cliente. */
+  logoUrl?: string | null
+  /** Sitio web del workspace — el logo (si es propio) enlaza acá en vez de a goxt.io. */
+  websiteUrl?: string | null
+}
+
+// El campo "Sitio Web" de Configuración suele guardarse sin protocolo (ej. "goxt.io") —
+// sin esto el link quedaría relativo a la página actual en vez de salir del formulario.
+function normalizeExternalUrl(url: string): string {
+  return /^https?:\/\//i.test(url) ? url : `https://${url}`
+}
+
+// Logo sobre fondo que respeta el tema (light/dark) — el de GOxT se invierte con
+// el tema; uno propio del cliente va sobre una placa blanca fija, sin importar el
+// tema de la página. No es solo por tamaño: muchos logos son PNG con fondo
+// transparente pensado para fondo claro, y en modo oscuro el texto oscuro se pierde
+// contra el fondo oscuro de la página (pasó con el de CamionGO). Invertir colores a
+// ciegas arruinaría un logo a color, así que en vez de adivinar, le damos un fondo
+// propio estable — funciona igual para logos claros, oscuros o a color.
+function ThemeAwareLogo({ logoUrl, className }: { logoUrl?: string | null; className: string }) {
+  if (logoUrl) {
+    return (
+      <span className={cn(className, "flex max-w-56 items-center justify-start rounded-md bg-white px-2.5 py-1.5 shadow-sm")}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={logoUrl} alt="" className="h-full max-h-full w-auto max-w-full object-contain object-left" />
+      </span>
+    )
+  }
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src="/images/goxt-negro.png" alt="GOxT" className={cn(className, "dark:invert")} />
+}
+
+// Logo sobre la imagen de portada (overlay oscuro fijo, sin importar el tema) — el
+// de GOxT se invierte siempre a blanco; uno propio del cliente va dentro de una
+// placa blanca, porque no sabemos si su logo es oscuro (invisible sobre el overlay).
+function CoverLogo({ logoUrl }: { logoUrl?: string | null }) {
+  if (logoUrl) {
+    return (
+      <span className="flex h-12 max-w-52 items-center rounded-md bg-white px-2.5 py-2 shadow-sm">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={logoUrl} alt="" className="h-full max-h-full w-auto max-w-full object-contain" />
+      </span>
+    )
+  }
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src="/images/goxt-negro.png" alt="GOxT" className="h-10 w-auto invert" />
 }
 
 export function PublicFormShell({
@@ -71,11 +120,17 @@ export function PublicFormShell({
   onSubmit,
   children,
   embedded = false,
+  logoUrl,
+  websiteUrl,
 }: PublicFormShellProps) {
   const { resolvedTheme } = useTheme()
   const [mounted, setMounted] = React.useState(false)
   React.useEffect(() => setMounted(true), [])
   const isDark = mounted && resolvedTheme === "dark"
+
+  // Solo se desvía a goxt.io cuando NO hay logo propio — un logo propio sin sitio
+  // configurado no debería mandar a la página de otra empresa (GOxT).
+  const logoHref = logoUrl && websiteUrl ? normalizeExternalUrl(websiteUrl) : "https://goxt.io"
 
   const padding = DENSITY_PADDING[d.density] ?? DENSITY_PADDING.comfortable
   const buttonStyle: React.CSSProperties = isDark
@@ -209,13 +264,12 @@ export function PublicFormShell({
       <div className="absolute inset-0 bg-black/55" />
       <div className="relative z-10 flex h-full flex-col justify-center p-10">
         <a
-          href="https://goxt.io"
+          href={logoHref}
           target="_blank"
           rel="noopener noreferrer"
           className="absolute top-6 left-8 opacity-90 transition-opacity hover:opacity-100"
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/images/goxt-negro.png" alt="GOxT" className="h-8 w-auto invert" />
+          <CoverLogo logoUrl={logoUrl} />
         </a>
         <div className="flex flex-col gap-6">
           <div className="flex items-center gap-2.5">
@@ -294,13 +348,12 @@ export function PublicFormShell({
       <div className="relative min-h-screen bg-muted dark:bg-background">
         <div className="absolute top-6 left-8">
           <a
-            href="https://goxt.io"
+            href={logoHref}
             target="_blank"
             rel="noopener noreferrer"
             className="opacity-80 transition-opacity hover:opacity-100"
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/images/goxt-negro.png" alt="GOxT" className="h-8 w-auto dark:invert" />
+            <ThemeAwareLogo logoUrl={logoUrl} className="h-14 w-auto" />
           </a>
         </div>
         <div className="mx-auto w-full max-w-xl px-4 pt-20 pb-12">

@@ -68,6 +68,8 @@ export default async function PublicFormPage({
         name={form.name}
         config={form.base_config as BlocksBaseConfig}
         vacancyRef={vacancyRef}
+        logoUrl={form.workspace?.logo ?? null}
+        websiteUrl={form.workspace?.website ?? null}
       />
     )
   }
@@ -82,6 +84,8 @@ export default async function PublicFormPage({
       config={config}
       customFields={form.custom_fields}
       vacancyRef={vacancyRef}
+      logoUrl={form.workspace?.logo ?? null}
+      websiteUrl={form.workspace?.website ?? null}
     />
   )
 }
