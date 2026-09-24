@@ -53,6 +53,11 @@ export const whatsappService = {
     return res.conversation
   },
 
+  async getConversationByNumber(number: string): Promise<WhatsAppConversationRaw | null> {
+    const res = await api.get<never, { conversation: WhatsAppConversationRaw | null }>("whatsapp/conversations/by-number", { params: { number } })
+    return res.conversation
+  },
+
   async sendMessageToConversation(id: number, text: string): Promise<void> {
     await api.post(`whatsapp/conversations/${id}/send`, { text })
   },
@@ -114,9 +119,9 @@ export const whatsappService = {
     templateName: string,
     languageCode: string,
     bodyVarValues?: string[],
-    context?: { personId?: number; opportunityId?: number },
-  ): Promise<void> {
-    await api.post("whatsapp/send-template", { to, templateName, languageCode, bodyVarValues, ...context })
+    context?: { personId?: number; opportunityId?: number; recipientName?: string },
+  ): Promise<{ conversationId: number; messageId: string }> {
+    return api.post("whatsapp/send-template", { to, templateName, languageCode, bodyVarValues, ...context })
   },
 
   async sendTemplateToConversation(conversationId: number, templateName: string, languageCode: string, bodyVarValues?: string[]): Promise<void> {

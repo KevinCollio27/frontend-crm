@@ -33,9 +33,11 @@ interface Props {
   contactName:     string | null
   contactEmail:    string | null
   contactPhone:    string | null
+  contactCountry:  string
+  personId:        number | null
 }
 
-export function Col2Tabs({ opportunityId, opportunityName, flowName, contactName, contactEmail, contactPhone }: Props) {
+export function Col2Tabs({ opportunityId, opportunityName, flowName, contactName, contactEmail, contactPhone, contactCountry, personId }: Props) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -77,7 +79,7 @@ export function Col2Tabs({ opportunityId, opportunityName, flowName, contactName
           <TabsPrimitive.Panel value="cotizaciones" className="outline-none"><CotizacionesTab opportunityId={opportunityId} opportunityName={opportunityName} flowName={flowName} contactEmail={contactEmail} /></TabsPrimitive.Panel>
           {/* <TabsPrimitive.Panel value="facturas" className="outline-none"><FacturasTab opportunityId={opportunityId} /></TabsPrimitive.Panel> */}
           <TabsPrimitive.Panel value="correo"       className="outline-none"><CorreoTab       opportunityId={opportunityId} contactName={contactName} contactEmail={contactEmail} /></TabsPrimitive.Panel>
-          <TabsPrimitive.Panel value="whatsapp"    className="outline-none"><WhatsAppTab    opportunityId={opportunityId} contactPhone={contactPhone} /></TabsPrimitive.Panel>
+          <TabsPrimitive.Panel value="whatsapp"    className="outline-none"><WhatsAppTab    opportunityId={opportunityId} personId={personId} contactName={contactName} contactPhone={contactPhone} contactCountry={contactCountry} /></TabsPrimitive.Panel>
         </div>
       </TabsPrimitive.Root>
 

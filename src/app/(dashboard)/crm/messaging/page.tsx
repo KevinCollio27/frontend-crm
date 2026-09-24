@@ -12,7 +12,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { MessagingNav, type AgentNavItem } from "@/components/dashboard/messaging/MessagingNav"
 import { ConversationList } from "@/components/dashboard/messaging/ConversationList"
 import { ConversationView } from "@/components/dashboard/messaging/ConversationView"
-import { conversationKey } from "@/components/dashboard/messaging/data"
+import {
+  conversationKey,
+  getDateGroup,
+  getNameInitials,
+  assistantMessageRole,
+  lastActivityAt,
+  mapWhatsAppConversation,
+} from "@/components/dashboard/messaging/data"
 import type { Conversation, MessagingView } from "@/components/dashboard/messaging/data"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { widgetAIService } from "@/services/widget-ai.service"
@@ -21,10 +28,9 @@ import { instagramService } from "@/services/instagram.service"
 import { facebookService } from "@/services/facebook.service"
 import type { WidgetConversationRaw, WidgetMessageRaw } from "@/types/widget-conversation"
 import type { WidgetAIRaw } from "@/types/widget-ai"
-import type { WhatsAppConversationMessageRaw, WhatsAppConversationRaw } from "@/types/whatsapp-conversation"
-import type { WhatsappTemplateRaw } from "@/types/whatsapp"
 import type { InstagramConversationMessageRaw, InstagramConversationRaw } from "@/types/instagram-conversation"
 import type { FacebookConversationMessageRaw, FacebookConversationRaw } from "@/types/facebook-conversation"
+import type { WhatsappTemplateRaw } from "@/types/whatsapp"
 import { useSidebar } from "@/components/ui/sidebar"
 import { useSessionStore } from "@/store/session.store"
 import { useEntityRealtime } from "@/hooks/useEntityRealtime"
@@ -45,17 +51,9 @@ function isFixedChannel(v: string): v is "my_inbox" | "whatsapp" | "instagram" |
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function getDateGroup(dateStr: string): Conversation["dateGroup"] {
-  const date = new Date(dateStr)
-  const now = new Date()
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const yesterday = new Date(today)
-  yesterday.setDate(yesterday.getDate() - 1)
-  if (date >= today) return "today"
-  if (date >= yesterday) return "yesterday"
-  return "older"
-}
+// getDateGroup, getNameInitials, assistantMessageRole, lastActivityAt y
+// mapWhatsAppConversation viven en data.ts — WhatsAppTab (detalle de oportunidad)
+// también los necesita para reusar ConversationView.
 
 function getInitials(email: string | null): string {
   if (!email) return "?"
@@ -65,56 +63,6 @@ function getInitials(email: string | null): string {
   return local.substring(0, 2).toUpperCase()
 }
 
-function getPhoneInitials(phone: string): string {
-  const digits = phone.replace(/\D/g, "")
-  return digits ? digits.slice(-2) : "WA"
-}
-
-// Mensajes viejos (previos a agregar `author`) no distinguen IA de operador humano —
-// por eso el default es "bot", no porque asumamos que todo assistant es la IA.
-function assistantMessageRole(author: "ai" | "human" | undefined): "bot" | "agent" {
-  return author === "human" ? "agent" : "bot"
-}
-
-function mapWhatsAppMessages(raws: WhatsAppConversationMessageRaw[]): Conversation["messages"] {
-  return raws.map((m, i) => ({
-    id: `${i}-${m.created_at}`,
-    role: m.role === "assistant" ? assistantMessageRole(m.author) : ("user" as const),
-    content: m.content,
-    createdAt: formatDistanceToNow(new Date(m.created_at), { addSuffix: true, locale: es }),
-    template: m.template,
-  }))
-}
-
-// `updated_at` de la conversación se pisa con cualquier escritura a la fila (ej. el
-// refresh de avatar de IG/FB en cada vista de la bandeja), no solo con mensajes nuevos —
-// para "hace X" y para ordenar la lista, lo que importa es el último mensaje real.
-function lastActivityAt(updatedAt: string, lastMessageCreatedAt?: string): string {
-  return lastMessageCreatedAt ?? updatedAt
-}
-
-function mapWhatsAppConversation(raw: WhatsAppConversationRaw): Conversation {
-  const lastMessage = raw.messages[raw.messages.length - 1]
-  const lastActivity = lastActivityAt(raw.updated_at, lastMessage?.created_at)
-  return {
-    id: String(raw.id),
-    channel: "whatsapp",
-    status: "open",
-    isRead: (raw.unread_count ?? 0) === 0,
-    unreadCount: raw.unread_count ?? 0,
-    isAiActive: raw.status !== "human_takeover",
-    lastMessageAt: formatDistanceToNow(new Date(lastActivity), { addSuffix: true, locale: es }),
-    lastMessageAtRaw: lastActivity,
-    dateGroup: getDateGroup(lastActivity),
-    visitorName: raw.visitor_name,
-    visitorPhone: raw.from_number,
-    visitorInitials: raw.visitor_name ? getNameInitials(raw.visitor_name) : getPhoneInitials(raw.from_number),
-    lastMessage: lastMessage?.content ?? "Sin mensajes",
-    messages: mapWhatsAppMessages(raw.messages),
-    windowOpen: raw.window_open,
-  }
-}
-
 function mapInstagramMessages(raws: InstagramConversationMessageRaw[]): Conversation["messages"] {
   return raws.map((m, i) => ({
     id: `${i}-${m.created_at}`,
@@ -122,12 +70,6 @@ function mapInstagramMessages(raws: InstagramConversationMessageRaw[]): Conversa
     content: m.content,
     createdAt: formatDistanceToNow(new Date(m.created_at), { addSuffix: true, locale: es }),
   }))
-}
-
-function getNameInitials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean)
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
-  return name.trim().slice(0, 2).toUpperCase()
 }
 
 function mapInstagramConversation(raw: InstagramConversationRaw): Conversation {

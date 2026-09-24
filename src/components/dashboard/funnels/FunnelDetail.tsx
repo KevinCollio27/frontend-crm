@@ -125,6 +125,8 @@ export function FunnelDetail({ data, onStatusChange }: Props) {
             contactName={data.person?.name ?? null}
             contactEmail={data.person_email}
             contactPhone={data.person_phone}
+            contactCountry={data.person_country}
+            personId={data.person_id}
           />
         </div>
 

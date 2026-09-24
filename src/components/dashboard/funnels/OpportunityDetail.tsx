@@ -128,6 +128,7 @@ export function OpportunityDetail({ id }: { id: number }) {
           origin:          originDetail?.value ?? null,
           person_email,
           person_phone,
+          person_country: raw.person?.pais_origen ?? "CL",
         })
       })
       .catch(() => {})

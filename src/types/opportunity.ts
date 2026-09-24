@@ -81,6 +81,7 @@ export interface OpportunityDetailRaw {
   person: {
     id: number
     name: string
+    pais_origen?: string | null
     person_detail?: { value: string; label: { key: string } | null }[]
   } | null
   organization: {
@@ -136,4 +137,5 @@ export interface OpportunityDetailData {
   origin: string | null
   person_email: string | null
   person_phone: string | null
+  person_country: string
 }
