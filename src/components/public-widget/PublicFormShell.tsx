@@ -74,16 +74,18 @@ function normalizeExternalUrl(url: string): string {
 }
 
 // Logo sobre fondo que respeta el tema (light/dark) — el de GOxT se invierte con
-// el tema; uno propio del cliente va sobre una placa blanca fija, sin importar el
-// tema de la página. No es solo por tamaño: muchos logos son PNG con fondo
-// transparente pensado para fondo claro, y en modo oscuro el texto oscuro se pierde
-// contra el fondo oscuro de la página (pasó con el de CamionGO). Invertir colores a
-// ciegas arruinaría un logo a color, así que en vez de adivinar, le damos un fondo
-// propio estable — funciona igual para logos claros, oscuros o a color.
+// el tema; uno propio del cliente va sobre una placa clara. La placa solo hace
+// falta en modo oscuro: ahí un logo con texto oscuro (PNG transparente pensado
+// para fondo claro) desaparece contra el fondo oscuro de la página (pasó con
+// CamionGO), así que necesita un respaldo blanco. En modo claro la página YA es
+// clara (bg-muted) — poner una placa blanca encima solo genera un recuadro visible
+// sin necesidad, así que ahí se funde con el mismo tono de la página en vez de
+// blanco puro. Invertir colores a ciegas arruinaría un logo a color, por eso el
+// respaldo en vez de adivinar cómo invertir.
 function ThemeAwareLogo({ logoUrl, className }: { logoUrl?: string | null; className: string }) {
   if (logoUrl) {
     return (
-      <span className={cn(className, "flex max-w-56 items-center justify-start rounded-md bg-white px-2.5 py-1.5 shadow-sm")}>
+      <span className={cn(className, "flex max-w-56 items-center justify-start rounded-md bg-muted px-2.5 py-1.5 dark:bg-white dark:shadow-sm")}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={logoUrl} alt="" className="h-full max-h-full w-auto max-w-full object-contain object-left" />
       </span>
@@ -356,7 +358,7 @@ export function PublicFormShell({
             <ThemeAwareLogo logoUrl={logoUrl} className="h-14 w-auto" />
           </a>
         </div>
-        <div className="mx-auto w-full max-w-xl px-4 pt-20 pb-12">
+        <div className="mx-auto w-full max-w-xl px-4 pt-28 pb-12">
           <div className="flex flex-col gap-6">
             {cardContent}
             {footer}
