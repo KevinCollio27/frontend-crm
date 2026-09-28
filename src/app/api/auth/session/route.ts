@@ -22,14 +22,17 @@ export async function POST(req: Request) {
 
 // PATCH — update workspace_id after workspace creation (o limpiarlo, cuando no
 // queda ningún workspace disponible — workspaceId: null borra la cookie en vez
-// de guardar el string "null")
+// de guardar el string "null").
+// Usa la vida máxima de una sesión (90 días): si workspace_id vence antes que
+// session_token, el proxy manda al usuario a /create-workspace aunque tenga
+// workspaces. Que sobreviva a la sesión es inofensivo — sin token no sirve.
 export async function PATCH(req: Request) {
   const { workspaceId } = await req.json();
   const jar = await cookies();
   if (!jar.get("session_token")) return NextResponse.json({ success: false }, { status: 401 });
 
   if (workspaceId) {
-    jar.set("workspace_id", String(workspaceId), { ...BASE, maxAge: 30 * 24 * 60 * 60 });
+    jar.set("workspace_id", String(workspaceId), { ...BASE, maxAge: 90 * 24 * 60 * 60 });
   } else {
     jar.delete("workspace_id");
   }

@@ -18,12 +18,12 @@ export function proxy(req: NextRequest) {
   }
 
   if (isAuth && token) {
-    const dest = workspaceId ? "/chat" : "/create-workspace";
+    const dest = workspaceId ? "/chat" : "/api/auth/resume";
     return NextResponse.redirect(new URL(dest, req.url));
   }
 
   if (isDashboard && token && !workspaceId) {
-    return NextResponse.redirect(new URL("/create-workspace", req.url));
+    return NextResponse.redirect(new URL("/api/auth/resume", req.url));
   }
 
   return NextResponse.next();
