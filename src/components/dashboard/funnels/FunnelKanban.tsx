@@ -27,7 +27,7 @@ import {
   CalendarIcon,
   ChevronDownIcon,
   Columns3Icon,
-  EyeIcon,
+  // EyeIcon,
   FileTextIcon,
   KanbanSquareIcon,
   ListIcon,
@@ -119,6 +119,8 @@ function formatTotal(value: number) {
   return `$${value.toLocaleString("es-CL")}`
 }
 
+type DetailTab = "cotizaciones" | "actividades"
+
 function stageDropId(stageId: number) {
   return `stage-${stageId}`
 }
@@ -138,7 +140,7 @@ interface OppCardProps {
   stages: FlowStage[]
   onMove: (stageId: number) => void
   onPreview: () => void
-  onViewDetail: () => void
+  onViewDetail: (tab?: DetailTab) => void
   onEdit: () => void
   onDelete: () => void
   onWon: () => void
@@ -182,11 +184,11 @@ const OppCard = React.memo(function OppCard({
           <DropdownMenuContent align="end" className="min-w-44">
             <DropdownMenuGroup>
               <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-              <DropdownMenuItem onClick={onPreview}>
+              {/* oculto hasta que el sheet deje de ser mock — <DropdownMenuItem onClick={onPreview}>
                 <EyeIcon />
                 Vista Previa
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={onViewDetail}>
+              </DropdownMenuItem> */}
+              <DropdownMenuItem onClick={() => onViewDetail()}>
                 <ArrowUpRightIcon />
                 Ver detalles
               </DropdownMenuItem>
@@ -278,6 +280,7 @@ const OppCard = React.memo(function OppCard({
       >
         <button
           type="button"
+          onClick={() => onViewDetail("cotizaciones")}
           className="flex h-7 flex-1 items-center justify-center gap-1.5 rounded border px-2.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
           <FileTextIcon className="size-3.5 shrink-0" />
@@ -285,6 +288,7 @@ const OppCard = React.memo(function OppCard({
         </button>
         <button
           type="button"
+          onClick={() => onViewDetail("actividades")}
           className="flex h-7 flex-1 items-center justify-center gap-1.5 rounded border px-2.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
           <ActivityIcon className="size-3.5 shrink-0" />
@@ -313,7 +317,7 @@ function SortableCard({
   stages: FlowStage[]
   onMove: (oppId: number, stageId: number) => void
   onPreview: (opp: Opportunity) => void
-  onViewDetail: (opp: Opportunity) => void
+  onViewDetail: (opp: Opportunity, tab?: DetailTab) => void
   onEdit: (opp: Opportunity) => void
   onDelete: (opp: Opportunity) => void
   onWon: (opp: Opportunity) => void
@@ -327,7 +331,7 @@ function SortableCard({
 
   const handleMove       = React.useCallback((stageId: number) => onMove(opp.id, stageId), [opp.id, onMove])
   const handlePreview    = React.useCallback(() => onPreview(opp), [opp, onPreview])
-  const handleViewDetail = React.useCallback(() => onViewDetail(opp), [opp, onViewDetail])
+  const handleViewDetail = React.useCallback((tab?: DetailTab) => onViewDetail(opp, tab), [opp, onViewDetail])
   const handleEdit       = React.useCallback(() => onEdit(opp), [opp, onEdit])
   const handleDelete     = React.useCallback(() => onDelete(opp), [opp, onDelete])
   const handleWon        = React.useCallback(() => onWon(opp), [opp, onWon])
@@ -374,7 +378,7 @@ interface DroppableColumnProps {
   stages: FlowStage[]
   onMove: (oppId: number, stageId: number) => void
   onPreview: (opp: Opportunity) => void
-  onViewDetail: (opp: Opportunity) => void
+  onViewDetail: (opp: Opportunity, tab?: DetailTab) => void
   onEdit: (opp: Opportunity) => void
   onDelete: (opp: Opportunity) => void
   onWon: (opp: Opportunity) => void
@@ -692,7 +696,9 @@ export function FunnelKanban() {
   const refresh = React.useCallback(() => setRefreshKey((k) => k + 1), [])
 
   const handlePreview    = React.useCallback((opp: Opportunity) => { setPreviewOpp(opp); setSheetOpen(true) }, [])
-  const handleViewDetail = React.useCallback((opp: Opportunity) => { router.push(`/crm/funnels/${opp.id}`) }, [router])
+  const handleViewDetail = React.useCallback((opp: Opportunity, tab?: DetailTab) => {
+    router.push(tab ? `/crm/funnels/${opp.id}?tab=${tab}` : `/crm/funnels/${opp.id}`)
+  }, [router])
   const handleEdit       = React.useCallback((opp: Opportunity) => { setEditOppId(opp.id) }, [])
 
   const handleDelete = React.useCallback(async (opp: Opportunity) => {

@@ -18,7 +18,7 @@ import {
   PencilIcon,
   RotateCcwIcon,
   Trash2Icon,
-  TrendingUpIcon,
+  // TrendingUpIcon,
   TrophyIcon,
   XCircleIcon,
 } from "lucide-react"
@@ -400,10 +400,10 @@ function getColumns(
                   <ExternalLinkIcon />
                   Ver Detalles
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onPreview(opp)}>
+                {/* oculto hasta que el sheet deje de ser mock — <DropdownMenuItem onClick={() => onPreview(opp)}>
                   <TrendingUpIcon />
                   Vista Previa
-                </DropdownMenuItem>
+                </DropdownMenuItem> */}
                 <DropdownMenuItem onClick={() => onEdit(opp)}>
                   <PencilIcon />
                   Editar

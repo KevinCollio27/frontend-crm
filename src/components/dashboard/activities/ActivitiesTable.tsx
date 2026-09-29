@@ -16,7 +16,7 @@ import {
   MoreHorizontal,
   PencilIcon,
   Trash2Icon,
-  UserIcon,
+  // UserIcon,
 } from "lucide-react"
 import * as React from "react"
 import { useRouter } from "next/navigation"
@@ -347,9 +347,9 @@ function getColumns(
                 <DropdownMenuItem onClick={() => onDetail(activity)}>
                   <ExternalLinkIcon /> Ver Detalles
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onPreview(activity)}>
+                {/* oculto hasta que el sheet deje de ser mock — <DropdownMenuItem onClick={() => onPreview(activity)}>
                   <UserIcon /> Vista Previa
-                </DropdownMenuItem>
+                </DropdownMenuItem> */}
                 <DropdownMenuItem onClick={() => onEdit(activity)}>
                   <PencilIcon /> Editar
                 </DropdownMenuItem>

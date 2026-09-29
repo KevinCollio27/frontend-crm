@@ -26,7 +26,7 @@ import {
   CalendarIcon,
   ChevronDownIcon,
   Columns3Icon,
-  EyeIcon,
+  // EyeIcon,
   KanbanSquareIcon,
   ListIcon,
   Loader2Icon,
@@ -274,9 +274,9 @@ const ActivityCard = React.memo(function ActivityCard({
           <DropdownMenuContent align="end" className="min-w-44">
             <DropdownMenuGroup>
               <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-              <DropdownMenuItem onClick={onPreview}>
+              {/* oculto hasta que el sheet deje de ser mock — <DropdownMenuItem onClick={onPreview}>
                 <EyeIcon /> Vista Previa
-              </DropdownMenuItem>
+              </DropdownMenuItem> */}
               <DropdownMenuItem onClick={onViewDetail}>
                 <ArrowUpRightIcon /> Ver detalles
               </DropdownMenuItem>

@@ -48,15 +48,17 @@ function KanbanColumn({
             {count}
           </span>
         </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="size-6 text-muted-foreground hover:text-foreground"
-          onClick={onAdd}
-        >
-          <PlusIcon className="size-3.5" />
-        </Button>
+        {onAdd && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-6 text-muted-foreground hover:text-foreground"
+            onClick={onAdd}
+          >
+            <PlusIcon className="size-3.5" />
+          </Button>
+        )}
       </div>
 
       {subtitle && (

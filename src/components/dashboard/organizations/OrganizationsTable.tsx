@@ -25,7 +25,7 @@ import {
   SearchIcon,
   SlidersHorizontalIcon,
   Trash2Icon,
-  UserIcon,
+  // UserIcon,
   UsersIcon,
   XIcon,
 } from "lucide-react"
@@ -298,10 +298,10 @@ function getColumns(
                   <ExternalLinkIcon />
                   Ver Detalles
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onPreview(org)}>
+                {/* oculto hasta que el sheet deje de ser mock — <DropdownMenuItem onClick={() => onPreview(org)}>
                   <UserIcon />
                   Vista Previa
-                </DropdownMenuItem>
+                </DropdownMenuItem> */}
                 <DropdownMenuItem onClick={() => onEdit(org)}>
                   <PencilIcon />
                   Editar

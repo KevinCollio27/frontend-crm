@@ -16,7 +16,7 @@ import {
   ChevronDown,
   Columns3Icon,
   DownloadIcon,
-  EyeIcon,
+  // EyeIcon,
   ListIcon,
   MoreHorizontal,
   PencilIcon,
@@ -317,10 +317,10 @@ function getColumns(
             <DropdownMenuContent align="end" className="min-w-48">
               <DropdownMenuGroup>
                 <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                <DropdownMenuItem onClick={() => onPreview(doc)}>
+                {/* oculto hasta que el sheet deje de ser mock — <DropdownMenuItem onClick={() => onPreview(doc)}>
                   <EyeIcon />
                   Vista Previa
-                </DropdownMenuItem>
+                </DropdownMenuItem> */}
                 <DropdownMenuItem onClick={() => onDownload(doc)}>
                   <DownloadIcon />
                   Descargar
