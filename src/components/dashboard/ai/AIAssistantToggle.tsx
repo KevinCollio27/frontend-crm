@@ -4,10 +4,15 @@ import { SparklesIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAIAssistant } from "@/context/AIAssistantContext";
+import { useIsPlatformAdmin } from "@/hooks/useIsPlatformAdmin";
 import { cn } from "@/lib/utils";
 
+// Solo visible para admins de plataforma mientras el asistente está en desarrollo.
 export function AIAssistantToggle() {
   const { toggle, isOpen } = useAIAssistant();
+  const isPlatformAdmin = useIsPlatformAdmin();
+
+  if (!isPlatformAdmin) return null;
 
   return (
     <TooltipProvider>

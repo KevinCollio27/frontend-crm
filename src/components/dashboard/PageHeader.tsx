@@ -37,7 +37,7 @@ export function PageHeader({ icon: Icon, title, description }: PageHeaderProps) 
         </div> */}
         {/* <CreateQuickMenu /> */}
         <ThemeToggle />
-        {/* <AIAssistantToggle /> */}
+        <AIAssistantToggle />
         <BellButton />
       </div>
     </header>
