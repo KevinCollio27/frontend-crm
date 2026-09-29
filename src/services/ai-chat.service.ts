@@ -38,6 +38,20 @@ export const aiChatService = {
     return res
   },
 
+  // Ejecuta la acción pendiente (ej. enviar la campaña) sin pasar por el modelo.
+  async confirm(conversationId: number, toolName: string): Promise<AiChatResponse> {
+    return await api.post<never, AiChatResponse>("ai/chat/confirm", { conversationId, toolName })
+  },
+
+  // Prueba de la campaña pendiente con exactamente lo que muestra la tarjeta.
+  async sendCampaignTest(conversationId: number): Promise<AiChatResponse> {
+    return await api.post<never, AiChatResponse>("ai/chat/campaign-test", { conversationId })
+  },
+
+  async cancel(conversationId: number, toolName: string): Promise<AiChatResponse> {
+    return await api.post<never, AiChatResponse>("ai/chat/cancel", { conversationId, toolName })
+  },
+
   async updateTitle(id: number, title: string): Promise<void> {
     await api.patch(`ai/conversations/${id}`, { title })
   },

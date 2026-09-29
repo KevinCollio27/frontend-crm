@@ -5,6 +5,7 @@ import {
   IconGitMerge,
 } from "@tabler/icons-react"
 import type { ComponentType } from "react"
+import type { AiChatBlock } from "@/types/ai-chat"
 
 export type ChatDateGroup = "today" | "yesterday" | "thisWeek" | "thisMonth" | "older"
 
@@ -14,6 +15,7 @@ export interface ChatMessage {
   content: string
   createdAt: string
   images?: string[]
+  blocks?: AiChatBlock[]
 }
 
 export interface ChatConversation {

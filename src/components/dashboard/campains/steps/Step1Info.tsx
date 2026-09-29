@@ -8,7 +8,8 @@ const MERGE_TAGS = [
   { tag: "{{nombre}}", desc: "Nombre del contacto" },
   { tag: "{{empresa}}", desc: "Nombre de la organización" },
   { tag: "{{correo}}", desc: "Correo del contacto" },
-  { tag: "{{ciudad}}", desc: "Ciudad del contacto" },
+  // Los contactos no tienen campo de ciudad — el backend no puede reemplazarla.
+  // { tag: "{{ciudad}}", desc: "Ciudad del contacto" },
   { tag: "{{fecha}}", desc: "Fecha de envío" },
 ]
 

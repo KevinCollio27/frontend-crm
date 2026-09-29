@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet"
 import { Stepper, type StepperStep } from "@/components/ui/stepper"
 import { confirmDialog } from "@/lib/confirm"
-import { campaignService, type CampaignDispatchPayload } from "@/services/campaign.service"
+import { campaignService, type CampaignAudiencePayload, type CampaignAudiencePreview, type CampaignDispatchPayload } from "@/services/campaign.service"
 import { Step1Info } from "./steps/Step1Info"
 import { Step2Audience } from "./steps/Step2Audience"
 import { Step3Content } from "./steps/Step3Content"
@@ -33,8 +33,32 @@ function transformVars(text: string): string {
     .replace(/\{\{nombre\}\}/gi, "{{name}}")
     .replace(/\{\{empresa\}\}/gi, "{{organization}}")
     .replace(/\{\{correo\}\}/gi, "{{email}}")
-    .replace(/\{\{ciudad\}\}/gi, "{{city}}")
+    // Los contactos no tienen campo de ciudad en la base — el backend dejaba "{{city}}" literal.
+    // .replace(/\{\{ciudad\}\}/gi, "{{city}}")
     .replace(/\{\{fecha\}\}/gi, new Date().toLocaleDateString("es-CL"))
+}
+
+function buildMessage(form: CampaignFormState): string {
+  if (form.contentMode === "blocks") return blocksToHtml(form.blocks)
+  if (form.contentMode === "html") return form.htmlContent
+  if (form.contentMode === "text") return form.textContent.replace(/\n/g, "<br>")
+  return form.htmlContent || form.textContent
+}
+
+// Misma regla que el backend: vacío si no hay imágenes ni texto visible.
+function hasVisibleContent(html: string): boolean {
+  if (/<img\b/i.test(html)) return true
+  return html.replace(/<[^>]*>/g, "").replace(/&nbsp;/gi, " ").trim().length > 0
+}
+
+function describeAudience(p: CampaignAudiencePreview): string {
+  const parts = [`Se enviarán emails a ${p.recipientCount} destinatario(s).`]
+  if (p.withoutEmail > 0) parts.push(`${p.withoutEmail} contacto(s) quedan fuera por no tener correo.`)
+  if (p.duplicateEmails > 0) parts.push(`${p.duplicateEmails} correo(s) repetidos recibirán una sola copia.`)
+  if (p.invalidEmails > 0) parts.push(`${p.invalidEmails} correo(s) con formato inválido no se enviarán.`)
+  if (p.bouncedExcluded > 0) parts.push(`${p.bouncedExcluded} correo(s) que ya rebotaron antes no se enviarán.`)
+  parts.push("Esta acción no se puede deshacer.")
+  return parts.join(" ")
 }
 
 // ─── Blocks → HTML ───────────────────────────────────────────────────────────
@@ -163,6 +187,7 @@ function CampaignWizard({ onClose, onSuccess, initialForm }: { onClose: () => vo
   const [step, setStep] = React.useState(1)
   const [form, setForm] = React.useState(() => ({ ...createEmptyCampaignForm(), ...initialForm }))
   const [sending, setSending] = React.useState(false)
+  const [checkingAudience, setCheckingAudience] = React.useState(false)
   const bodyRef = React.useRef<HTMLDivElement>(null)
 
   React.useEffect(() => {
@@ -176,10 +201,12 @@ function CampaignWizard({ onClose, onSuccess, initialForm }: { onClose: () => vo
       : form.customRecipients.some((r) => r.email.trim()) &&
         form.customRecipients.every((r) => !r.email.trim() || EMAIL_RE.test(r.email.trim()))
 
+  const contentOk = hasVisibleContent(buildMessage(form))
+
   const canNext =
     (step === 1 && form.name.trim().length > 0 && form.subject.trim().length > 0) ||
     (step === 2 && audienceOk) ||
-    step === 3 ||
+    (step === 3 && contentOk) ||
     step === 4
 
   function handleNext() {
@@ -191,41 +218,60 @@ function CampaignWizard({ onClose, onSuccess, initialForm }: { onClose: () => vo
     if (!form.name.trim()) { campaignNotify.error("Falta el nombre de la campaña"); setStep(1); return }
     if (!form.subject.trim()) { campaignNotify.error("Falta el asunto del correo"); setStep(1); return }
     if (!audienceOk) { campaignNotify.error("Falta seleccionar al menos un destinatario"); setStep(2); return }
+    if (!contentOk) { campaignNotify.error("El contenido del correo está vacío"); setStep(3); return }
 
-    const recipientCount =
-      form.audienceMode === "crm"
-        ? form.selectedContactIds.length
-        : form.customRecipients.filter((r) => r.email.trim()).length
+    const audience: CampaignAudiencePayload = {
+      audience: form.audienceMode === "custom" ? "custom_list" : "specific",
+      personIds: form.audienceMode === "crm" ? form.selectedContactIds : undefined,
+      organizationId: form.crmFilterOrganizationId ?? undefined,
+      customRecipients: form.audienceMode === "custom"
+        ? form.customRecipients.filter((r) => r.email.trim()).map((r) => ({ name: r.name, email: r.email }))
+        : undefined,
+    }
+
+    // Conteo real antes de confirmar — el backend descarta los contactos sin correo,
+    // así que la cantidad seleccionada no siempre es la que se envía.
+    let preview: CampaignAudiencePreview
+    setCheckingAudience(true)
+    try {
+      preview = await campaignService.previewAudience(audience)
+    } catch (err: any) {
+      campaignNotify.error(err?.message)
+      return
+    } finally {
+      setCheckingAudience(false)
+    }
+
+    if (preview.recipientCount === 0) {
+      campaignNotify.error("Ninguno de los destinatarios tiene correo")
+      setStep(2)
+      return
+    }
+    if (preview.limits.exceedsPerCampaign) {
+      campaignNotify.error(`El límite por campaña es ${preview.limits.perCampaign.toLocaleString("es-CL")} destinatarios. Divide la audiencia en tandas.`)
+      setStep(2)
+      return
+    }
+    if (preview.limits.exceedsDaily) {
+      campaignNotify.error(`Hoy quedan ${preview.limits.dailyRemaining.toLocaleString("es-CL")} envíos disponibles. El límite se restablece mañana.`)
+      return
+    }
 
     const ok = await confirmDialog({
       title: "¿Enviar campaña?",
-      description: `Se enviarán emails a ${recipientCount} destinatario(s). Esta acción no se puede deshacer.`,
+      description: describeAudience(preview),
       confirmText: "Sí, enviar",
       cancelText: "Cancelar",
       tone: "warning",
     })
     if (!ok) return
 
-    // Convertir contenido a HTML
-    let message = ""
-    if (form.contentMode === "blocks") message = blocksToHtml(form.blocks)
-    else if (form.contentMode === "html") message = form.htmlContent
-    else if (form.contentMode === "text") message = form.textContent.replace(/\n/g, "<br>")
-    else message = form.htmlContent || form.textContent
-
-    message = transformVars(message)
-    const subject = transformVars(form.subject)
-
     const payload: CampaignDispatchPayload = {
+      ...audience,
       campaignName: form.name,
-      audience: form.audienceMode === "custom" ? "custom_list" : "specific",
-      subject,
-      message,
-      personIds: form.audienceMode === "crm" ? form.selectedContactIds : undefined,
-      organizationId: form.crmFilterOrganizationId ?? undefined,
-      customRecipients: form.audienceMode === "custom"
-        ? form.customRecipients.filter((r) => r.email.trim()).map((r) => ({ name: r.name, email: r.email }))
-        : undefined,
+      subject: transformVars(form.subject),
+      message: transformVars(buildMessage(form)),
+      preheader: form.preheader.trim() ? transformVars(form.preheader) : undefined,
       blocksJson: form.contentMode === "blocks" && form.blocks.length > 0 ? form.blocks : undefined,
     }
 
@@ -291,10 +337,12 @@ function CampaignWizard({ onClose, onSuccess, initialForm }: { onClose: () => vo
               Siguiente
             </Button>
           ) : (
-            <Button type="button" onClick={handleSubmit} disabled={sending}>
-              {sending
-                ? <><Loader2Icon className="size-4 animate-spin" /> Enviando...</>
-                : <><SendIcon className="size-4" /> Enviar Campaña</>
+            <Button type="button" onClick={handleSubmit} disabled={sending || checkingAudience}>
+              {checkingAudience
+                ? <><Loader2Icon className="size-4 animate-spin" /> Revisando audiencia...</>
+                : sending
+                  ? <><Loader2Icon className="size-4 animate-spin" /> Enviando...</>
+                  : <><SendIcon className="size-4" /> Enviar Campaña</>
               }
             </Button>
           )}

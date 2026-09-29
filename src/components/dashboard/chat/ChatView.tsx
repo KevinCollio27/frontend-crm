@@ -26,6 +26,10 @@ import { useSessionStore } from "@/store/session.store"
 import { notify } from "@/lib/notify"
 import { aiAudioService } from "@/services/ai-audio.service"
 import { type ChatConversation, type ChatMessage, QUICK_ACTIONS } from "./data"
+import { EmailCampaignPreviewCard } from "./EmailCampaignPreviewCard"
+import { EmailCampaignStatsCard } from "./EmailCampaignStatsCard"
+import { EmailCampaignProgressCard } from "./EmailCampaignProgressCard"
+import { EmailCampaignSeriesStatsCard } from "./EmailCampaignSeriesStatsCard"
 
 // ─── Shared input bar ─────────────────────────────────────────────────────────
 
@@ -409,14 +413,61 @@ function UserBubble({ content, images }: { content: string; images?: string[] })
   )
 }
 
-function AssistantBubble({ content }: { content: string }) {
+export interface ChatBlockActions {
+  busyMessageId: string | null
+  locked: boolean
+  // Envía la campaña (o la tanda siguiente) pendiente de la conversación.
+  onSend: (messageId: string) => void
+  onSendTest: (messageId: string) => void
+  onPrompt: (prompt: string) => void
+}
+
+function AssistantBubble({ message, blockActions, isLatestProgress }: { message: ChatMessage; blockActions?: ChatBlockActions; isLatestProgress: boolean }) {
+  const campaignBlock = message.blocks?.find((b) => b.type === "email_campaign_preview")
+  const statsBlock = message.blocks?.find((b) => b.type === "email_campaign_stats")
+  const progressBlock = message.blocks?.find((b) => b.type === "email_campaign_progress")
+  const seriesBlock = message.blocks?.find((b) => b.type === "email_campaign_series_stats")
+
   return (
     <div className="flex items-start gap-3">
       <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-violet-100 dark:bg-violet-950/40">
         <IconSparkles size={14} className="text-violet-600 dark:text-violet-400" />
       </div>
-      <div className="flex-1 pt-0.5 text-sm leading-relaxed text-foreground">
-        <MarkdownContent content={content} />
+      <div className="min-w-0 flex-1 pt-0.5 text-sm leading-relaxed text-foreground">
+        {/* Con tarjeta, el resumen en texto sobra: se muestra solo la introducción. */}
+        <MarkdownContent content={campaignBlock ? campaignBlock.data.intro : message.content} />
+        {campaignBlock && (
+          <EmailCampaignPreviewCard
+            block={campaignBlock}
+            busy={blockActions?.busyMessageId === message.id}
+            disabled={!!blockActions?.locked}
+            onSend={() => blockActions?.onSend(message.id)}
+            onSendTest={() => blockActions?.onSendTest(message.id)}
+          />
+        )}
+        {progressBlock && (
+          <EmailCampaignProgressCard
+            block={progressBlock}
+            busy={blockActions?.busyMessageId === message.id}
+            // Solo la tarjeta más reciente puede disparar la tanda siguiente.
+            disabled={!!blockActions?.locked || !isLatestProgress}
+            onSendNextBatch={() => blockActions?.onSend(message.id)}
+          />
+        )}
+        {seriesBlock && (
+          <EmailCampaignSeriesStatsCard
+            block={seriesBlock}
+            disabled={!!blockActions?.locked}
+            onPrompt={(prompt) => blockActions?.onPrompt(prompt)}
+          />
+        )}
+        {statsBlock && (
+          <EmailCampaignStatsCard
+            block={statsBlock}
+            disabled={!!blockActions?.locked}
+            onFollowUp={(prompt) => blockActions?.onPrompt(prompt)}
+          />
+        )}
       </div>
     </div>
   )
@@ -429,6 +480,7 @@ interface ChatViewProps {
   onSubmit: (prompt: string, files: File[]) => void
   sending?: boolean
   onOpenHistory?: () => void
+  blockActions?: ChatBlockActions
 }
 
 function HistoryBar({ onOpenHistory }: { onOpenHistory?: () => void }) {
@@ -443,7 +495,7 @@ function HistoryBar({ onOpenHistory }: { onOpenHistory?: () => void }) {
   )
 }
 
-export function ChatView({ conversation, onSubmit, sending = false, onOpenHistory }: ChatViewProps) {
+export function ChatView({ conversation, onSubmit, sending = false, onOpenHistory, blockActions }: ChatViewProps) {
   const messagesEndRef = React.useRef<HTMLDivElement>(null)
 
   React.useEffect(() => {
@@ -498,6 +550,10 @@ export function ChatView({ conversation, onSubmit, sending = false, onOpenHistor
     )
   }
 
+  const latestProgressId = [...conversation.messages]
+    .reverse()
+    .find((m) => m.blocks?.some((b) => b.type === "email_campaign_progress"))?.id
+
   // ── Active chat ──────────────────────────────────────────────────────────
   return (
     <div className="flex h-full flex-col">
@@ -508,7 +564,12 @@ export function ChatView({ conversation, onSubmit, sending = false, onOpenHistor
             msg.role === "user" ? (
               <UserBubble key={msg.id} content={msg.content} images={msg.images} />
             ) : (
-              <AssistantBubble key={msg.id} content={msg.content} />
+              <AssistantBubble
+                key={msg.id}
+                message={msg}
+                blockActions={blockActions}
+                isLatestProgress={msg.id === latestProgressId}
+              />
             )
           )}
           {sending && (

@@ -13,7 +13,24 @@ import { aiChatService } from "@/services/ai-chat.service"
 import { aiChatImageService } from "@/services/ai-chat-image.service"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
-import type { AiConversationGrouped, AiConversationListItem } from "@/types/ai-chat"
+import type { AiChatBlockUpdate, AiConversationGrouped, AiConversationListItem } from "@/types/ai-chat"
+
+// El backend avisa qué tarjetas anteriores cambiaron de estado (reemplazada, enviada, cancelada).
+function applyBlockUpdates(messages: ChatMessage[], updates?: AiChatBlockUpdate[]): ChatMessage[] {
+  if (!updates?.length) return messages
+  return messages.map((m) => {
+    const update = updates.find((u) => String(u.messageId) === m.id)
+    if (!update || !m.blocks) return m
+    return {
+      ...m,
+      blocks: m.blocks.map((b) => b.type !== "email_campaign_preview" ? b : {
+        ...b,
+        status: update.status,
+        data: update.campaignId ? { ...b.data, campaignId: update.campaignId } : b.data,
+      }),
+    }
+  })
+}
 
 function groupedToList(grouped: AiConversationGrouped): ChatConversation[] {
   const entries: [ChatDateGroup, AiConversationListItem[]][] = [
@@ -42,6 +59,7 @@ export default function ChatPage() {
   const [selectedId, setSelectedId]       = React.useState<string | null>(null)
   const [currentMessages, setCurrentMessages] = React.useState<ChatMessage[]>([])
   const [sending, setSending]             = React.useState(false)
+  const [busyBlockId, setBusyBlockId]     = React.useState<string | null>(null)
 
   const isMobile = useIsMobile()
   // Lista (historial) ⇄ Chat en mobile — a diferencia de Mensajería/Correo, acá se
@@ -97,6 +115,7 @@ export default function ChatPage() {
             content: m.content,
             createdAt: m.created_at,
             images: m.images,
+            blocks: m.metadata?.blocks,
           }))
       )
     } catch {
@@ -154,12 +173,13 @@ export default function ChatPage() {
       })
 
       const assistantMsg: ChatMessage = {
-        id: `ai-${Date.now()}`,
+        id: response.messageId ? String(response.messageId) : `ai-${Date.now()}`,
         role: "assistant",
         content: response.content,
         createdAt: "ahora",
+        blocks: response.metadata?.blocks,
       }
-      setCurrentMessages((prev) => [...prev, assistantMsg])
+      setCurrentMessages((prev) => [...applyBlockUpdates(prev, response.metadata?.blockUpdates), assistantMsg])
 
       const newId = String(response.conversationId)
       if (selectedId !== newId) setSelectedId(newId)
@@ -170,6 +190,50 @@ export default function ChatPage() {
       setCurrentMessages((prev) => prev.filter((m) => m.id !== userMsg.id))
     } finally {
       setSending(false)
+    }
+  }
+
+  // "Enviar campaña" de la tarjeta: ejecuta lo pendiente directo en el backend, sin
+  // pasar por el modelo — se envía exactamente lo que muestra la tarjeta.
+  const handleBlockSend = async (messageId: string) => {
+    if (!selectedId || busyBlockId) return
+    setBusyBlockId(messageId)
+    try {
+      const res = await aiChatService.confirm(Number(selectedId), "createEmailCampaign")
+      const userMsg: ChatMessage = { id: `tmp-${Date.now()}`, role: "user", content: "Confirmar", createdAt: "ahora" }
+      const resultMsg: ChatMessage = {
+        id: res.messageId ? String(res.messageId) : `ai-${Date.now()}`,
+        role: "assistant",
+        content: res.content,
+        createdAt: "ahora",
+        blocks: res.metadata?.blocks,
+      }
+      setCurrentMessages((prev) => [...applyBlockUpdates(prev, res.metadata?.blockUpdates), userMsg, resultMsg])
+    } catch {
+      toast.error("No se pudo enviar la campaña")
+    } finally {
+      setBusyBlockId(null)
+    }
+  }
+
+  const handleBlockTest = async (messageId: string) => {
+    if (!selectedId || busyBlockId) return
+    setBusyBlockId(messageId)
+    try {
+      const res = await aiChatService.sendCampaignTest(Number(selectedId))
+      const userMsg: ChatMessage = { id: `tmp-${Date.now()}`, role: "user", content: "Enviar prueba", createdAt: "ahora" }
+      const resultMsg: ChatMessage = {
+        id: res.messageId ? String(res.messageId) : `ai-${Date.now()}`,
+        role: "assistant",
+        content: res.content,
+        createdAt: "ahora",
+        blocks: res.metadata?.blocks,
+      }
+      setCurrentMessages((prev) => [...applyBlockUpdates(prev, res.metadata?.blockUpdates), userMsg, resultMsg])
+    } catch {
+      toast.error("No se pudo enviar la prueba")
+    } finally {
+      setBusyBlockId(null)
     }
   }
 
@@ -243,6 +307,13 @@ export default function ChatPage() {
             onSubmit={handleSubmit}
             sending={sending}
             onOpenHistory={isMobile ? () => setMobileShowChat(false) : undefined}
+            blockActions={{
+              busyMessageId: busyBlockId,
+              locked: sending || busyBlockId !== null,
+              onSend: handleBlockSend,
+              onSendTest: handleBlockTest,
+              onPrompt: (prompt) => handleSubmit(prompt, []),
+            }}
           />
         </div>
       </div>

@@ -28,15 +28,35 @@ export interface CampaignListParams {
   filter?: string
 }
 
-export interface CampaignDispatchPayload {
-  campaignName: string
+export interface CampaignAudiencePayload {
   audience: "all" | "recent" | "organization" | "specific" | "custom_list"
-  subject: string
-  message: string
   personIds?: number[]
   organizationId?: number
   customRecipients?: { name: string; email: string }[]
+}
+
+export interface CampaignDispatchPayload extends CampaignAudiencePayload {
+  campaignName: string
+  subject: string
+  message: string
+  preheader?: string
   blocksJson?: unknown[]
+}
+
+export interface CampaignAudiencePreview {
+  recipientCount: number
+  withoutEmail: number
+  invalidEmails: number
+  duplicateEmails: number
+  bouncedExcluded: number
+  sample: { name: string; email: string }[]
+  limits: {
+    perCampaign: number
+    dailyLimit: number
+    dailyRemaining: number
+    exceedsPerCampaign: boolean
+    exceedsDaily: boolean
+  }
 }
 
 export interface CampaignDispatchResult {
@@ -69,6 +89,11 @@ export const campaignService = {
   async getEvents(id: number): Promise<CampaignContactEvent[]> {
     const res = await api.get<never, { contacts: CampaignContactEvent[] }>(`marketing/campaigns/${id}/events`)
     return res.contacts
+  },
+
+  async previewAudience(payload: CampaignAudiencePayload): Promise<CampaignAudiencePreview> {
+    const res = await api.post<never, { data: CampaignAudiencePreview }>("marketing/audience/preview", payload)
+    return res.data
   },
 
   async dispatch(payload: CampaignDispatchPayload): Promise<CampaignDispatchResult> {
