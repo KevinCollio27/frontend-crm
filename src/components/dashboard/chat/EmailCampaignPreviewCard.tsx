@@ -6,7 +6,7 @@ import { useTheme } from "next-themes"
 import { CheckIcon, CopyIcon, FlaskConicalIcon, LayersIcon, Loader2Icon, MailIcon, SendIcon, TriangleAlertIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import type { EmailCampaignPreviewBlock } from "@/types/ai-chat"
+import type { EmailCampaignBatchInfo, EmailCampaignPreviewBlock } from "@/types/ai-chat"
 
 const MAX_BODY_HEIGHT = 420
 
@@ -125,7 +125,7 @@ export function EmailCampaignPreviewCard({ block, busy = false, disabled = false
 }
 
 // Plan del envío masivo: qué tandas ya salieron, cuál es esta y cuáles faltan.
-function BatchPlan({ batch }: { batch: NonNullable<EmailCampaignPreviewBlock["data"]["batch"]> }) {
+export function BatchPlan({ batch }: { batch: EmailCampaignBatchInfo }) {
   return (
     <div className="border-t px-4 py-2.5 text-xs">
       <div className="mb-1.5 flex items-center gap-2 text-muted-foreground">

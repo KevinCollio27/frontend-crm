@@ -6,11 +6,12 @@ import { CheckCircle2Icon, Loader2Icon, SendIcon, TriangleAlertIcon } from "luci
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { campaignService } from "@/services/campaign.service"
+import { whatsappCampaignService } from "@/services/whatsappCampaign.service"
 import type { EmailCampaignProgressBlock } from "@/types/ai-chat"
 
 const POLL_MS = 2000
-// Mismo ritmo que el backend: lotes de 50 por segundo.
-const SEND_RATE_PER_SEC = 50
+// Mismo ritmo que el backend: correo en lotes de 50/s; WhatsApp en lotes de 20 cada 1,5 s.
+const SEND_RATE_PER_SEC = { email: 50, whatsapp: 13 }
 
 type CampaignStatus = "processing" | "sent" | "partial" | "failed"
 
@@ -25,6 +26,7 @@ interface EmailCampaignProgressCardProps {
 // de Campañas). Al recargar la conversación consulta una vez y muestra el estado final.
 export function EmailCampaignProgressCard({ block, busy = false, disabled = false, onSendNextBatch }: EmailCampaignProgressCardProps) {
   const { data } = block
+  const channel = data.channel ?? "email"
   const [sent, setSent] = React.useState(0)
   const [status, setStatus] = React.useState<CampaignStatus>("processing")
 
@@ -34,7 +36,9 @@ export function EmailCampaignProgressCard({ block, busy = false, disabled = fals
 
     async function poll() {
       try {
-        const c = await campaignService.getById(data.campaignId)
+        const c = channel === "whatsapp"
+          ? await whatsappCampaignService.getById(data.campaignId)
+          : await campaignService.getById(data.campaignId)
         if (!active) return
         setSent(c.sent_count)
         setStatus(c.status as CampaignStatus)
@@ -46,12 +50,14 @@ export function EmailCampaignProgressCard({ block, busy = false, disabled = fals
 
     poll()
     return () => { active = false; clearTimeout(timer) }
-  }, [data.campaignId])
+  }, [data.campaignId, channel])
 
   const done = status !== "processing"
   const pct = data.total > 0 ? Math.min(100, Math.round((sent / data.total) * 100)) : 0
-  const secondsLeft = Math.ceil((data.total - sent) / SEND_RATE_PER_SEC)
-  const title = data.batch ? `tanda ${data.batch.index} de ${data.batch.total}` : "campaña"
+  const secondsLeft = Math.ceil((data.total - sent) / SEND_RATE_PER_SEC[channel])
+  const title = data.batch
+    ? `tanda ${data.batch.index} de ${data.batch.total}`
+    : channel === "whatsapp" ? "campaña de WhatsApp" : "campaña"
   const hasNext = !!data.batch && data.batch.index < data.batch.total
 
   return (

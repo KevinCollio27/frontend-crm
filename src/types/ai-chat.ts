@@ -45,9 +45,52 @@ export interface EmailCampaignBatchInfo {
   plan: { index: number; size: number; sent: boolean }[]
 }
 
+export interface WhatsappCampaignPreviewBlock {
+  type: "whatsapp_campaign_preview"
+  status: AiChatBlockStatus
+  toolName: "createWhatsappCampaign"
+  data: {
+    intro: string
+    name: string
+    templateName: string
+    category: string | null
+    body: string
+    template: WhatsappTemplateView
+    previewFor: string
+    recipientCount: number
+    recipients: string[]
+    excluded?: string
+    campaignId?: number
+    alternatives: WhatsappTemplateView[]
+    batch?: EmailCampaignBatchInfo
+    testSentTo?: string
+  }
+}
+
+export interface WhatsappTemplateView {
+  name: string
+  category: string | null
+  variables: number
+  headerMode: "none" | "text" | "image"
+  headerText?: string
+  headerImageUrl?: string
+  body: string
+  footerText?: string
+  buttons: { text: string; url?: string }[]
+}
+
+export interface WhatsappTemplatePickerBlock {
+  type: "whatsapp_template_picker"
+  data: {
+    templates: WhatsappTemplateView[]
+    recommended?: string
+  }
+}
+
 export interface EmailCampaignProgressBlock {
   type: "email_campaign_progress"
   data: {
+    channel?: "email" | "whatsapp"
     campaignId: number
     name: string
     total: number
@@ -111,11 +154,55 @@ export interface EmailCampaignSeriesStatsBlock {
   }
 }
 
+export type WhatsappSegmentKey = "read" | "not_read" | "replied" | "not_replied" | "failed"
+
+export interface WhatsappCampaignStatsBlock {
+  type: "whatsapp_campaign_stats"
+  data: {
+    id: number
+    name: string
+    templateName: string
+    sentAt: string
+    total: number
+    sent: number
+    delivered: number
+    read: number
+    replied: number
+    failed: number
+    deliveryRate: number
+    readRate: number
+    replyRate: number
+    failureReasons: { reason: string; count: number }[]
+    segments: Record<WhatsappSegmentKey, { count: number; sample: string[] }>
+    freshnessNote: string
+  }
+}
+
+export interface WhatsappCostBlock {
+  type: "whatsapp_cost"
+  data: {
+    scope: "period" | "campaign"
+    title: string
+    subtitle?: string
+    currency: string
+    total: number
+    estimated: boolean
+    messages: number
+    perMessage?: number
+    rows: { label: string; count: number; cost: number }[]
+    note: string
+  }
+}
+
 export type AiChatBlock =
   | EmailCampaignPreviewBlock
   | EmailCampaignStatsBlock
   | EmailCampaignSeriesStatsBlock
   | EmailCampaignProgressBlock
+  | WhatsappCampaignPreviewBlock
+  | WhatsappTemplatePickerBlock
+  | WhatsappCampaignStatsBlock
+  | WhatsappCostBlock
 
 export interface AiChatBlockUpdate {
   messageId: number

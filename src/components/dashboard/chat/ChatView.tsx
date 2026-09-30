@@ -28,8 +28,12 @@ import { aiAudioService } from "@/services/ai-audio.service"
 import { type ChatConversation, type ChatMessage, QUICK_ACTIONS } from "./data"
 import { EmailCampaignPreviewCard } from "./EmailCampaignPreviewCard"
 import { EmailCampaignStatsCard } from "./EmailCampaignStatsCard"
+import { WhatsappCampaignStatsCard } from "./WhatsappCampaignStatsCard"
+import { WhatsappCostCard } from "./WhatsappCostCard"
 import { EmailCampaignProgressCard } from "./EmailCampaignProgressCard"
 import { EmailCampaignSeriesStatsCard } from "./EmailCampaignSeriesStatsCard"
+import { WhatsappCampaignPreviewCard } from "./WhatsappCampaignPreviewCard"
+import { WhatsappTemplatePickerCard } from "./WhatsappTemplatePickerCard"
 
 // ─── Shared input bar ─────────────────────────────────────────────────────────
 
@@ -417,7 +421,7 @@ export interface ChatBlockActions {
   busyMessageId: string | null
   locked: boolean
   // Envía la campaña (o la tanda siguiente) pendiente de la conversación.
-  onSend: (messageId: string) => void
+  onSend: (messageId: string, toolName: "createEmailCampaign" | "createWhatsappCampaign") => void
   onSendTest: (messageId: string) => void
   onPrompt: (prompt: string) => void
 }
@@ -427,6 +431,10 @@ function AssistantBubble({ message, blockActions, isLatestProgress }: { message:
   const statsBlock = message.blocks?.find((b) => b.type === "email_campaign_stats")
   const progressBlock = message.blocks?.find((b) => b.type === "email_campaign_progress")
   const seriesBlock = message.blocks?.find((b) => b.type === "email_campaign_series_stats")
+  const whatsappBlock = message.blocks?.find((b) => b.type === "whatsapp_campaign_preview")
+  const templatePickerBlock = message.blocks?.find((b) => b.type === "whatsapp_template_picker")
+  const whatsappStatsBlock = message.blocks?.find((b) => b.type === "whatsapp_campaign_stats")
+  const costBlock = message.blocks?.find((b) => b.type === "whatsapp_cost")
 
   return (
     <div className="flex items-start gap-3">
@@ -434,14 +442,14 @@ function AssistantBubble({ message, blockActions, isLatestProgress }: { message:
         <IconSparkles size={14} className="text-violet-600 dark:text-violet-400" />
       </div>
       <div className="min-w-0 flex-1 pt-0.5 text-sm leading-relaxed text-foreground">
-        {/* Con tarjeta, el resumen en texto sobra: se muestra solo la introducción. */}
-        <MarkdownContent content={campaignBlock ? campaignBlock.data.intro : message.content} />
+        {/* Con tarjeta de vista previa, el resumen en texto sobra: se muestra solo la introducción. */}
+        <MarkdownContent content={campaignBlock?.data.intro ?? whatsappBlock?.data.intro ?? message.content} />
         {campaignBlock && (
           <EmailCampaignPreviewCard
             block={campaignBlock}
             busy={blockActions?.busyMessageId === message.id}
             disabled={!!blockActions?.locked}
-            onSend={() => blockActions?.onSend(message.id)}
+            onSend={() => blockActions?.onSend(message.id, "createEmailCampaign")}
             onSendTest={() => blockActions?.onSendTest(message.id)}
           />
         )}
@@ -451,7 +459,26 @@ function AssistantBubble({ message, blockActions, isLatestProgress }: { message:
             busy={blockActions?.busyMessageId === message.id}
             // Solo la tarjeta más reciente puede disparar la tanda siguiente.
             disabled={!!blockActions?.locked || !isLatestProgress}
-            onSendNextBatch={() => blockActions?.onSend(message.id)}
+            onSendNextBatch={() =>
+              blockActions?.onSend(message.id, progressBlock.data.channel === "whatsapp" ? "createWhatsappCampaign" : "createEmailCampaign")
+            }
+          />
+        )}
+        {templatePickerBlock && (
+          <WhatsappTemplatePickerCard
+            block={templatePickerBlock}
+            disabled={!!blockActions?.locked}
+            onChoose={(name) => blockActions?.onPrompt(`Usa la plantilla "${name}"`)}
+          />
+        )}
+        {whatsappBlock && (
+          <WhatsappCampaignPreviewCard
+            block={whatsappBlock}
+            busy={blockActions?.busyMessageId === message.id}
+            disabled={!!blockActions?.locked}
+            onSend={() => blockActions?.onSend(message.id, "createWhatsappCampaign")}
+            onSendTest={() => blockActions?.onPrompt("Envíame una prueba de esta plantilla por WhatsApp")}
+            onChooseTemplate={(name) => blockActions?.onPrompt(`Usa la plantilla "${name}"`)}
           />
         )}
         {seriesBlock && (
@@ -464,6 +491,14 @@ function AssistantBubble({ message, blockActions, isLatestProgress }: { message:
         {statsBlock && (
           <EmailCampaignStatsCard
             block={statsBlock}
+            disabled={!!blockActions?.locked}
+            onFollowUp={(prompt) => blockActions?.onPrompt(prompt)}
+          />
+        )}
+        {costBlock && <WhatsappCostCard block={costBlock} />}
+        {whatsappStatsBlock && (
+          <WhatsappCampaignStatsCard
+            block={whatsappStatsBlock}
             disabled={!!blockActions?.locked}
             onFollowUp={(prompt) => blockActions?.onPrompt(prompt)}
           />

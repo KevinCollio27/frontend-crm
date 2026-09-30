@@ -23,10 +23,11 @@ function applyBlockUpdates(messages: ChatMessage[], updates?: AiChatBlockUpdate[
     if (!update || !m.blocks) return m
     return {
       ...m,
-      blocks: m.blocks.map((b) => b.type !== "email_campaign_preview" ? b : {
-        ...b,
-        status: update.status,
-        data: update.campaignId ? { ...b.data, campaignId: update.campaignId } : b.data,
+      blocks: m.blocks.map((b) => {
+        const data = (d: typeof b.data) => (update.campaignId ? { ...d, campaignId: update.campaignId } : d)
+        if (b.type === "email_campaign_preview") return { ...b, status: update.status, data: data(b.data) as typeof b.data }
+        if (b.type === "whatsapp_campaign_preview") return { ...b, status: update.status, data: data(b.data) as typeof b.data }
+        return b
       }),
     }
   })
@@ -195,11 +196,11 @@ export default function ChatPage() {
 
   // "Enviar campaña" de la tarjeta: ejecuta lo pendiente directo en el backend, sin
   // pasar por el modelo — se envía exactamente lo que muestra la tarjeta.
-  const handleBlockSend = async (messageId: string) => {
+  const handleBlockSend = async (messageId: string, toolName: "createEmailCampaign" | "createWhatsappCampaign") => {
     if (!selectedId || busyBlockId) return
     setBusyBlockId(messageId)
     try {
-      const res = await aiChatService.confirm(Number(selectedId), "createEmailCampaign")
+      const res = await aiChatService.confirm(Number(selectedId), toolName)
       const userMsg: ChatMessage = { id: `tmp-${Date.now()}`, role: "user", content: "Confirmar", createdAt: "ahora" }
       const resultMsg: ChatMessage = {
         id: res.messageId ? String(res.messageId) : `ai-${Date.now()}`,
