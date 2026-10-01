@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Loader2Icon, RefreshCwIcon, SearchIcon, ZapIcon } from "lucide-react"
+import { BadgeCheckIcon, Loader2Icon, RefreshCwIcon, SearchIcon, ZapIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -156,10 +156,13 @@ export function ConversationList({
                     {/* Línea 1: visitante + hora */}
                     <div className="flex items-center justify-between gap-1 mb-0.5">
                       <span className={cn(
-                        "truncate text-sm text-foreground",
+                        "flex min-w-0 items-center gap-1 text-sm text-foreground",
                         !conv.isRead ? "font-semibold" : "font-medium"
                       )}>
-                        {conv.visitorName ?? "Visitante"}
+                        <span className="truncate">{conv.visitorName ?? "Visitante"}</span>
+                        {conv.visitorVerified && (
+                          <BadgeCheckIcon className="size-3.5 shrink-0 text-blue-600" aria-label="Correo verificado por el sistema" />
+                        )}
                       </span>
                       <span
                         className={cn(

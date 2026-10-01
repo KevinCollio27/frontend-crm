@@ -12,8 +12,8 @@ import {
 import {
   CheckCircle2Icon,
   ChevronDown,
+  Code2Icon,
   Columns3Icon,
-  CopyIcon,
   EyeIcon,
   GlobeIcon,
   ListIcon,
@@ -60,6 +60,7 @@ import { cn } from "@/lib/utils"
 import { widgetAIService } from "@/services/widget-ai.service"
 import type { WidgetAIRaw } from "@/types/widget-ai"
 import { CreateWidgetSheet } from "./CreateWidgetSheet"
+import { WidgetInstallSheet } from "./WidgetInstallSheet"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -192,7 +193,8 @@ const skeletonCell: Record<string, React.ReactNode> = {
 
 function getColumns(
   onEdit: (widget: WidgetAI) => void,
-  onToggleActive: (widget: WidgetAI) => void
+  onToggleActive: (widget: WidgetAI) => void,
+  onInstall: (widget: WidgetAI) => void
 ): ColumnDef<WidgetAI>[] {
   return [
   {
@@ -383,9 +385,11 @@ function getColumns(
               <DropdownMenuItem onClick={() => onEdit(widget)}>
                 <PencilIcon /> Editar
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigator.clipboard.writeText(widget.apiKey)}>
-                <CopyIcon /> Copiar API Key
-              </DropdownMenuItem>
+              {!widget.isWhatsappAgent && (
+                <DropdownMenuItem onClick={() => onInstall(widget)}>
+                  <Code2Icon /> Instalación
+                </DropdownMenuItem>
+              )}
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem
@@ -425,6 +429,7 @@ export function WidgetsTable() {
   const [rowSelection, setRowSelection] = React.useState({})
   const [createOpen, setCreateOpen] = React.useState(false)
   const [editId, setEditId] = React.useState<number | null>(null)
+  const [installId, setInstallId] = React.useState<number | null>(null)
   const [refreshKey, setRefreshKey] = React.useState(0)
   const [filtersOpen, setFiltersOpen] = React.useState(false)
   const [columnsOpen, setColumnsOpen] = React.useState(false)
@@ -456,7 +461,8 @@ export function WidgetsTable() {
             notify.error({ title: `No se pudo ${activating ? "activar" : "desactivar"} el widget`, description: "Intenta de nuevo." })
             setData((prev) => prev.map((w) => (w.id === widget.id ? { ...w, isActive: widget.isActive } : w)))
           }
-        }
+        },
+        (widget) => setInstallId(widget.id)
       ),
     []
   )
@@ -696,6 +702,14 @@ export function WidgetsTable() {
           open
           onOpenChange={setCreateOpen}
           onSuccess={() => setRefreshKey((k) => k + 1)}
+        />
+      )}
+      {installId !== null && (
+        <WidgetInstallSheet
+          key={installId}
+          widgetId={installId}
+          open
+          onOpenChange={(v) => { if (!v) setInstallId(null) }}
         />
       )}
       {editId !== null && (

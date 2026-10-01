@@ -1,12 +1,11 @@
 import * as React from "react"
-import { CheckIcon } from "lucide-react"
+import { CheckIcon, InfoIcon } from "lucide-react"
 
 import { Field } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Section } from "@/components/ui/section"
-import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
-import type { WidgetFormState, WidgetPosition } from "../shared/form-state"
+import { LEAD_CAPTURE_MODE_OPTIONS, type WidgetFormState, type WidgetPosition } from "../shared/form-state"
 
 const POSITIONS: { value: WidgetPosition; label: string }[] = [
   { value: "bottom-right", label: "Inferior derecha" },
@@ -23,24 +22,46 @@ interface Step4AvailabilityProps {
 export function Step4Availability({ form, setForm }: Step4AvailabilityProps) {
   return (
     <div className="mx-auto max-w-2xl space-y-5">
-      <Section title="Captura de Correo" description="Pídele el correo al visitante al inicio de la conversación.">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-sm font-medium">Solicitar correo al visitante</div>
-            <div className="text-xs text-muted-foreground">Si está activo, el bot pedirá el correo antes de responder.</div>
-          </div>
-          <Switch
-            checked={form.leadCaptureEnabled}
-            onCheckedChange={(v) => setForm((f) => ({ ...f, leadCaptureEnabled: v }))}
-          />
+      <Section title="Captura de Correo" description="Cómo identifica el widget a quien conversa.">
+        <div className="grid gap-3 sm:grid-cols-2">
+          {LEAD_CAPTURE_MODE_OPTIONS.map((opt) => {
+            const active = form.leadCaptureMode === opt.value
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, leadCaptureMode: opt.value }))}
+                className={cn(
+                  "relative rounded-lg border p-3 text-left transition-colors hover:border-primary/50",
+                  active && "border-primary bg-primary/5"
+                )}
+              >
+                <div className="pr-6 text-sm font-medium">{opt.label}</div>
+                <div className="mt-0.5 text-xs text-muted-foreground">{opt.description}</div>
+                {active && (
+                  <CheckIcon className="absolute top-2 right-2 size-4 rounded-full bg-primary p-0.5 text-primary-foreground" />
+                )}
+              </button>
+            )
+          })}
         </div>
-        {form.leadCaptureEnabled && (
+        {(form.leadCaptureMode === "optional" || form.leadCaptureMode === "required") && (
           <Field label="Mensaje de solicitud">
             <Input
               value={form.leadCaptureMessage}
               onChange={(e) => setForm((f) => ({ ...f, leadCaptureMessage: e.target.value }))}
             />
           </Field>
+        )}
+        {form.leadCaptureMode === "identified_only" && (
+          <div className="flex gap-2 rounded-lg border bg-muted/40 p-3 text-xs text-muted-foreground">
+            <InfoIcon className="mt-0.5 size-3.5 shrink-0" />
+            <p>
+              El chat no se mostrará a visitantes anónimos. Tu sistema debe identificar al usuario con{" "}
+              <code className="rounded bg-muted px-1 font-mono">GoxtWidget.identify()</code>. El secreto y el código de
+              integración están en <span className="font-medium text-foreground">Acciones → Instalación</span> de la tabla de widgets.
+            </p>
+          </div>
         )}
       </Section>
 

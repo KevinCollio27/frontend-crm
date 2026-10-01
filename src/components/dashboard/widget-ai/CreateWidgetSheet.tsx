@@ -87,6 +87,7 @@ function WidgetWizard({
   const [form, setForm] = React.useState(createEmptyWidgetForm())
   const [submitting, setSubmitting] = React.useState(false)
   const [loadingWidget, setLoadingWidget] = React.useState(isEditMode)
+  const [apiKey, setApiKey] = React.useState<string | undefined>(undefined)
   const bodyRef = React.useRef<HTMLDivElement>(null)
 
   React.useEffect(() => {
@@ -112,12 +113,14 @@ function WidgetWizard({
             answer: q.answer,
           })),
           prompt: widget.system_prompt,
-          leadCaptureEnabled: widget.lead_capture_enabled,
+          // Widgets anteriores a lead_capture_mode solo traen el switch
+          leadCaptureMode: widget.lead_capture_mode ?? (widget.lead_capture_enabled ? "optional" : "off"),
           leadCaptureMessage: widget.lead_capture_message ?? "",
           position: widget.position as WidgetFormState["position"],
           allowedDomains: widget.allowed_domains.join(", "),
         }
         setForm(mapped)
+        setApiKey(widget.api_key)
         setLoadingWidget(false)
       })
       .catch(() => {
@@ -161,7 +164,8 @@ function WidgetWizard({
         suggested_questions: form.faqs
           .filter((f) => f.question.trim() && f.answer.trim())
           .map(({ question, answer }) => ({ question, answer })),
-        lead_capture_enabled: form.leadCaptureEnabled,
+        lead_capture_mode: form.leadCaptureMode,
+        lead_capture_enabled: form.leadCaptureMode === "optional" || form.leadCaptureMode === "required",
         lead_capture_message: form.leadCaptureMessage || undefined,
         brand_color: form.brandColor,
         chat_title: form.chatTitle,
@@ -241,7 +245,7 @@ function WidgetWizard({
         {step === 2 && <Step2Knowledge form={form} setForm={setForm} widgetId={widgetId} />}
         {step === 3 && <Step3Actions form={form} setForm={setForm} />}
         {step === 4 && <Step4Availability form={form} setForm={setForm} />}
-        {step === 5 && <Step5Review form={form} />}
+        {step === 5 && <Step5Review form={form} apiKey={apiKey} />}
       </div>
 
       {/* Footer */}

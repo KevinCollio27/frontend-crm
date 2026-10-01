@@ -13,6 +13,8 @@ export interface WidgetConversationRaw {
   message_count: number
   last_message_preview: string | null
   captured_email: string | null
+  visitor_name?: string | null
+  identity_verified?: boolean
 }
 
 export interface WidgetConversationsPage {

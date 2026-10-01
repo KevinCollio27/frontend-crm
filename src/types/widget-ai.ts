@@ -1,3 +1,5 @@
+export type LeadCaptureMode = "off" | "optional" | "required" | "identified_only"
+
 export interface WidgetAIRaw {
   id: number
   workspace_id: number
@@ -9,11 +11,13 @@ export interface WidgetAIRaw {
   brand_logo_url: string | null
   position: string
   allowed_domains: string[]
+  identity_secret?: string | null
   is_active: boolean
   is_whatsapp_agent: boolean
   document_count: number
   used_in?: string[]
   lead_capture_enabled: boolean
+  lead_capture_mode?: LeadCaptureMode
   system_prompt: string
   welcome_message: string
   suggested_questions: { question: string; answer: string }[] | null

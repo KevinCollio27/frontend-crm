@@ -1,4 +1,17 @@
-import type { WidgetAIDocument } from "@/types/widget-ai"
+import type { LeadCaptureMode, WidgetAIDocument } from "@/types/widget-ai"
+
+export type { LeadCaptureMode }
+
+export const LEAD_CAPTURE_MODE_OPTIONS: { value: LeadCaptureMode; label: string; description: string }[] = [
+  { value: "off",             label: "Desactivada",                 description: "Nunca se pide el correo." },
+  { value: "optional",        label: "Opcional",                    description: "Se pide, pero el visitante puede omitirlo." },
+  { value: "required",        label: "Obligatoria",                 description: "No puede chatear sin dejar su correo." },
+  { value: "identified_only", label: "Solo usuarios identificados", description: "Solo lo usan los usuarios que tu sistema identifica." },
+]
+
+export const LEAD_CAPTURE_MODE_LABELS = Object.fromEntries(
+  LEAD_CAPTURE_MODE_OPTIONS.map((o) => [o.value, o.label])
+) as Record<LeadCaptureMode, string>
 
 export type WidgetPosition = "bottom-right" | "bottom-left" | "top-right" | "top-left"
 
@@ -53,7 +66,7 @@ export interface WidgetFormState {
   resources: WidgetResource[]
 
   // ── Leads y Disponibilidad — campos reales ──
-  leadCaptureEnabled: boolean
+  leadCaptureMode: LeadCaptureMode
   leadCaptureMessage: string
 
   // ── Apariencia — campos reales ──
@@ -91,7 +104,7 @@ export function createEmptyWidgetForm(): WidgetFormState {
     actionResource: false,
     resources: [],
 
-    leadCaptureEnabled: true,
+    leadCaptureMode: "optional",
     leadCaptureMessage: "Déjanos tu correo para enviarte más información.",
 
     position: "bottom-right",

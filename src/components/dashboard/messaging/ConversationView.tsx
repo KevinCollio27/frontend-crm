@@ -16,6 +16,7 @@ import {
   UserPlusIcon,
   ZapIcon,
   UserIcon,
+  BadgeCheckIcon,
 } from "lucide-react"
 import { SiFacebook, SiInstagram } from "react-icons/si"
 import { cn } from "@/lib/utils"
@@ -326,12 +327,20 @@ export function ConversationView({ conversation, loadingMessages = false, onConv
 
         {/* Info */}
         <div className="flex-1 min-w-0">
-          <p className="truncate text-sm font-semibold">{displayName}</p>
+          <p className="flex min-w-0 items-center gap-1 text-sm font-semibold">
+            <span className="truncate">{displayName}</span>
+            {conversation.visitorVerified && (
+              <BadgeCheckIcon className="size-3.5 shrink-0 text-blue-600" aria-label="Correo verificado por el sistema" />
+            )}
+          </p>
           <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
             <span className={cn("size-1.5 rounded-full", isWsp ? "bg-[#25D366]" : isIg ? "bg-pink-500" : isFb ? "bg-[#1877F2]" : "bg-blue-600")} />
             {channelLabel}
             {isIg && conversation.visitorUsername && (
               <><span>·</span><span className="truncate">@{conversation.visitorUsername}</span></>
+            )}
+            {conversation.visitorVerified && conversation.visitorEmail && conversation.visitorEmail !== conversation.visitorName && (
+              <><span>·</span><span className="truncate">{conversation.visitorEmail}</span></>
             )}
             {conversation.companyName && (
               <><span>·</span><span className="truncate">{conversation.companyName}</span></>

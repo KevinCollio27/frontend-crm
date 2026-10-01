@@ -1,5 +1,5 @@
 import api from "@/lib/api"
-import type { WidgetAIDocument, WidgetAIPage, WidgetAIRaw } from "@/types/widget-ai"
+import type { LeadCaptureMode, WidgetAIDocument, WidgetAIPage, WidgetAIRaw } from "@/types/widget-ai"
 import type { WidgetConversationsPage, WidgetMessageRaw } from "@/types/widget-conversation"
 
 export interface WidgetAIListParams {
@@ -22,6 +22,7 @@ export interface CreateWidgetPayload {
   welcome_message?: string
   suggested_questions?: { question: string; answer: string }[]
   lead_capture_enabled?: boolean
+  lead_capture_mode?: LeadCaptureMode
   lead_capture_message?: string
   brand_color?: string
   position?: string
@@ -38,6 +39,11 @@ export const widgetAIService = {
   async getById(id: number): Promise<WidgetAIRaw> {
     const res = await api.get<never, { data: WidgetAIRaw }>(`ai/widgets/${id}`)
     return res.data
+  },
+
+  async regenerateIdentitySecret(id: number): Promise<string> {
+    const res = await api.post<never, { data: { identity_secret: string } }>(`ai/widgets/${id}/identity-secret`)
+    return res.data.identity_secret
   },
 
   async create(payload: CreateWidgetPayload): Promise<WidgetAIRaw> {

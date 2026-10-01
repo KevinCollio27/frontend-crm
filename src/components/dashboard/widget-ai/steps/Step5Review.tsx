@@ -5,13 +5,15 @@ import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Section } from "@/components/ui/section"
-import type { WidgetFormState, WidgetPosition } from "../shared/form-state"
+import { LEAD_CAPTURE_MODE_LABELS, type WidgetFormState, type WidgetPosition } from "../shared/form-state"
 
 interface Step5ReviewProps {
   form: WidgetFormState
+  /** Solo en edición — al crear todavía no existe */
+  apiKey?: string
 }
 
-export function Step5Review({ form }: Step5ReviewProps) {
+export function Step5Review({ form, apiKey }: Step5ReviewProps) {
   const activeActions = [
     form.actionSchedule && "Agendar Reunión",
     form.actionLead && "Capturar Lead",
@@ -20,8 +22,7 @@ export function Step5Review({ form }: Step5ReviewProps) {
     form.actionResource && "Enviar Documento",
   ].filter(Boolean) as string[]
 
-  const slug = form.name.toLowerCase().trim().replace(/\s+/g, "-") || "widget"
-  const embed = `<script\n  src="https://api-crm.goxt.io/api/widget/embed.js"\n  data-api-key="SE_GENERARÁ_AL_CREAR"\n  data-widget="${slug}"\n></script>`
+  const embed = `<script\n  src="${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/widget/embed.js"\n  data-api-key="${apiKey}"\n></script>`
 
   function copyEmbed() {
     navigator.clipboard.writeText(embed)
@@ -38,7 +39,7 @@ export function Step5Review({ form }: Step5ReviewProps) {
             <ReviewRow label="Conocimiento" value={`${form.docFiles.length} doc · ${form.faqs.length} FAQ`} />
             <ReviewRow
               label="Captura de Correo"
-              value={form.leadCaptureEnabled ? "Activada" : "Desactivada"}
+              value={LEAD_CAPTURE_MODE_LABELS[form.leadCaptureMode]}
             />
           </div>
         </Section>
@@ -57,19 +58,29 @@ export function Step5Review({ form }: Step5ReviewProps) {
           </div>
         </Section>
 
-        <Section
-          title="Código Embed"
-          actions={
-            <Button type="button" variant="outline" size="sm" onClick={copyEmbed}>
-              <CopyIcon className="size-3.5" /> Copiar
-            </Button>
-          }
-        >
-          <pre className="overflow-x-auto rounded-md border bg-muted/60 p-3 font-mono text-xs whitespace-pre-wrap">
-            {embed}
-          </pre>
-          <p className="text-xs text-muted-foreground">El API Key se generará al crear el widget.</p>
-        </Section>
+        {apiKey ? (
+          <Section
+            title="Código Embed"
+            actions={
+              <Button type="button" variant="outline" size="sm" onClick={copyEmbed}>
+                <CopyIcon className="size-3.5" /> Copiar
+              </Button>
+            }
+          >
+            <pre className="overflow-x-auto rounded-md border bg-muted/60 p-3 font-mono text-xs whitespace-pre-wrap">
+              {embed}
+            </pre>
+            <p className="text-xs text-muted-foreground">
+              La identificación de usuarios está en Acciones → Instalación.
+            </p>
+          </Section>
+        ) : (
+          <Section title="Instalación">
+            <p className="text-xs text-muted-foreground">
+              Una vez creado, encontrarás el código para tu sitio en <span className="font-medium text-foreground">Acciones → Instalación</span> de la tabla de widgets.
+            </p>
+          </Section>
+        )}
       </div>
 
       <div className="space-y-2">

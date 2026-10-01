@@ -39,6 +39,7 @@ export interface Conversation {
   visitorUsername?: string     // Instagram (@handle)
   visitorAvatarUrl?: string    // Instagram — URL temporal de Meta, puede expirar
   visitorInitials: string
+  visitorVerified?: boolean    // Widget — identificado por el sistema anfitrión (correo con HMAC verificado)
 
   // Widget origin
   widgetName?: string

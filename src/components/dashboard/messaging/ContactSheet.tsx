@@ -6,6 +6,7 @@ import {
   MailIcon,
   PhoneIcon,
   UserPlusIcon,
+  BadgeCheckIcon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -47,7 +48,15 @@ export function ContactSheet({ open, onOpenChange, conversation }: ContactSheetP
           </Avatar>
 
           <div className="text-center">
-            <SheetTitle className="text-base font-semibold">{displayName}</SheetTitle>
+            <SheetTitle className="flex items-center justify-center gap-1 text-base font-semibold">
+              {displayName}
+              {conversation.visitorVerified && (
+                <BadgeCheckIcon className="size-4 text-blue-600" aria-label="Correo verificado por el sistema" />
+              )}
+            </SheetTitle>
+            {conversation.visitorVerified && (
+              <p className="mt-0.5 text-[11px] text-muted-foreground">Identificado por el sistema · correo verificado</p>
+            )}
             <div className="mt-1 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
               <span className={cn("size-1.5 rounded-full", isWsp ? "bg-[#25D366]" : isIg ? "bg-pink-500" : isFb ? "bg-[#1877F2]" : "bg-blue-600")} />
               {channelLabel}
