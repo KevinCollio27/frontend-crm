@@ -18,6 +18,8 @@ export interface WidgetConversationRaw {
   identity_verified?: boolean
   // "human_takeover" = un operador tomó el control desde el inbox y la IA no responde
   status?: "active" | "human_takeover"
+  // "Limpiar conversación" del widget: id del último mensaje que el visitante ya no ve
+  visitor_cleared_after_id?: number | null
 }
 
 export interface WidgetConversationsPage {

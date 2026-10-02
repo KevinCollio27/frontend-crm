@@ -17,6 +17,7 @@ import {
   ZapIcon,
   UserIcon,
   BadgeCheckIcon,
+  RotateCcwIcon,
 } from "lucide-react"
 import { SiFacebook, SiInstagram } from "react-icons/si"
 import { cn } from "@/lib/utils"
@@ -63,6 +64,21 @@ function conversationActions(conversation: Conversation) {
 }
 
 // ─── Bubble components ────────────────────────────────────────────────────────
+
+// Marca de "Limpiar conversación" del widget: lo anterior sigue aquí para el equipo,
+// pero el visitante ya no lo ve y la IA ya no lo tiene en memoria
+function ClearedDivider() {
+  return (
+    <div className="flex items-center gap-2 py-1">
+      <div className="h-px flex-1 bg-border" />
+      <span className="flex items-center gap-1 text-center text-[10px] text-muted-foreground">
+        <RotateCcwIcon className="size-3 shrink-0" />
+        El visitante limpió la conversación aquí · lo anterior ya no lo ve él ni la IA
+      </span>
+      <div className="h-px flex-1 bg-border" />
+    </div>
+  )
+}
 
 function DateChip({ label }: { label: string }) {
   return (
@@ -293,6 +309,60 @@ export function ConversationView({ conversation, loadingMessages = false, onConv
     }
   }
 
+  function renderBubble(msg: ConversationMessage, conv: Conversation) {
+    if (msg.role === "user") {
+      return (
+        <IncomingBubble
+          key={msg.id}
+          initials={conv.visitorInitials}
+          avatarUrl={conv.visitorAvatarUrl}
+          content={msg.content}
+          time={msg.createdAt}
+        />
+      )
+    }
+    if (msg.role === "bot") {
+      return (
+        <OutgoingBubble
+          key={msg.id}
+          content={msg.content}
+          time={msg.createdAt}
+          channel={conv.channel}
+          isBot
+        />
+      )
+    }
+    if (msg.role === "agent" && msg.template) {
+      const tpl = templateIndex?.get(`${msg.template.name}__${msg.template.language}`)
+      if (tpl) {
+        const parsed = parseTemplateForPreview(tpl)
+        const vars = msg.template.vars
+        return (
+          <TemplateOutgoingBubble
+            key={msg.id}
+            templateName={msg.template.name}
+            time={msg.createdAt}
+            preview={{
+              ...parsed,
+              bodyText: parsed.bodyText.replace(/\{\{(\d+)\}\}/g, (_, n) => vars[parseInt(n) - 1] || `{{${n}}}`),
+            }}
+          />
+        )
+      }
+    }
+    if (msg.role === "agent") {
+      return (
+        <OutgoingBubble
+          key={msg.id}
+          content={msg.content}
+          time={msg.createdAt}
+          channel={conv.channel}
+        />
+      )
+    }
+    return null
+  }
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
@@ -420,59 +490,14 @@ export function ConversationView({ conversation, loadingMessages = false, onConv
         <>
         <DateChip label="Hoy, 28 abr. 2026" />
 
-        {conversation.messages.map((msg) => {
-          if (msg.role === "user") {
-            return (
-              <IncomingBubble
-                key={msg.id}
-                initials={conversation.visitorInitials}
-                avatarUrl={conversation.visitorAvatarUrl}
-                content={msg.content}
-                time={msg.createdAt}
-              />
-            )
-          }
-          if (msg.role === "bot") {
-            return (
-              <OutgoingBubble
-                key={msg.id}
-                content={msg.content}
-                time={msg.createdAt}
-                channel={conversation.channel}
-                isBot
-              />
-            )
-          }
-          if (msg.role === "agent" && msg.template) {
-            const tpl = templateIndex?.get(`${msg.template.name}__${msg.template.language}`)
-            if (tpl) {
-              const parsed = parseTemplateForPreview(tpl)
-              const vars = msg.template.vars
-              return (
-                <TemplateOutgoingBubble
-                  key={msg.id}
-                  templateName={msg.template.name}
-                  time={msg.createdAt}
-                  preview={{
-                    ...parsed,
-                    bodyText: parsed.bodyText.replace(/\{\{(\d+)\}\}/g, (_, n) => vars[parseInt(n) - 1] || `{{${n}}}`),
-                  }}
-                />
-              )
-            }
-          }
-          if (msg.role === "agent") {
-            return (
-              <OutgoingBubble
-                key={msg.id}
-                content={msg.content}
-                time={msg.createdAt}
-                channel={conversation.channel}
-              />
-            )
-          }
-          return null
-        })}
+        {conversation.messages.map((msg) => (
+          <React.Fragment key={msg.id}>
+            {renderBubble(msg, conversation)}
+            {conversation.clearedAfterMessageId !== undefined && msg.id === String(conversation.clearedAfterMessageId) && (
+              <ClearedDivider />
+            )}
+          </React.Fragment>
+        ))}
 
         <div ref={messagesEndRef} />
         </>

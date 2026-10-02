@@ -141,6 +141,7 @@ function mapWidgetConversation(raw: WidgetConversationRaw, widget: WidgetAIRaw):
     visitorEmail: raw.captured_email ?? undefined,
     visitorInitials: raw.visitor_name ? getNameInitials(raw.visitor_name) : getInitials(raw.captured_email),
     visitorVerified: raw.identity_verified ?? false,
+    clearedAfterMessageId: raw.visitor_cleared_after_id ?? undefined,
     widgetName: widget.name,
     lastMessage: raw.last_message_preview ?? "Sin mensajes",
     messages: [],
