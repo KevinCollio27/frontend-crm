@@ -133,7 +133,7 @@ function mapWidgetConversation(raw: WidgetConversationRaw, widget: WidgetAIRaw):
     status: "open",
     isRead: false,
     unreadCount: 0,
-    isAiActive: true,
+    isAiActive: raw.status !== "human_takeover",
     lastMessageAt: formatDistanceToNow(new Date(raw.last_message_at), { addSuffix: true, locale: es }),
     lastMessageAtRaw: raw.last_message_at,
     dateGroup: getDateGroup(raw.last_message_at),
@@ -153,7 +153,9 @@ function mapMessages(raws: WidgetMessageRaw[]): Conversation["messages"] {
     .filter((m) => m.role !== "system")
     .map((m) => ({
       id: String(m.id),
-      role: m.role === "assistant" ? ("bot" as const) : ("user" as const),
+      role: m.role === "assistant"
+        ? (m.metadata?.author === "human" ? ("agent" as const) : ("bot" as const))
+        : ("user" as const),
       content: m.content,
       createdAt: formatDistanceToNow(new Date(m.created_at), { addSuffix: true, locale: es }),
     }))
@@ -260,6 +262,29 @@ export default function MessagingPage() {
           const exists = prev.some((c) => c.channel === "facebook" && c.id === mapped.id)
           const next = exists
             ? prev.map((c) => (c.channel === "facebook" && c.id === mapped.id ? mapped : c))
+            : [...prev, mapped]
+          return mergeAndSort(next)
+        })
+      })
+      .catch(() => {})
+  })
+
+  // Widget: mensaje del visitante, respuesta de la IA, o tomar control/envío desde otra
+  // sesión. El backend manda { id, widget_config_id }; al actualizar la conversación en la
+  // lista, el efecto de lazy-load vuelve a traer los mensajes si es la que está abierta.
+  useEntityRealtime("ai_conversation", (payload) => {
+    const { id: changedId, widget_config_id: widgetId } = (payload.data ?? {}) as { id?: number; widget_config_id?: number }
+    if (!changedId || !widgetId) return
+    const widget = widgetsRef.current.find((w) => w.id === widgetId)
+    if (!widget) return
+    widgetAIService.conversation(widgetId, changedId)
+      .then((raw) => {
+        if (!raw) return
+        const mapped = mapWidgetConversation(raw, widget)
+        setConversations((prev) => {
+          const exists = prev.some((c) => c.channel === "widget" && c.id === mapped.id)
+          const next = exists
+            ? prev.map((c) => (c.channel === "widget" && c.id === mapped.id ? mapped : c))
             : [...prev, mapped]
           return mergeAndSort(next)
         })

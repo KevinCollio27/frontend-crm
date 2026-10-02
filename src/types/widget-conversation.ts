@@ -1,5 +1,6 @@
 export interface WidgetConversationRaw {
   id: number
+  widget_config_id?: number
   external_visitor_id: string | null
   title: string
   visitor_metadata: {
@@ -15,6 +16,8 @@ export interface WidgetConversationRaw {
   captured_email: string | null
   visitor_name?: string | null
   identity_verified?: boolean
+  // "human_takeover" = un operador tomó el control desde el inbox y la IA no responde
+  status?: "active" | "human_takeover"
 }
 
 export interface WidgetConversationsPage {
@@ -32,4 +35,6 @@ export interface WidgetMessageRaw {
   created_at: string
   tokens_used?: number
   model_used?: string
+  // author "human" = lo escribió un operador desde el inbox (no la IA)
+  metadata?: { author?: "human"; operator?: { user_id: number; name: string } } | null
 }

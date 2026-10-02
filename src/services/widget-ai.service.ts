@@ -1,6 +1,6 @@
 import api from "@/lib/api"
 import type { LeadCaptureMode, WidgetAIDocument, WidgetAIPage, WidgetAIRaw } from "@/types/widget-ai"
-import type { WidgetConversationsPage, WidgetMessageRaw } from "@/types/widget-conversation"
+import type { WidgetConversationRaw, WidgetConversationsPage, WidgetMessageRaw } from "@/types/widget-conversation"
 
 export interface WidgetAIListParams {
   page?: number
@@ -92,6 +92,23 @@ export const widgetAIService = {
       { params }
     )
     return res.data
+  },
+
+  async conversation(widgetId: number, conversationId: number): Promise<WidgetConversationRaw> {
+    const res = await api.get<never, { data: WidgetConversationRaw }>(`ai/widgets/${widgetId}/conversations/${conversationId}`)
+    return res.data
+  },
+
+  async takeoverConversation(widgetId: number, conversationId: number): Promise<void> {
+    await api.patch(`ai/widgets/${widgetId}/conversations/${conversationId}/takeover`)
+  },
+
+  async releaseConversation(widgetId: number, conversationId: number): Promise<void> {
+    await api.patch(`ai/widgets/${widgetId}/conversations/${conversationId}/release`)
+  },
+
+  async sendMessageToConversation(widgetId: number, conversationId: number, text: string): Promise<void> {
+    await api.post(`ai/widgets/${widgetId}/conversations/${conversationId}/send`, { text })
   },
 
   async messages(widgetId: number, conversationId: number): Promise<WidgetMessageRaw[]> {

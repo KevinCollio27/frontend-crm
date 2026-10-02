@@ -23,6 +23,27 @@
 		},
 		{
 			"path": "../../../../../../../Downloads/dashboard-shell-01"
+		},
+		{
+			"path": "../../../../goxt-backend-cargo"
+		},
+		{
+			"path": "../../../../FrontendMVC"
+		},
+		{
+			"path": "../../../../goxt-backend-bi"
+		},
+		{
+			"path": "../../../../goxt-frontend-bi"
+		},
+		{
+			"path": "../../../../camiongo-web"
+		},
+		{
+			"path": "../../../../../../../../../xampp/htdocs/camiongo-api"
+		},
+		{
+			"path": "../../../../NODO-WebPage"
 		}
 	]
 }

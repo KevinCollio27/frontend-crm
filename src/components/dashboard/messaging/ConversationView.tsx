@@ -27,6 +27,7 @@ import { notify } from "@/lib/notify"
 import { whatsappService } from "@/services/whatsapp.service"
 import { instagramService } from "@/services/instagram.service"
 import { facebookService } from "@/services/facebook.service"
+import { widgetAIService } from "@/services/widget-ai.service"
 import { type Conversation, type ConversationMessage } from "./data"
 import { ContactSheet } from "./ContactSheet"
 import { SendTemplateToConversationSheet } from "./SendTemplateToConversationSheet"
@@ -40,6 +41,26 @@ const DIRECT_CHANNEL_SERVICE = {
   instagram: instagramService,
   facebook: facebookService,
 } as const
+
+// Enviar / tomar control / devolver a la IA. El widget usa el mismo contrato, pero sus
+// rutas del backend necesitan además el widgetId.
+function conversationActions(conversation: Conversation) {
+  const id = Number(conversation.id)
+  if (conversation.channel === "widget") {
+    const widgetId = conversation.widgetId!
+    return {
+      send: (text: string) => widgetAIService.sendMessageToConversation(widgetId, id, text),
+      takeover: () => widgetAIService.takeoverConversation(widgetId, id),
+      release: () => widgetAIService.releaseConversation(widgetId, id),
+    }
+  }
+  const service = DIRECT_CHANNEL_SERVICE[conversation.channel as "whatsapp" | "instagram" | "facebook"]
+  return {
+    send: (text: string) => service.sendMessageToConversation(id, text),
+    takeover: () => service.takeoverConversation(id),
+    release: () => service.releaseConversation(id),
+  }
+}
 
 // ─── Bubble components ────────────────────────────────────────────────────────
 
@@ -215,23 +236,18 @@ export function ConversationView({ conversation, loadingMessages = false, onConv
   const channelLabel = isWsp ? "WhatsApp" : isIg ? "Instagram" : isFb ? "Messenger" : conversation.widgetName ?? "Widget web"
   const displayName  = conversation.visitorName ?? `Visitante · ${channelLabel}`
   const isDirect     = isWsp || isIg || isFb
+  const isWidget     = conversation.channel === "widget" && !!conversation.widgetId
+  const canReply     = isDirect || isWidget
   const windowClosed = isDirect && conversation.windowOpen === false
 
   async function handleSend() {
     const text = message.trim()
-    if (!text || !conversation) return
+    if (!text || !conversation || !canReply) return
+    if (windowClosed) return
 
-    if (!isDirect) {
-      // Envío real de Widget todavía no implementado en el backend de conversaciones.
-      setMessage("")
-      return
-    }
-    if (conversation.windowOpen === false) return
-
-    const service = DIRECT_CHANNEL_SERVICE[conversation.channel as "whatsapp" | "instagram" | "facebook"]
     setSending(true)
     try {
-      await service.sendMessageToConversation(Number(conversation.id), text)
+      await conversationActions(conversation).send(text)
       const sentMessage: ConversationMessage = {
         id: `local-${Date.now()}`,
         role: "agent",
@@ -255,15 +271,15 @@ export function ConversationView({ conversation, loadingMessages = false, onConv
   }
 
   async function handleToggleTakeover() {
-    if (!conversation || !isDirect) return
-    const service = DIRECT_CHANNEL_SERVICE[conversation.channel as "whatsapp" | "instagram" | "facebook"]
+    if (!conversation || !canReply) return
+    const actions = conversationActions(conversation)
     setTakeoverLoading(true)
     try {
       if (conversation.isAiActive) {
-        await service.takeoverConversation(Number(conversation.id))
+        await actions.takeover()
         notify.info({ title: "Tomaste el control", description: "La IA dejó de responder en esta conversación." })
       } else {
-        await service.releaseConversation(Number(conversation.id))
+        await actions.release()
         notify.info({ title: "Se lo devolviste a la IA", description: "El agente IA volvió a responder en esta conversación." })
       }
       onConversationChange?.({ ...conversation, isAiActive: !conversation.isAiActive })
@@ -363,7 +379,7 @@ export function ConversationView({ conversation, loadingMessages = false, onConv
               <UserPlusIcon className="size-3.5" />
             )}
           </Button>
-          {isDirect && (
+          {canReply && (
             <Button
               variant="ghost"
               size="icon"
