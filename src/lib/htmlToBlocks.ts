@@ -81,6 +81,8 @@ export function resolveTemplateVariables(html: string, quotation: any): string {
         'sender.name': sender?.name || '',
         'workspace.name': workspace?.trade_name || workspace?.legal_name || '',
         'date': new Date().toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' }),
+        'quotation.month': formatMonth(quotation?.created_at, { month: 'long' }),
+        'quotation.month_year': formatMonth(quotation?.created_at, { month: 'long', year: 'numeric' }),
     };
 
     return html.replace(/\{\{([^}]+)\}\}/g, (match, key) => variables[key.trim()] ?? match);
@@ -89,6 +91,13 @@ export function resolveTemplateVariables(html: string, quotation: any): string {
 function formatCurrency(amount: number, currencyCode?: string): string {
     const formatted = new Intl.NumberFormat('es-CL').format(Math.round(amount));
     return `$${formatted} ${currencyCode || 'CLP'}`;
+}
+
+function formatMonth(date: string | Date | undefined, options: Intl.DateTimeFormatOptions): string {
+    const text = new Date(date ?? Date.now())
+        .toLocaleDateString('es-CL', { ...options, timeZone: 'America/Santiago' })
+        .replace(' de ', ' ');
+    return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 function formatDate(date: string | Date): string {

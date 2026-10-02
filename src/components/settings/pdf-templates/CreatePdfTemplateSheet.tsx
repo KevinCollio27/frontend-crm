@@ -11,6 +11,7 @@ import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/
 import { Stepper, type StepperStep } from "@/components/ui/stepper"
 import { Switch } from "@/components/ui/switch"
 import { pdfTemplateService } from "@/services/pdfTemplate.service"
+import { clearPdfTemplateCache } from "@/components/dashboard/quotations/shared/download-pdf"
 import type { PdfTemplate, PdfTemplateBlockDraft } from "@/types/pdfTemplate"
 import { BlockSection, type BlockDraft } from "./BlockSection"
 
@@ -91,6 +92,7 @@ function TemplateWizard({ onClose, entity, onSuccess }: WizardProps) {
       const result = isEdit
         ? await pdfTemplateService.update(entity!.id, payload)
         : await pdfTemplateService.create(payload)
+      clearPdfTemplateCache()
       notify.success({
         title: isEdit ? "Plantilla actualizada" : "Plantilla creada",
         description: `"${result.name}" se guardó correctamente.`,

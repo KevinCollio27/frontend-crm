@@ -113,6 +113,13 @@ export function clearAllPdfCache(): void {
   blobCache.clear()
 }
 
+/** Call when a template is created, edited, deleted or set as default — sin esto se sigue usando la versión vieja hasta recargar. */
+export function clearPdfTemplateCache(): void {
+  templateByIdCache.clear()
+  workspaceDefaultCache = null
+  blobCache.clear()
+}
+
 // ─── Shared blob builder ──────────────────────────────────────────────────────
 
 async function buildBlob(quotationId: number): Promise<Blob> {

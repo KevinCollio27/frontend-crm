@@ -42,6 +42,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { pdfTemplateService } from "@/services/pdfTemplate.service"
+import { clearPdfTemplateCache } from "@/components/dashboard/quotations/shared/download-pdf"
 import type { PdfTemplate } from "@/types/pdfTemplate"
 import { CreatePdfTemplateSheet } from "./CreatePdfTemplateSheet"
 import { PdfTemplatePreviewSheet } from "./PdfTemplatePreviewSheet"
@@ -254,6 +255,7 @@ export function PdfTemplatesTable() {
     setData((prev) => prev.map((r) => ({ ...r, isDefault: r.id === row.id })))
     try {
       await pdfTemplateService.setDefault(row.id)
+      clearPdfTemplateCache()
       notify.success({ title: "Plantilla predeterminada", description: `"${row.name}" es ahora la plantilla por defecto.` })
     } catch (error) {
       setData(previous)
@@ -266,6 +268,7 @@ export function PdfTemplatesTable() {
     if (!confirmed) return
     try {
       await pdfTemplateService.remove(row.id)
+      clearPdfTemplateCache()
       notify.success({ title: "Plantilla eliminada", description: `"${row.name}" fue eliminada.` })
       setRefreshKey((k) => k + 1)
     } catch (error) {

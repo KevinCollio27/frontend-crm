@@ -292,6 +292,8 @@ const VARIABLES = [
   "{{quotation.code}}",
   "{{quotation.total}}",
   "{{quotation.valid_until}}",
+  "{{quotation.month}}",
+  "{{quotation.month_year}}",
   "{{date}}",
 ]
 
