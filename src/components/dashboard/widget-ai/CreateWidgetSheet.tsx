@@ -189,7 +189,9 @@ function WidgetWizard({
         await Promise.all(
           form.docFiles.map(async ({ file }) => {
             const base64 = await fileToBase64(file)
-            return widgetAIService.uploadDocument(targetId, file.name, base64, file.type)
+            // En Windows el navegador suele dejar vacío el tipo de un .md, y el backend exige uno
+            const fileType = file.type || (file.name.toLowerCase().endsWith(".md") ? "text/markdown" : "text/plain")
+            return widgetAIService.uploadDocument(targetId, file.name, base64, fileType)
           })
         )
       }

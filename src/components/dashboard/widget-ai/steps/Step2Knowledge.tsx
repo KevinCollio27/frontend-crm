@@ -34,7 +34,9 @@ const PERSONALITIES: { key: string; prompt: string }[] = [
   },
 ]
 
-const ALLOWED_DOC_EXTENSIONS = ["pdf", "doc", "docx", "txt"]
+// Las que el backend sabe convertir a texto (fileWidget.service). ".doc" (Word antiguo) no:
+// se subía "bien" pero quedaba sin texto y el agente no aprendía nada.
+const ALLOWED_DOC_EXTENSIONS = ["pdf", "docx", "txt", "md"]
 const MAX_DOC_SIZE = 10 * 1024 * 1024
 
 function formatBytes(bytes: number): string {
@@ -113,7 +115,7 @@ function DocumentsDropzone({
     for (const file of Array.from(fileList)) {
       const ext = file.name.split(".").pop()?.toLowerCase() ?? ""
       if (!ALLOWED_DOC_EXTENSIONS.includes(ext)) {
-        notify.error({ title: "Formato no permitido", description: `"${file.name}" debe ser PDF, DOC, DOCX o TXT.` })
+        notify.error({ title: "Formato no permitido", description: `"${file.name}" debe ser PDF, DOCX, TXT o MD.` })
         continue
       }
       if (file.size > MAX_DOC_SIZE) {
@@ -145,12 +147,12 @@ function DocumentsDropzone({
       >
         <UploadIcon className="mx-auto mb-2 size-6 text-muted-foreground" />
         <div className="text-sm font-medium">Arrastra archivos o haz clic para subir</div>
-        <div className="mt-1 text-xs text-muted-foreground">PDF, DOCX, TXT · 10MB máx por archivo</div>
+        <div className="mt-1 text-xs text-muted-foreground">PDF, DOCX, TXT o MD · 10MB máx por archivo</div>
         <input
           ref={inputRef}
           type="file"
           multiple
-          accept=".pdf,.doc,.docx,.txt"
+          accept=".pdf,.docx,.txt,.md"
           className="hidden"
           onChange={(e) => { if (e.target.files?.length) handleFiles(e.target.files); e.target.value = "" }}
         />
@@ -224,7 +226,7 @@ export function Step2Knowledge({ form, setForm, widgetId }: Step2KnowledgeProps)
         />
       </Section>
 
-      <Section title="Documentos Base" description="PDF, DOC o TXT. Máx 10MB por archivo.">
+      <Section title="Documentos Base" description="PDF, DOCX, TXT o MD. Máx 10MB por archivo.">
         {widgetId && form.existingDocs.length > 0 && (
           <ExistingDocsList widgetId={widgetId} existingDocs={form.existingDocs} onRemoved={removeExistingDoc} />
         )}
