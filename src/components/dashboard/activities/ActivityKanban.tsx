@@ -64,7 +64,7 @@ import { KanbanFacetedFilter } from "@/components/ui/faceted-filter"
 import { ActivitiesTable, COLUMN_LABELS, DEFAULT_COLUMN_VISIBILITY, MOBILE_COLUMN_VISIBILITY } from "./ActivitiesTable"
 import { ActivityPreviewSheet } from "./ActivityPreviewSheet"
 import { CreateActivitySheet } from "./CreateActivitySheet"
-import { activityService } from "@/services/activity.service"
+import { activityService, type ActivityFilterOptions } from "@/services/activity.service"
 import { flowService } from "@/services/flow.service"
 import {
   OVERDUE_BADGE_CLASS,
@@ -73,6 +73,8 @@ import {
 import { useWorkspaceTimezone } from "@/hooks/useWorkspaceTimezone"
 import { useEntityRealtime } from "@/hooks/useEntityRealtime"
 import { useIsMobile } from "@/hooks/use-mobile"
+import { useSessionStore } from "@/store/session.store"
+import { loadActivityFilters, saveActivityFilters } from "@/lib/activity-filters-pref"
 import type { ActivityRaw } from "@/types/activity"
 import type { Flow } from "@/types/flow"
 
@@ -81,8 +83,8 @@ interface OppOption { id: number; name: string }
 type ActivityView = "board" | "lista"
 
 const VIEW_OPTIONS: { value: ActivityView; label: string; icon: React.ElementType }[] = [
-  { value: "lista", label: "Lista", icon: ListIcon         },
   { value: "board", label: "Board", icon: KanbanSquareIcon },
+  { value: "lista", label: "Lista", icon: ListIcon         },
 ]
 
 // Cuántas actividades carga cada columna al abrir el board, y cuántas trae cada
@@ -142,10 +144,6 @@ const BOARD_STAGES = [
   { id: "en_progreso", name: "En Progreso", color: "bg-blue-500"    },
   { id: "completada",  name: "Completada",  color: "bg-emerald-500" },
   { id: "cancelada",   name: "Cancelada",   color: "bg-slate-400"   },
-]
-
-const BOARD_ACTIVITY_TYPES = [
-  "Llamada", "Reunión", "Video Llamada", "Email", "Visita",
 ]
 
 // Estado — solo tiene sentido en Lista: en Board las columnas YA son esta
@@ -450,7 +448,7 @@ export function ActivityKanban() {
   const timezone     = useWorkspaceTimezone()
 
   const [view, setView] = React.useState<ActivityView>(
-    () => (searchParams.get("view") as ActivityView) ?? "lista"
+    () => (searchParams.get("view") as ActivityView) ?? "board"
   )
 
   React.useEffect(() => {
@@ -477,7 +475,21 @@ export function ActivityKanban() {
   const [editActivity, setEditActivity]         = React.useState<ActivityRaw | null>(null)
   const [sheetOpen, setSheetOpen]               = React.useState(false)
 
+  // Los filtros se guardan por usuario + workspace (activity-filters-pref.ts)
+  const userId      = useSessionStore((s) => s.user?.id ?? null)
+  const workspaceId = useSessionStore((s) => s.workspaceId)
+  // false hasta restaurar lo guardado: evita pedir datos sin filtros y volver a pedirlos filtrados
+  const [prefsReady, setPrefsReady]               = React.useState(false)
+  const hasSavedPrefRef                           = React.useRef(false)
+  const [filterOptions, setFilterOptions]         = React.useState<ActivityFilterOptions>({ responsibles: [], types: [] })
+
   const [search, setSearch]                       = React.useState("")
+  // El Board ahora busca en el servidor: se espera a que el usuario deje de escribir
+  const [debouncedSearch, setDebouncedSearch]     = React.useState("")
+  React.useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), 300)
+    return () => clearTimeout(t)
+  }, [search])
   const [status, setStatus]                       = React.useState("all")
   const [typeFilter, setTypeFilter]               = React.useState<string[]>([])
   const [priorityFilter, setPriorityFilter]       = React.useState<string[]>([])
@@ -505,13 +517,72 @@ export function ActivityKanban() {
       .then((list) => {
         setFlows(list)
         const def = list.find((f) => f.is_default)
-        if (def) setFlowId(def.id)
+        setFlowId((current) => {
+          // Guardado y vigente → se respeta (null = "todos los embudos", también es una elección)
+          if (hasSavedPrefRef.current && (current === null || list.some((f) => f.id === current))) return current
+          return def ? def.id : null
+        })
       })
       .catch(() => {})
   }, [])
 
-  // Reset opp selection when funnel changes
-  React.useEffect(() => { setOpportunityId(null) }, [flowId])
+  // Restaura los filtros guardados de este usuario en este workspace. Va en un effect (no en
+  // el estado inicial) porque localStorage no existe en el render del servidor.
+  React.useEffect(() => {
+    if (prefsReady || !userId || !workspaceId) return
+    const saved = loadActivityFilters(userId, workspaceId)
+    if (saved) {
+      hasSavedPrefRef.current = true
+      // ?view= en la URL manda (así vuelve el detalle a la vista desde la que se abrió)
+      if (!searchParams.get("view") && saved.view) setView(saved.view)
+      if (saved.flowId !== undefined) setFlowId(saved.flowId)
+      setOpportunityId(saved.opportunityId ?? null)
+      setStatus(saved.status ?? "all")
+      setTypeFilter(saved.types ?? [])
+      setPriorityFilter(saved.priorities ?? [])
+      setResponsibleFilter(saved.responsibles ?? [])
+    }
+    setPrefsReady(true)
+  }, [userId, workspaceId, prefsReady]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Guarda cada cambio. La búsqueda por texto no se guarda: es una consulta puntual.
+  React.useEffect(() => {
+    if (!prefsReady || !userId || !workspaceId) return
+    saveActivityFilters(userId, workspaceId, {
+      view,
+      flowId,
+      opportunityId,
+      status,
+      types: typeFilter,
+      priorities: priorityFilter,
+      responsibles: responsibleFilter,
+    })
+  }, [prefsReady, userId, workspaceId, view, flowId, opportunityId, status, typeFilter, priorityFilter, responsibleFilter])
+
+  // Opciones de Responsable y Tipo: de todo el workspace, no de las tarjetas cargadas
+  React.useEffect(() => {
+    activityService.getFilterOptions().then(setFilterOptions).catch(() => {})
+  }, [refreshKey])
+
+  // Al cambiar de embudo la oportunidad elegida deja de aplicar (va en el handler y no en un
+  // effect sobre flowId: ese effect también corría al montar y borraba la oportunidad guardada)
+  function handleFlowChange(id: number | null) {
+    setFlowId(id)
+    setOpportunityId(null)
+  }
+
+  // Filtros que resuelve el servidor — los mismos para las tarjetas, los contadores y la Lista.
+  // Antes Tipo/Prioridad/Responsable se aplicaban en memoria sobre las 30 tarjetas cargadas por
+  // columna, así que "mis actividades" mostraba solo una parte.
+  const serverFilters = React.useMemo(() => ({
+    ...(flowId        !== null ? { flowId }        : {}),
+    ...(opportunityId !== null ? { opportunityId } : {}),
+    ...(debouncedSearch ? { filter: debouncedSearch } : {}),
+    responsibleIds: responsibleFilter.map(Number).filter((n) => n > 0),
+    types:          typeFilter,
+    // En la base la prioridad va con mayúscula inicial ("Alta")
+    priorities:     priorityFilter.map((v) => v.charAt(0).toUpperCase() + v.slice(1)),
+  }), [flowId, opportunityId, debouncedSearch, responsibleFilter, typeFilter, priorityFilter])
 
   // Oportunidades únicas con actividades en el embudo seleccionado — para el
   // filtro "Oportunidad", compartido entre Board y Lista (no depende de la
@@ -539,7 +610,7 @@ export function ActivityKanban() {
   const [stagePages, setStagePages] = React.useState<Record<string, StagePageState>>({})
 
   React.useEffect(() => {
-    if (view !== "board") return
+    if (view !== "board" || !prefsReady) return
     let cancelled = false
     setLoading(true)
 
@@ -550,8 +621,7 @@ export function ActivityKanban() {
             status: stage.id,
             take: STAGE_PAGE_SIZE,
             page: 1,
-            ...(flowId        !== null ? { flowId }        : {}),
-            ...(opportunityId !== null ? { opportunityId } : {}),
+            ...serverFilters,
           })
           .then((page) => ({ stageId: stage.id, page }))
       )
@@ -570,7 +640,7 @@ export function ActivityKanban() {
     }).finally(() => { if (!cancelled) setLoading(false) })
 
     return () => { cancelled = true }
-  }, [view, flowId, opportunityId, timezone, refreshKey])
+  }, [view, prefsReady, serverFilters, timezone, refreshKey])
 
   function loadMoreForStage(stageId: string) {
     const current = stagePages[stageId]
@@ -584,8 +654,7 @@ export function ActivityKanban() {
         status: stageId,
         take: STAGE_PAGE_SIZE,
         page: nextPage,
-        ...(flowId        !== null ? { flowId }        : {}),
-        ...(opportunityId !== null ? { opportunityId } : {}),
+        ...serverFilters,
       })
       .then((page) => {
         setActivities((prev) => {
@@ -609,10 +678,10 @@ export function ActivityKanban() {
   const [stageCounts, setStageCounts]           = React.useState<Record<string, number>>({})
   const [realOverdueCount, setRealOverdueCount] = React.useState(0)
   React.useEffect(() => {
-    if (view !== "board") return
+    if (view !== "board" || !prefsReady) return
     let cancelled = false
     activityService
-      .getStatusCounts(flowId ?? undefined, opportunityId ?? undefined)
+      .getStatusCounts(serverFilters)
       .then(({ counts, overdue }) => {
         if (cancelled) return
         setStageCounts(Object.fromEntries(counts.map((c) => [c.status, c.count])))
@@ -620,7 +689,7 @@ export function ActivityKanban() {
       })
       .catch(() => { if (!cancelled) { setStageCounts({}); setRealOverdueCount(0) } })
     return () => { cancelled = true }
-  }, [view, flowId, opportunityId, refreshKey])
+  }, [view, prefsReady, serverFilters, refreshKey])
 
   const handlePreview = React.useCallback((activity: BoardActivity) => {
     setPreviewRawId(activity.rawId)
@@ -643,32 +712,19 @@ export function ActivityKanban() {
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
   )
 
-  const responsibleOptions = React.useMemo(() => {
-    const seen = new Set<string>()
-    return activities.filter((a) => {
-      if (seen.has(a.responsible.initials)) return false
-      seen.add(a.responsible.initials)
-      return true
-    }).map((a) => ({ value: a.responsible.initials, label: a.responsible.name }))
-  }, [activities])
+  const responsibleOptions = React.useMemo(
+    () => filterOptions.responsibles.map((u) => ({ value: String(u.id), label: u.name })),
+    [filterOptions.responsibles]
+  )
+  // Tipos reales del workspace (los más usados primero). Si hay uno elegido que ya no
+  // existe, se mantiene en la lista para poder desmarcarlo.
+  const typeOptions = React.useMemo(() => {
+    const names = [...filterOptions.types, ...typeFilter.filter((t) => !filterOptions.types.includes(t))]
+    return names.map((t) => ({ value: t, label: t }))
+  }, [filterOptions.types, typeFilter])
 
-  const filtered = React.useMemo(() => {
-    return activities.filter((a) => {
-      if (typeFilter.length        > 0 && !typeFilter.includes(a.type))                             return false
-      if (priorityFilter.length    > 0 && !priorityFilter.includes(a.priority))                     return false
-      if (responsibleFilter.length > 0 && !responsibleFilter.includes(a.responsible.initials))      return false
-      if (search) {
-        if (!a.title.toLowerCase().includes(search.toLowerCase())) return false
-      }
-      return true
-    })
-  }, [activities, search, typeFilter, priorityFilter, responsibleFilter])
-
-  // opportunityId no cuenta acá — ya se lo pasamos al endpoint de conteo real, así
-  // que el número de columna sigue siendo exacto con ese filtro activo. Solo los
-  // filtros que el backend no ve (tipo/prioridad/responsable/búsqueda) invalidan
-  // el conteo real y hacen caer al conteo local (lo cargado hasta el momento).
-  const hasClientOnlyFilters = typeFilter.length > 0 || priorityFilter.length > 0 || responsibleFilter.length > 0 || !!search
+  // Las tarjetas ya llegan filtradas desde el servidor
+  const filtered = activities
 
   // Mirror activities state in a ref so drag handlers always read the latest value
   const activitiesRef   = React.useRef<BoardActivity[]>([])
@@ -678,13 +734,10 @@ export function ActivityKanban() {
   const preDragInfoRef  = React.useRef<{ id: string; rawId: number; stageId: string } | null>(null)
   const predragFilteredRef = React.useRef(filtered)
   const statsActivities    = activeActivity ? predragFilteredRef.current : filtered
-  const overdueCount       = filtered.filter(isOverdue).length
 
-  // Mismo criterio que el conteo por columna: el total/atrasadas real del backend
-  // solo vale si no hay filtros que el backend no ve — si no, cae a lo cargado.
-  const realTotalCount = Object.values(stageCounts).reduce((sum, n) => sum + n, 0)
-  const displayTotal   = hasClientOnlyFilters ? filtered.length : realTotalCount
-  const displayOverdue = hasClientOnlyFilters ? overdueCount    : realOverdueCount
+  // Total y atrasadas reales del backend — ve los mismos filtros que las tarjetas
+  const displayTotal   = Object.values(stageCounts).reduce((sum, n) => sum + n, 0)
+  const displayOverdue = realOverdueCount
 
   const moveActivity = React.useCallback((activityId: string, targetStageId: string) => {
     const activity = activities.find((a) => a.id === activityId)
@@ -794,24 +847,25 @@ export function ActivityKanban() {
     }
   }
 
-  // Restablecer limpia lo relevante a la vista activa — search/Embudo/Oportunidad
-  // son compartidos, pero cada vista decide qué tan a fondo resetea (igual
-  // criterio que Funnels: Board no toca el Embudo seleccionado, Lista sí).
-  const hasActiveFilters = view === "board"
-    ? (typeFilter.length > 0 || priorityFilter.length > 0 || responsibleFilter.length > 0 || !!search || !!opportunityId)
-    : (!!search || status !== "all" || !!flowId || !!opportunityId)
+  // Cuántos filtros avanzados hay puestos — se muestra en el botón "Filtros" para que un
+  // filtro guardado no pase desapercibido con el panel cerrado. El Embudo no cuenta en Board
+  // (siempre hay uno elegido) y Estado solo existe en Lista (en Board son las columnas).
+  const activeFilterCount =
+    (opportunityId !== null ? 1 : 0) +
+    (typeFilter.length > 0 ? 1 : 0) +
+    (priorityFilter.length > 0 ? 1 : 0) +
+    (responsibleFilter.length > 0 ? 1 : 0) +
+    (view === "lista" && status !== "all" ? 1 : 0)
+  const hasActiveFilters = activeFilterCount > 0 || !!search
 
+  // Restablecer no toca el Embudo: es el contexto de trabajo, no un filtro puntual
   function resetFilters() {
     setSearch("")
     setOpportunityId(null)
-    if (view === "board") {
-      setTypeFilter([])
-      setPriorityFilter([])
-      setResponsibleFilter([])
-    } else {
-      setStatus("all")
-      setFlowId(null)
-    }
+    setTypeFilter([])
+    setPriorityFilter([])
+    setResponsibleFilter([])
+    setStatus("all")
   }
 
   return (
@@ -849,17 +903,6 @@ export function ActivityKanban() {
         <div className="hidden items-center gap-0.5 rounded-lg border bg-muted/40 p-0.5 md:flex">
           <button
             type="button"
-            onClick={() => changeView("lista")}
-            className={cn(
-              "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
-              view === "lista" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <ListIcon className="size-3.5" />
-            Lista
-          </button>
-          <button
-            type="button"
             onClick={() => changeView("board")}
             className={cn(
               "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
@@ -868,6 +911,17 @@ export function ActivityKanban() {
           >
             <KanbanSquareIcon className="size-3.5" />
             Board
+          </button>
+          <button
+            type="button"
+            onClick={() => changeView("lista")}
+            className={cn(
+              "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+              view === "lista" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <ListIcon className="size-3.5" />
+            Lista
           </button>
         </div>
         <Button size="sm" onClick={() => setCreateOpen(true)}>+ Crear Actividad</Button>
@@ -920,6 +974,11 @@ export function ActivityKanban() {
             >
               <SlidersHorizontalIcon className="size-3.5" />
               Filtros
+              {activeFilterCount > 0 && (
+                <span className="rounded-full bg-primary px-1.5 text-[10px] font-semibold leading-4 text-primary-foreground">
+                  {activeFilterCount}
+                </span>
+              )}
               <ChevronDownIcon className={cn("size-3.5 transition-transform", filtersOpen && "rotate-180")} />
             </Button>
 
@@ -959,7 +1018,7 @@ export function ActivityKanban() {
         <div className="flex shrink-0 flex-col gap-2 border-b bg-muted/30 px-4 py-2 md:flex-row md:items-center">
           <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:items-center">
             <div className="[&_button]:w-full md:[&_button]:w-auto">
-              <FlowFilter flows={flows} selected={flowId} onChange={setFlowId} />
+              <FlowFilter flows={flows} selected={flowId} onChange={handleFlowChange} />
             </div>
 
             {flowId !== null && (loadingOpps || opps.length > 0) && (
@@ -991,13 +1050,14 @@ export function ActivityKanban() {
               </>
             )}
 
-            {view === "board" && (
+            {/* Tipo, Prioridad y Responsable valen en Lista y Board: los resuelve el servidor */}
+            {(
               <>
                 <Separator orientation="vertical" className="mx-0.5 hidden data-[orientation=vertical]:h-5 data-[orientation=vertical]:self-auto md:block" />
                 <div className="[&_button]:w-full md:[&_button]:w-auto">
                   <KanbanFacetedFilter
                     title="Tipo"
-                    options={BOARD_ACTIVITY_TYPES.map((t) => ({ value: t, label: t }))}
+                    options={typeOptions}
                     selected={typeFilter}
                     onChange={setTypeFilter}
                   />
@@ -1048,7 +1108,7 @@ export function ActivityKanban() {
                 stage={stage}
                 activities={filtered}
                 statsActivities={statsActivities}
-                realCount={hasClientOnlyFilters ? undefined : stageCounts[stage.id]}
+                realCount={stageCounts[stage.id]}
                 hasMore={stagePages[stage.id]?.hasMore}
                 loadingMore={stagePages[stage.id]?.loadingMore}
                 onLoadMore={loadMoreForStage}
@@ -1076,12 +1136,15 @@ export function ActivityKanban() {
       )}
 
       {/* List */}
-      {view === "lista" && (
+      {view === "lista" && prefsReady && (
         <ActivitiesTable
           search={search}
           status={status === "all" ? null : status}
           flowId={flowId}
           opportunityId={opportunityId}
+          responsibleIds={serverFilters.responsibleIds}
+          types={serverFilters.types}
+          priorities={serverFilters.priorities}
           columnVisibility={columnVisibility}
           onColumnVisibilityChange={setColumnVisibility}
           onTotalChange={setListTotal}

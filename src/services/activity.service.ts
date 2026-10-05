@@ -11,6 +11,25 @@ export interface ActivityListParams {
   personId?: number
   organizationId?: number
   opportunityId?: number
+  responsibleIds?: number[]
+  types?: string[]
+  priorities?: string[]
+}
+
+export interface ActivityFilterOptions {
+  responsibles: { id: number; name: string; avatar_url: string | null }[]
+  types: string[]
+}
+
+// El backend recibe las listas como texto: ids separados por coma y textos por "|"
+// (un tipo lo escribe el usuario y puede traer comas).
+function serializeListParams({ responsibleIds, types, priorities, ...rest }: ActivityListParams) {
+  return {
+    ...rest,
+    ...(responsibleIds?.length ? { responsibleIds: responsibleIds.join(",") } : {}),
+    ...(types?.length ? { types: types.join("|") } : {}),
+    ...(priorities?.length ? { priorities: priorities.join("|") } : {}),
+  }
 }
 
 export interface ActivityDetailItem {
@@ -38,17 +57,24 @@ export const activityService = {
   async list(params: ActivityListParams = {}): Promise<ActivityPage> {
     const res = await api.get<never, { opportunityActivities: ActivityPage }>(
       "opportunity-activity",
-      { params }
+      { params: serializeListParams(params) }
     )
     return res.opportunityActivities
   },
 
-  async getStatusCounts(flowId?: number, opportunityId?: number): Promise<{ counts: { status: string; count: number }[]; overdue: number }> {
+  // Mismos filtros que `list`, para que el número de cada columna del Board calce
+  // con las tarjetas que esa columna puede mostrar.
+  async getStatusCounts(params: Pick<ActivityListParams, "flowId" | "opportunityId" | "filter" | "responsibleIds" | "types" | "priorities"> = {}): Promise<{ counts: { status: string; count: number }[]; overdue: number }> {
     const res = await api.get<never, { counts: { status: string; count: number }[]; overdue: number }>(
       "opportunity-activity/status-counts",
-      { params: { flowId, opportunityId } }
+      { params: serializeListParams(params) }
     )
     return { counts: res.counts, overdue: res.overdue }
+  },
+
+  // Opciones reales de Responsable y Tipo (todas las actividades del workspace)
+  async getFilterOptions(): Promise<ActivityFilterOptions> {
+    return await api.get<never, ActivityFilterOptions>("opportunity-activity/filter-options")
   },
 
   async getById(id: number): Promise<ActivityRaw> {

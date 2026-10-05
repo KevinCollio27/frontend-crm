@@ -374,6 +374,10 @@ interface ActivitiesTableProps {
   status:                   string | null
   flowId:                   number | null
   opportunityId:            number | null
+  // Mismos filtros que el Board — los resuelve el servidor
+  responsibleIds:           number[]
+  types:                    string[]
+  priorities:               string[]
   columnVisibility:         VisibilityState
   onColumnVisibilityChange: React.Dispatch<React.SetStateAction<VisibilityState>>
   onTotalChange:            (n: number) => void
@@ -385,6 +389,9 @@ export function ActivitiesTable({
   status,
   flowId,
   opportunityId,
+  responsibleIds,
+  types,
+  priorities,
   columnVisibility,
   onColumnVisibilityChange,
   onTotalChange,
@@ -409,7 +416,7 @@ export function ActivitiesTable({
   // Reset a la primera página cuando cambian los filtros compartidos con el Board.
   React.useEffect(() => {
     setQuery((q) => ({ ...q, page: 1 }))
-  }, [search, status, flowId, opportunityId])
+  }, [search, status, flowId, opportunityId, responsibleIds, types, priorities])
 
   React.useEffect(() => {
     let cancelled = false
@@ -423,6 +430,9 @@ export function ActivitiesTable({
           status:        status ?? undefined,
           flowId:        flowId ?? undefined,
           opportunityId: opportunityId ?? undefined,
+          responsibleIds,
+          types,
+          priorities,
         })
         .then((res) => {
           if (cancelled) return
@@ -441,7 +451,7 @@ export function ActivitiesTable({
       clearTimeout(timer)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, search, status, flowId, opportunityId, refreshKey, localRefreshKey, timezone])
+  }, [query, search, status, flowId, opportunityId, responsibleIds, types, priorities, refreshKey, localRefreshKey, timezone])
 
   const handleEdit = React.useCallback((activity: Activity) => {
     const raw = rawItems.find((r) => r.id === activity.id) ?? null
