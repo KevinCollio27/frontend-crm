@@ -12,11 +12,8 @@ import { cn } from "@/lib/utils"
 import { getInitials } from "@/lib/table-utils"
 import { ChevronDownIcon } from "lucide-react"
 import {
-  ACTIVITY_TYPE_CONFIG,
-  DEFAULT_TYPE_CONFIG,
   PRIORITY_CONFIG,
-  STAGE_CONFIG,
-} from "@/lib/activity-utils"
+  STAGE_CONFIG, getActivityTypeConfig } from "@/lib/activity-utils"
 import type { ActivityRaw } from "@/types/activity"
 
 function fmtDate(iso: string | null) {
@@ -67,7 +64,7 @@ export function Col1Info({ activity }: Props) {
   const responsible = activity.user?.name ?? "—"
   const responsibleAvatarUrl = activity.user?.avatar_url ?? null
 
-  const typeConfig = ACTIVITY_TYPE_CONFIG[type] ?? DEFAULT_TYPE_CONFIG
+  const typeConfig = getActivityTypeConfig(type)
   const TypeIcon   = typeConfig.icon
   const stageConf    = STAGE_CONFIG[stageId]    ?? STAGE_CONFIG.pendiente
   const priorityConf = PRIORITY_CONFIG[priority] ?? PRIORITY_CONFIG.media

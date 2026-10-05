@@ -13,6 +13,7 @@ import {
   ArrowDownRightIcon,
   ArrowUpRightIcon,
   ExternalLinkIcon,
+  EyeIcon,
   MoreHorizontal,
   PencilIcon,
   Trash2Icon,
@@ -50,14 +51,11 @@ import { activityService } from "@/services/activity.service"
 import { orgConfirm } from "@/lib/confirm"
 import { notify } from "@/lib/notify"
 import {
-  ACTIVITY_TYPE_CONFIG,
-  DEFAULT_TYPE_CONFIG,
   OVERDUE_BADGE_CLASS,
   PRIORITY_CONFIG,
   STAGE_CONFIG,
   mapActivity,
-  type Activity,
-} from "@/lib/activity-utils"
+  type Activity, getActivityTypeConfig } from "@/lib/activity-utils"
 import { useWorkspaceTimezone } from "@/hooks/useWorkspaceTimezone"
 import type { ActivityRaw } from "@/types/activity"
 import { getInitials, getSortIcon } from "@/lib/table-utils"
@@ -219,7 +217,7 @@ function getColumns(
       cell: ({ row }) => {
         const type = row.getValue("type") as string
         if (!type) return <span className="text-sm text-muted-foreground">—</span>
-        const typeConfig = ACTIVITY_TYPE_CONFIG[type] ?? DEFAULT_TYPE_CONFIG
+        const typeConfig = getActivityTypeConfig(type)
         const TypeIcon = typeConfig.icon
         return (
           <div className="flex items-center gap-1.5 text-sm">
@@ -347,9 +345,9 @@ function getColumns(
                 <DropdownMenuItem onClick={() => onDetail(activity)}>
                   <ExternalLinkIcon /> Ver Detalles
                 </DropdownMenuItem>
-                {/* oculto hasta que el sheet deje de ser mock — <DropdownMenuItem onClick={() => onPreview(activity)}>
-                  <UserIcon /> Vista Previa
-                </DropdownMenuItem> */}
+                <DropdownMenuItem onClick={() => onPreview(activity)}>
+                  <EyeIcon /> Vista Previa
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => onEdit(activity)}>
                   <PencilIcon /> Editar
                 </DropdownMenuItem>
@@ -558,11 +556,10 @@ export function ActivitiesTable({
       </div>
 
       <ActivityPreviewSheet
-        activity={selectedActivity}
+        activityId={selectedActivity?.id ?? null}
         open={sheetOpen}
         onOpenChange={setSheetOpen}
-        onEdit={selectedActivity ? () => { setSheetOpen(false); handleEdit(selectedActivity) } : undefined}
-        onDelete={selectedActivity ? () => { setSheetOpen(false); handleDelete(selectedActivity) } : undefined}
+        onActivityChange={() => setLocalRefreshKey((k) => k + 1)}
       />
 
       {editActivity !== null && (

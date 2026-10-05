@@ -8,7 +8,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetFooter, SheetTitle } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
-import { ACTIVITY_TYPE_CONFIG, DEFAULT_TYPE_CONFIG, type Activity } from "@/lib/activity-utils"
+import { type Activity, getActivityTypeConfig } from "@/lib/activity-utils"
 import type { GoogleEvent } from "@/lib/google-event-utils"
 
 interface Props {
@@ -91,7 +91,7 @@ export function DayActivitiesSheet({
                 }
 
                 const activity = item.activity
-                const { icon: Icon, iconClass, bgClass } = ACTIVITY_TYPE_CONFIG[activity.type] ?? DEFAULT_TYPE_CONFIG
+                const { icon: Icon, iconClass, bgClass } = getActivityTypeConfig(activity.type)
                 return (
                   <button
                     key={item.key}

@@ -1,6 +1,6 @@
 import { FcGoogle } from "react-icons/fc"
 import { cn } from "@/lib/utils"
-import { ACTIVITY_TYPE_CONFIG, DEFAULT_TYPE_CONFIG, type Activity } from "@/lib/activity-utils"
+import { type Activity, getActivityTypeConfig } from "@/lib/activity-utils"
 
 export type PillPosition = "single" | "start" | "middle" | "end"
 
@@ -10,7 +10,7 @@ interface EventPillProps {
 }
 
 export function EventPill({ activity, position = "single" }: EventPillProps) {
-  const { icon: Icon, iconClass, bgClass } = ACTIVITY_TYPE_CONFIG[activity.type] ?? DEFAULT_TYPE_CONFIG
+  const { icon: Icon, iconClass, bgClass } = getActivityTypeConfig(activity.type)
   const isSpan = position !== "single"
   const showIcon = position === "single" || position === "start"
   const synced = !!activity.googleEventId

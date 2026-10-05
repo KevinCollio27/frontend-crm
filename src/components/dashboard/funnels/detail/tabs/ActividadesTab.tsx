@@ -70,8 +70,9 @@ interface TabActivity {
 // ─── Map ──────────────────────────────────────────────────────────────────────
 
 function mapActivity(d: ActivityRaw): TabActivity {
-  const type = d.opportunity_activity_detail
-    ?.find((det) => det.label?.key === "activity_type")?.value ?? "Actividad"
+  // El tipo vive en `option` (igual que en el resto del CRM); `value` viene vacío en la mayoría
+  const typeDetail = d.opportunity_activity_detail?.find((det) => det.label?.key === "activity_type")
+  const type = typeDetail?.option || typeDetail?.value || "Actividad"
   return {
     id:          d.id,
     title:       d.title ?? "Sin título",

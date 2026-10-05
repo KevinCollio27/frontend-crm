@@ -10,27 +10,13 @@ import {
 } from 'date-fns'
 import { cn } from '@/lib/utils'
 import { useIsMobile } from '@/hooks/use-mobile'
-import type { Activity } from '@/lib/activity-utils'
+import { type Activity, getActivityTypeConfig } from '@/lib/activity-utils'
 import type { GoogleEvent } from '@/lib/google-event-utils'
 import { EventPill, type PillPosition } from './EventPill'
 import { GoogleEventPill } from './GoogleEventPill'
 
 const WEEKDAYS = ['Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab', 'Dom']
 
-// Mismos matices que ACTIVITY_TYPE_CONFIG (activity-utils.ts), pero en versión
-// "punto sólido" para la grilla compacta de mobile — bgClass ahí es un fondo pálido
-// (bg-violet-50) pensado para pills, no sirve como punto visible a este tamaño.
-const DOT_COLOR: Record<string, string> = {
-  'Reunión':       'bg-violet-500',
-  'Llamada':       'bg-blue-500',
-  'Correo':        'bg-amber-500',
-  'Seguimiento':   'bg-cyan-500',
-  'Revisión':      'bg-orange-500',
-  'Planificación': 'bg-emerald-500',
-  'Video Llamada': 'bg-pink-500',
-  'Visita':        'bg-red-500',
-}
-const DEFAULT_DOT_COLOR = 'bg-muted-foreground/40'
 const MAX_DOTS = 4
 
 function getPillPosition(activity: Activity, dayKey: string): PillPosition {
@@ -113,7 +99,8 @@ export function MonthView({ currentDate, activities, googleEvents = [], onDayCli
                       <span
                         key={activity.id}
                         title={activity.title}
-                        className={cn('size-1.5 shrink-0 rounded-full', DOT_COLOR[activity.type] ?? DEFAULT_DOT_COLOR)}
+                        // Punto sólido del mismo color del tipo en todo el CRM: bg-current toma el color de texto
+                        className={cn('size-1.5 shrink-0 rounded-full bg-current', getActivityTypeConfig(activity.type).iconClass)}
                       />
                     ))}
                     {dayGoogleEvents.slice(0, Math.max(0, MAX_DOTS - dayActivities.length)).map((event) => (

@@ -26,11 +26,12 @@ import {
   CalendarIcon,
   ChevronDownIcon,
   Columns3Icon,
-  // EyeIcon,
+  EyeIcon,
   KanbanSquareIcon,
   ListIcon,
   Loader2Icon,
   MoreHorizontalIcon,
+  PencilIcon,
   PlusCircleIcon,
   SearchIcon,
   SlidersHorizontalIcon,
@@ -66,12 +67,9 @@ import { CreateActivitySheet } from "./CreateActivitySheet"
 import { activityService } from "@/services/activity.service"
 import { flowService } from "@/services/flow.service"
 import {
-  ACTIVITY_TYPE_CONFIG,
-  DEFAULT_TYPE_CONFIG,
   OVERDUE_BADGE_CLASS,
   PRIORITY_CONFIG,
-  toWorkspaceDateTimeParts,
-} from "@/lib/activity-utils"
+  toWorkspaceDateTimeParts, getActivityTypeConfig } from "@/lib/activity-utils"
 import { useWorkspaceTimezone } from "@/hooks/useWorkspaceTimezone"
 import { useEntityRealtime } from "@/hooks/useEntityRealtime"
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -240,14 +238,15 @@ interface ActivityCardProps {
   onMove: (stageId: string) => void
   onPreview: () => void
   onViewDetail: () => void
+  onEdit: () => void
   isDragging?: boolean
 }
 
 const ActivityCard = React.memo(function ActivityCard({
-  activity, onMove, onPreview, onViewDetail, isDragging,
+  activity, onMove, onPreview, onViewDetail, onEdit, isDragging,
 }: ActivityCardProps) {
   const priority   = PRIORITY_CONFIG[activity.priority]
-  const typeConfig = ACTIVITY_TYPE_CONFIG[activity.type] ?? DEFAULT_TYPE_CONFIG
+  const typeConfig = getActivityTypeConfig(activity.type)
   const TypeIcon   = typeConfig.icon
   const overdue    = isOverdue(activity)
 
@@ -274,11 +273,14 @@ const ActivityCard = React.memo(function ActivityCard({
           <DropdownMenuContent align="end" className="min-w-44">
             <DropdownMenuGroup>
               <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-              {/* oculto hasta que el sheet deje de ser mock — <DropdownMenuItem onClick={onPreview}>
-                <EyeIcon /> Vista Previa
-              </DropdownMenuItem> */}
               <DropdownMenuItem onClick={onViewDetail}>
                 <ArrowUpRightIcon /> Ver detalles
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onPreview}>
+                <EyeIcon /> Vista Previa
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onEdit}>
+                <PencilIcon /> Editar
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
@@ -342,11 +344,12 @@ const ActivityCard = React.memo(function ActivityCard({
 
 // ─── SortableCard ─────────────────────────────────────────────────────────────
 
-function SortableCard({ activity, onMove, onPreview, onViewDetail }: {
+function SortableCard({ activity, onMove, onPreview, onViewDetail, onEdit }: {
   activity: BoardActivity
   onMove: (activityId: string, stageId: string) => void
   onPreview: (activity: BoardActivity) => void
   onViewDetail: (activity: BoardActivity) => void
+  onEdit: (activity: BoardActivity) => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: activity.id,
@@ -356,6 +359,7 @@ function SortableCard({ activity, onMove, onPreview, onViewDetail }: {
   const handleMove       = React.useCallback((stageId: string) => onMove(activity.id, stageId), [activity.id, onMove])
   const handlePreview    = React.useCallback(() => onPreview(activity), [activity, onPreview])
   const handleViewDetail = React.useCallback(() => onViewDetail(activity), [activity, onViewDetail])
+  const handleEdit       = React.useCallback(() => onEdit(activity), [activity, onEdit])
 
   return (
     <div
@@ -364,7 +368,7 @@ function SortableCard({ activity, onMove, onPreview, onViewDetail }: {
       {...attributes}
       {...listeners}
     >
-      <ActivityCard activity={activity} onMove={handleMove} onPreview={handlePreview} onViewDetail={handleViewDetail} />
+      <ActivityCard activity={activity} onMove={handleMove} onPreview={handlePreview} onViewDetail={handleViewDetail} onEdit={handleEdit} />
     </div>
   )
 }
@@ -382,6 +386,7 @@ function DroppableColumn({
   onMove,
   onPreview,
   onViewDetail,
+  onEdit,
 }: {
   stage: typeof BOARD_STAGES[number]
   activities: BoardActivity[]
@@ -393,6 +398,7 @@ function DroppableColumn({
   onMove: (activityId: string, stageId: string) => void
   onPreview: (activity: BoardActivity) => void
   onViewDetail: (activity: BoardActivity) => void
+  onEdit: (activity: BoardActivity) => void
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: stage.id })
   const stageActivities = activities.filter((a) => a.stageId === stage.id)
@@ -414,6 +420,7 @@ function DroppableColumn({
             onMove={onMove}
             onPreview={onPreview}
             onViewDetail={onViewDetail}
+            onEdit={onEdit}
           />
         ))}
       </SortableContext>
@@ -466,8 +473,8 @@ export function ActivityKanban() {
   const [flowId, setFlowId]               = React.useState<number | null>(null)
   const [opportunityId, setOpportunityId] = React.useState<number | null>(null)
   const [activeActivity, setActiveActivity]     = React.useState<BoardActivity | null>(null)
-  const [previewActivity, setPreviewActivity]   = React.useState<BoardActivity | null>(null)
   const [previewRawId, setPreviewRawId]         = React.useState<number | null>(null)
+  const [editActivity, setEditActivity]         = React.useState<ActivityRaw | null>(null)
   const [sheetOpen, setSheetOpen]               = React.useState(false)
 
   const [search, setSearch]                       = React.useState("")
@@ -616,9 +623,16 @@ export function ActivityKanban() {
   }, [view, flowId, opportunityId, refreshKey])
 
   const handlePreview = React.useCallback((activity: BoardActivity) => {
-    setPreviewActivity(activity)
     setPreviewRawId(activity.rawId)
     setSheetOpen(true)
+  }, [])
+
+  // Editar desde la tarjeta: el formulario necesita la actividad completa (la tarjeta solo
+  // tiene lo que se dibuja), así que se trae por id — mismo formulario que en la tabla
+  const handleEdit = React.useCallback((activity: BoardActivity) => {
+    activityService.getById(activity.rawId)
+      .then(setEditActivity)
+      .catch(() => notify.error({ title: "No se pudo abrir la actividad", description: "Intenta de nuevo." }))
   }, [])
 
   const handleViewDetail = React.useCallback((activity: BoardActivity) => {
@@ -1041,6 +1055,7 @@ export function ActivityKanban() {
                 onMove={moveActivity}
                 onPreview={handlePreview}
                 onViewDetail={handleViewDetail}
+                onEdit={handleEdit}
               />
             ))}
           </KanbanBoard>
@@ -1052,6 +1067,7 @@ export function ActivityKanban() {
                 onMove={() => {}}
                 onPreview={() => {}}
                 onViewDetail={() => {}}
+                onEdit={() => {}}
                 isDragging
               />
             )}
@@ -1074,11 +1090,26 @@ export function ActivityKanban() {
       )}
 
       <ActivityPreviewSheet
-        activity={previewActivity as any}
+        activityId={previewRawId}
         open={sheetOpen}
         onOpenChange={setSheetOpen}
-        onViewDetail={previewRawId ? () => { setSheetOpen(false); router.push(`/crm/activities/${previewRawId}?from=board`) } : undefined}
+        onActivityChange={() => setRefreshKey((k) => k + 1)}
       />
+
+      {editActivity !== null && (
+        <CreateActivitySheet
+          open
+          onOpenChange={(v) => { if (!v) setEditActivity(null) }}
+          opportunityId={editActivity.opportunity?.id}
+          opportunityName={editActivity.opportunity?.name}
+          flowName={editActivity.opportunity?.flow?.name ?? null}
+          activity={editActivity}
+          onSuccess={() => {
+            setEditActivity(null)
+            setRefreshKey((k) => k + 1)
+          }}
+        />
+      )}
 
       <CreateActivitySheet
         open={createOpen}

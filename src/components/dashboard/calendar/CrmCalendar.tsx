@@ -205,7 +205,7 @@ export function CrmCalendar() {
       />
 
       <ActivityPreviewSheet
-        activity={selectedActivity}
+        activityId={selectedActivity?.id ?? null}
         open={previewOpen}
         onOpenChange={setPreviewOpen}
         onViewDetail={() => {

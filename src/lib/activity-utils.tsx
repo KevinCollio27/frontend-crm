@@ -3,6 +3,7 @@ import {
   ArrowDownIcon,
   ArrowUpIcon,
   CalendarIcon,
+  CodeIcon,
   EyeIcon,
   FileTextIcon,
   MailIcon,
@@ -11,6 +12,7 @@ import {
   MinusIcon,
   PhoneIcon,
   SearchIcon,
+  TagIcon,
   UsersIcon,
   VideoIcon,
 } from "lucide-react"
@@ -136,12 +138,11 @@ export const PRIORITY_CONFIG: Record<string, { icon: ElementType; label: string;
 
 // ─── Tipo ───────────────────────────────────────────────────────────────────
 //
-// Tipo es texto libre (el usuario lo escribe al crear la actividad, no un
-// select cerrado) — igual que Cargo en Contactos, así que perseguir un color
-// por valor nunca cubre todo. En vez de eso: cada tipo *conocido* (el que
-// viene de la plantilla original) tiene su propio ícono/color como decoración,
-// y todo lo demás (incluido "Desarrollo", el valor más común en la base) cae
-// al genérico — sin fingir una categoría que no existe.
+// Tipo es texto libre (el usuario lo crea al registrar la actividad, no es un
+// select cerrado). Los tipos conocidos tienen ícono y color propios; cualquier
+// otro recibe un color estable derivado de su nombre (getActivityTypeConfig):
+// el mismo nombre da siempre el mismo color en tabla, tablero, calendario y
+// detalle. Solo una actividad sin tipo queda en gris.
 export const ACTIVITY_TYPE_CONFIG: Record<string, { icon: ElementType; iconClass: string; bgClass: string }> = {
   "Reunión":         { icon: UsersIcon,    iconClass: "text-violet-600 dark:text-violet-400",   bgClass: "bg-violet-50 dark:bg-violet-950/40"   },
   "Generar reunión": { icon: UsersIcon,    iconClass: "text-violet-600 dark:text-violet-400",   bgClass: "bg-violet-50 dark:bg-violet-950/40"   },
@@ -159,6 +160,40 @@ export const ACTIVITY_TYPE_CONFIG: Record<string, { icon: ElementType; iconClass
   "Visita Terreno":  { icon: MapPinIcon,   iconClass: "text-red-600 dark:text-red-400",         bgClass: "bg-red-50 dark:bg-red-950/40"         },
   "Documentación":   { icon: FileTextIcon, iconClass: "text-slate-600 dark:text-slate-400",     bgClass: "bg-slate-100 dark:bg-slate-800/40"    },
   "Marketing":       { icon: MegaphoneIcon,iconClass: "text-fuchsia-600 dark:text-fuchsia-400", bgClass: "bg-fuchsia-50 dark:bg-fuchsia-950/40" },
+  "Desarrollo":      { icon: CodeIcon,     iconClass: "text-emerald-600 dark:text-emerald-400", bgClass: "bg-emerald-50 dark:bg-emerald-950/40" },
 }
 
 export const DEFAULT_TYPE_CONFIG = { icon: CalendarIcon, iconClass: "text-muted-foreground", bgClass: "bg-muted" }
+
+// Paleta para los tipos que crea el usuario. Sin rojo: en actividades el rojo se
+// reserva para alertas reales (Atrasada, prioridad Alta). Clases completas y
+// literales para que Tailwind las incluya en el build.
+const DYNAMIC_TYPE_PALETTE: { iconClass: string; bgClass: string }[] = [
+  { iconClass: "text-teal-600 dark:text-teal-400",       bgClass: "bg-teal-50 dark:bg-teal-950/40"       },
+  { iconClass: "text-sky-600 dark:text-sky-400",         bgClass: "bg-sky-50 dark:bg-sky-950/40"         },
+  { iconClass: "text-lime-700 dark:text-lime-400",       bgClass: "bg-lime-50 dark:bg-lime-950/40"       },
+  { iconClass: "text-cyan-600 dark:text-cyan-400",       bgClass: "bg-cyan-50 dark:bg-cyan-950/40"       },
+  { iconClass: "text-indigo-600 dark:text-indigo-400",   bgClass: "bg-indigo-50 dark:bg-indigo-950/40"   },
+  { iconClass: "text-purple-600 dark:text-purple-400",   bgClass: "bg-purple-50 dark:bg-purple-950/40"   },
+  { iconClass: "text-orange-600 dark:text-orange-400",   bgClass: "bg-orange-50 dark:bg-orange-950/40"   },
+  { iconClass: "text-blue-600 dark:text-blue-400",       bgClass: "bg-blue-50 dark:bg-blue-950/40"       },
+  { iconClass: "text-fuchsia-600 dark:text-fuchsia-400", bgClass: "bg-fuchsia-50 dark:bg-fuchsia-950/40" },
+  { iconClass: "text-amber-600 dark:text-amber-400",     bgClass: "bg-amber-50 dark:bg-amber-950/40"     },
+  { iconClass: "text-emerald-600 dark:text-emerald-400", bgClass: "bg-emerald-50 dark:bg-emerald-950/40" },
+  { iconClass: "text-violet-600 dark:text-violet-400",   bgClass: "bg-violet-50 dark:bg-violet-950/40"   },
+]
+
+function hashString(value: string): number {
+  let hash = 0
+  for (let i = 0; i < value.length; i++) hash = (hash * 31 + value.charCodeAt(i)) >>> 0
+  return hash
+}
+
+export function getActivityTypeConfig(type: string | null | undefined): { icon: ElementType; iconClass: string; bgClass: string } {
+  const name = (type ?? "").trim()
+  if (!name) return DEFAULT_TYPE_CONFIG
+  const known = ACTIVITY_TYPE_CONFIG[name]
+  if (known) return known
+  const color = DYNAMIC_TYPE_PALETTE[hashString(name.toLowerCase()) % DYNAMIC_TYPE_PALETTE.length]
+  return { icon: TagIcon, ...color }
+}
