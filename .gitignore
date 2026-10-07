@@ -45,3 +45,11 @@ next-env.d.ts
 
 # Configuración local de MCP: contiene una clave personal
 .mcp.json
+
+# Documentos de trabajo internos: no se suben
+/docs/C01-flotas-consentimiento.yaml
+/docs/Instrucciones base.md
+/docs/herramientas-ai-crm.md
+/docs/instrucciones-ejecutor.md
+/docs/mkt.md
+/docs/segmentacion-etiquetas-bi.md
