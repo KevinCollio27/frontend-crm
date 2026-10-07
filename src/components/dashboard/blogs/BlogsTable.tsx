@@ -18,6 +18,7 @@ import {
   FileTextIcon,
   ListIcon,
   MoreHorizontal,
+  NotebookPenIcon,
   PencilIcon,
   SearchIcon,
   SlidersHorizontalIcon,
@@ -58,6 +59,7 @@ import { confirmDialog } from "@/lib/confirm"
 import { blogService, type BlogListParams } from "@/services/blog.service"
 import type { BlogRaw } from "@/types/blog"
 import { CreateBlogSheet, blogRawToFormValues, type BlogFormValues } from "./CreateBlogSheet"
+import { EditorialGuideSheet } from "./EditorialGuideSheet"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -70,6 +72,7 @@ export interface Blog {
   brandColor: string | null
   logoUrl: string | null
   allowedDomains: string | null
+  editorialGuide: string | null
   createdAt: string
 }
 
@@ -80,6 +83,7 @@ function mapBlog(d: BlogRaw): Blog {
     apiKey: d.api_key,
     postCount: d._count.blog_post,
     isActive: d.is_active,
+    editorialGuide: d.editorial_guide ?? null,
     brandColor: d.brand_color,
     logoUrl: d.logo_url,
     allowedDomains: d.allowed_domains,
@@ -171,6 +175,7 @@ function getColumns(
   onEdit: (blog: Blog) => void,
   onManage: (blog: Blog) => void,
   onToggleActive: (blog: Blog) => void,
+  onEditorialGuide: (blog: Blog) => void,
 ): ColumnDef<Blog>[] {
   return [
   {
@@ -332,6 +337,10 @@ function getColumns(
                 <PencilIcon />
                 Editar blog
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onEditorialGuide(blog)}>
+                <NotebookPenIcon />
+                Guía editorial
+              </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem
@@ -373,6 +382,7 @@ export function BlogsTable() {
   const [createOpen, setCreateOpen] = React.useState(false)
   const [editingBlog, setEditingBlog] = React.useState<BlogFormValues | undefined>(undefined)
   const [editingBlogId, setEditingBlogId] = React.useState<number | undefined>(undefined)
+  const [guideBlog, setGuideBlog] = React.useState<Blog | null>(null)
   const [filtersOpen, setFiltersOpen] = React.useState(false)
   const [columnsOpen, setColumnsOpen] = React.useState(false)
 
@@ -423,6 +433,7 @@ export function BlogsTable() {
             setData((prev) => prev.map((b) => b.id === blog.id ? { ...b, isActive: blog.isActive } : b))
           }
         },
+        setGuideBlog,
       ),
     [router]
   )
@@ -656,6 +667,14 @@ export function BlogsTable() {
         blogId={editingBlogId}
         onSuccess={() => setRefreshKey((k) => k + 1)}
       />
+      {guideBlog && (
+        <EditorialGuideSheet
+          open
+          onOpenChange={(v) => { if (!v) setGuideBlog(null) }}
+          blog={{ id: guideBlog.id, name: guideBlog.name, editorial_guide: guideBlog.editorialGuide }}
+          onSaved={(guide) => setData((prev) => prev.map((b) => b.id === guideBlog.id ? { ...b, editorialGuide: guide } : b))}
+        />
+      )}
     </div>
   )
 }

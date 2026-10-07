@@ -24,6 +24,7 @@ export interface BlogCreatePayload {
 
 export interface BlogUpdatePayload {
   name?: string
+  editorial_guide?: string | null
   brand_color?: string
   is_active?: boolean
   logo_url?: string

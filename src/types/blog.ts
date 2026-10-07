@@ -6,6 +6,8 @@ export interface BlogRaw {
   brand_color: string | null
   logo_url: string | null
   allowed_domains: string | null
+  // Texto libre que los asistentes de IA siguen al escribir posts en este blog.
+  editorial_guide?: string | null
   is_active: boolean
   created_at: string
   updated_at: string

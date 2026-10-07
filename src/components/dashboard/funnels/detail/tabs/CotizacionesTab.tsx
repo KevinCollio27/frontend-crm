@@ -818,7 +818,7 @@ export function CotizacionesTab({ opportunityId, opportunityName, flowName, cont
           onOpenChange={(open) => { if (!open) setTemplateTarget(null) }}
           title="Plantilla"
           description="Elige la plantilla PDF de esta cotización."
-          note="Tiene prioridad sobre la plantilla de la oportunidad y la predeterminada del workspace. Si no elegís ninguna, se usa la de la oportunidad o la del workspace."
+          note="Tiene prioridad sobre la plantilla de la oportunidad y la predeterminada del workspace. Si no eliges ninguna, se usa la de la oportunidad o la del workspace."
           currentTemplateId={templateTarget.pdfTemplateId}
           onSelect={async (id) => {
             await quotationService.updatePdfTemplate(templateTarget.id, id)

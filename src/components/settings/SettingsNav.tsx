@@ -4,6 +4,7 @@ import { useEffect } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import {
+  BotIcon,
   Building2Icon,
   CreditCardIcon,
   DatabaseIcon,
@@ -74,6 +75,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { label: "Integraciones", href: "/settings/integrations", icon: PlugIcon },
       { label: "API", href: "/settings/api", icon: KeyIcon },
+      { label: "Asistentes de IA", href: "/settings/ai-assistants", icon: BotIcon },
       { label: "Observabilidad", href: "/settings/observability", icon: LineChartIcon },
       { label: "Datasources", href: "/settings/datasources", icon: DatabaseIcon },
     ],

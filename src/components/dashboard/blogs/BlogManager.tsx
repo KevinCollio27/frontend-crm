@@ -31,6 +31,7 @@ import {
   Loader2Icon,
   MessageCircleIcon,
   MonitorIcon,
+  NotebookPenIcon,
   PencilIcon,
   PlusIcon,
   SearchIcon,
@@ -64,6 +65,7 @@ import {
 } from "@/components/ui/sheet"
 import { CreateBlogSheet, blogRawToFormValues, VIEWS, type BlogView } from "./CreateBlogSheet"
 import { CreatePostSheet, type PostFormValues } from "./CreatePostSheet"
+import { EditorialGuideSheet } from "./EditorialGuideSheet"
 import { LinkedInIcon, XSocialIcon } from "../campains/shared/social-icons"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -191,6 +193,7 @@ export function BlogManager({ id }: { id: number }) {
   const [statusFilter, setStatusFilter] = React.useState<boolean | null>(null)
   const [editOpen, setEditOpen] = React.useState(false)
   const [installOpen, setInstallOpen] = React.useState(false)
+  const [guideOpen, setGuideOpen] = React.useState(false)
   const [postSheetOpen, setPostSheetOpen] = React.useState(false)
   const [postSheetLoading, setPostSheetLoading] = React.useState(false)
   const [editingPost, setEditingPost] = React.useState<PostFormValues | undefined>(undefined)
@@ -350,6 +353,9 @@ export function BlogManager({ id }: { id: number }) {
             <DropdownMenuItem onClick={() => setEditOpen(true)}>
               <PencilIcon /> Editar Blog
             </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setGuideOpen(true)}>
+              <NotebookPenIcon /> Guía editorial
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </header>
@@ -419,6 +425,12 @@ export function BlogManager({ id }: { id: number }) {
       </div>
 
       <InstallSheet open={installOpen} onOpenChange={setInstallOpen} blog={blog} />
+      <EditorialGuideSheet
+        open={guideOpen}
+        onOpenChange={setGuideOpen}
+        blog={blog}
+        onSaved={(guide) => setBlog((prev) => (prev ? { ...prev, editorial_guide: guide } : prev))}
+      />
       <CreateBlogSheet
         open={editOpen}
         onOpenChange={setEditOpen}

@@ -42,3 +42,6 @@ next-env.d.ts
 
 # notas internas / docs de trabajo — no se suben
 /Puntos/
+
+# Configuración local de MCP: contiene una clave personal
+.mcp.json
