@@ -8,6 +8,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { notify } from "@/lib/notify";
+import { takePostLoginRedirect } from "@/lib/post-login-redirect";
 import { authService } from "@/services/auth.service";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -38,7 +39,8 @@ export const LoginForm = () => {
       const firstName = data.user?.name?.split(" ")[0] ?? "";
       notify.success({ title: `¡Bienvenido, ${firstName}!`, description: "Comienza a gestionar tus ventas." });
       const hasWorkspace = !!data.user?.user_workspace?.[0]?.workspace_id;
-      router.replace(hasWorkspace ? "/chat" : "/create-workspace");
+      const pending = hasWorkspace ? takePostLoginRedirect() : null;
+      router.replace(pending ?? (hasWorkspace ? "/chat" : "/create-workspace"));
     } catch (err: unknown) {
       const e = err as { extraMessage?: string; message?: string };
       const msg = e.extraMessage || e.message || "Verifica tu email y contraseña.";

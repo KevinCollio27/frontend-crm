@@ -30,23 +30,27 @@ import { ASSISTANT_LABEL, CreateConnectionSheet } from "./CreateConnectionSheet"
 
 const MCP_SERVER_URL = `${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/mcp`
 
+// Las conexiones hechas iniciando sesión desde el asistente no tienen una clave que mostrar.
+const OAUTH_KEY_PREFIX = "goxt_oat_"
+
 const GUIDES = [
   {
     value: "claude",
     label: "Claude",
     steps: [
-      "Crea una conexión y copia la clave.",
-      "En Claude, abre Configuración → Conectores → Agregar conector personalizado.",
-      "Pega la URL del servidor y la clave. En Claude Code también puedes agregarlo con el comando claude mcp add.",
+      "Copia la URL del servidor.",
+      "En Claude (web o escritorio), abre Configuración → Conectores → Agregar conector personalizado y pega la URL.",
+      "Claude abre el CRM: inicia sesión, elige el workspace y presiona Permitir acceso. No necesitas ninguna clave.",
+      "Para Claude Code, crea una conexión con Nueva conexión y usa el comando que te entrega.",
     ],
   },
   {
     value: "chatgpt",
     label: "ChatGPT",
     steps: [
-      "Crea una conexión y copia la clave.",
-      "En ChatGPT, abre Configuración → Conectores y agrega uno nuevo.",
-      "Pega la URL del servidor y autoriza el acceso.",
+      "Copia la URL del servidor.",
+      "En ChatGPT, abre Configuración → Conectores y agrega uno nuevo con esa URL.",
+      "ChatGPT abre el CRM: inicia sesión, elige el workspace y presiona Permitir acceso.",
     ],
   },
   {
@@ -113,7 +117,7 @@ export function AiAssistantsPanel() {
   async function handleRevoke(connection: AiConnection) {
     const confirmed = await confirmDialog({
       title: `¿Revocar "${connection.name}"?`,
-      description: "El asistente que usa esta clave dejará de tener acceso al CRM. No se puede deshacer.",
+      description: "El asistente dejará de tener acceso al CRM. Para volver a usarlo habrá que conectarlo de nuevo.",
       confirmText: "Sí, revocar",
       cancelText: "Cancelar",
       tone: "danger",
@@ -150,7 +154,7 @@ export function AiAssistantsPanel() {
             <div>
               <CardTitle>Servidor MCP</CardTitle>
               <CardDescription>
-                La dirección que le das a tu asistente para conectarse a GOXT
+                Pega esta dirección en tu asistente; te pedirá iniciar sesión en el CRM
               </CardDescription>
             </div>
           </div>
@@ -193,7 +197,7 @@ export function AiAssistantsPanel() {
             </div>
           ) : connections.length === 0 ? (
             <p className="px-6 py-10 text-center text-sm text-muted-foreground">
-              Todavía no tienes conexiones. Crea una para conectar tu asistente.
+              Todavía no tienes conexiones. Conecta tu asistente con la URL del servidor o crea una clave.
             </p>
           ) : (
             <ul className="divide-y">
@@ -202,7 +206,8 @@ export function AiAssistantsPanel() {
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{c.name}</p>
                     <p className="text-xs text-muted-foreground">
-                      {ASSISTANT_LABEL[c.assistant] ?? c.assistant} · <span className="font-mono">{c.key_prefix}…</span> · {lastUsedLabel(c.last_used_at)}
+                      {ASSISTANT_LABEL[c.assistant] ?? c.assistant} ·{" "}
+                      {c.key_prefix.startsWith(OAUTH_KEY_PREFIX) ? "inicio de sesión" : <span className="font-mono">{c.key_prefix}…</span>} · {lastUsedLabel(c.last_used_at)}
                     </p>
                   </div>
                   <Badge variant="secondary" className="hidden sm:inline-flex">
