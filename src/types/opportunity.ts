@@ -3,6 +3,8 @@ export interface OpportunityEmailRaw {
   opportunity_id: number
   user_id: number
   to: string
+  cc: string | null
+  bcc: string | null
   subject: string
   body: string
   signature_html: string | null

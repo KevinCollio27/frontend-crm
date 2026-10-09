@@ -45,6 +45,7 @@ import type { QuotationRaw } from "@/types/quotation"
 import type { OpportunityEmailRaw } from "@/types/opportunity"
 import { notify } from "@/lib/notify"
 import { getInitials } from "@/lib/table-utils"
+import { cn } from "@/lib/utils"
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -85,6 +86,83 @@ function formatEmailDate(iso: string): string {
   return format(date, "d MMM yyyy, HH:mm", { locale: es })
 }
 
+// ─── Destinatarios ────────────────────────────────────────────────────────────
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+type RecipientsState = { values: string[]; input: string }
+
+// Pasa a píldoras lo escrito que sea un correo válido; lo que no, queda en el input.
+function commitRecipients({ values, input }: RecipientsState): RecipientsState {
+  const typed = input.split(/[,;\s]+/).filter(Boolean)
+  const valid = typed.filter((t) => EMAIL_REGEX.test(t))
+  const invalid = typed.filter((t) => !EMAIL_REGEX.test(t))
+  return { values: [...new Set([...values, ...valid])], input: invalid.join(", ") }
+}
+
+interface RecipientFieldProps {
+  label:        string
+  placeholder:  string
+  state:        RecipientsState
+  onChange:     (state: RecipientsState) => void
+  displayName?: (email: string) => string
+  trailing?:    React.ReactNode
+}
+
+function RecipientField({ label, placeholder, state, onChange, displayName, trailing }: RecipientFieldProps) {
+  const [invalid, setInvalid] = React.useState(false)
+
+  function commit() {
+    const next = commitRecipients(state)
+    setInvalid(!!next.input)
+    onChange(next)
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if ((e.key === "Enter" || e.key === ",") && state.input.trim()) {
+      e.preventDefault()
+      commit()
+    }
+    if (e.key === "Backspace" && !state.input && state.values.length > 0) {
+      onChange({ ...state, values: state.values.slice(0, -1) })
+    }
+  }
+
+  return (
+    <div className="flex min-h-10 flex-wrap items-center gap-1.5 border-b px-3.5 py-2">
+      <span className="w-9 shrink-0 text-xs font-medium text-muted-foreground">{label}</span>
+      {state.values.map((r) => (
+        <span
+          key={r}
+          className="flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium"
+        >
+          {displayName ? displayName(r) : r}
+          <button
+            type="button"
+            onClick={() => onChange({ ...state, values: state.values.filter((x) => x !== r) })}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <XIcon className="size-3" />
+          </button>
+        </span>
+      ))}
+      <input
+        className={cn(
+          "min-w-28 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground",
+          invalid && "text-destructive",
+        )}
+        placeholder={placeholder}
+        title={invalid ? "No es un correo válido" : undefined}
+        value={state.input}
+        onChange={(e) => { setInvalid(false); onChange({ ...state, input: e.target.value }) }}
+        onKeyDown={handleKeyDown}
+        onBlur={commit}
+      />
+      {trailing}
+    </div>
+  )
+}
+
 // ─── Composer ─────────────────────────────────────────────────────────────────
 
 interface ComposerProps {
@@ -98,8 +176,10 @@ interface ComposerProps {
 }
 
 function EmailComposer({ connectionId, userEmail, contactEmail, contactName, opportunityId, onSent, onCancel }: ComposerProps) {
-  const [recipients, setRecipients]         = React.useState<string[]>(contactEmail ? [contactEmail] : [])
-  const [recipientInput, setRecipientInput] = React.useState("")
+  const [to, setTo]                         = React.useState<RecipientsState>({ values: contactEmail ? [contactEmail] : [], input: "" })
+  const [cc, setCc]                         = React.useState<RecipientsState>({ values: [], input: "" })
+  const [bcc, setBcc]                       = React.useState<RecipientsState>({ values: [], input: "" })
+  const [showCcBcc, setShowCcBcc]           = React.useState(false)
   const [subject, setSubject]               = React.useState("")
   const [body, setBody]                     = React.useState("")
   const [signatureHtml, setSignatureHtml]   = React.useState<string | undefined>(undefined)
@@ -115,21 +195,6 @@ function EmailComposer({ connectionId, userEmail, contactEmail, contactName, opp
       .then((signature) => setSignatureHtml(signature))
       .catch(() => {})
   }, [connectionId])
-
-  function removeRecipient(r: string) {
-    setRecipients((prev) => prev.filter((x) => x !== r))
-  }
-
-  function handleRecipientKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if ((e.key === "Enter" || e.key === ",") && recipientInput.trim()) {
-      e.preventDefault()
-      setRecipients((prev) => [...prev, recipientInput.trim()])
-      setRecipientInput("")
-    }
-    if (e.key === "Backspace" && !recipientInput && recipients.length > 0) {
-      setRecipients((prev) => prev.slice(0, -1))
-    }
-  }
 
   async function handleFilesSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const selected = Array.from(e.target.files ?? [])
@@ -175,12 +240,32 @@ function EmailComposer({ connectionId, userEmail, contactEmail, contactName, opp
     setAttachments([])
   }
 
+  const canSend = (to.values.length > 0 || !!to.input.trim()) && !!subject.trim() && !!body.trim() && !sending
+
   async function handleSend() {
-    if (sending || recipients.length === 0 || !subject.trim() || !body.trim()) return
+    if (!canSend) return
+
+    // Lo que quedó escrito sin presionar Enter también cuenta como destinatario
+    const finalTo  = commitRecipients(to)
+    const finalCc  = commitRecipients(cc)
+    const finalBcc = commitRecipients(bcc)
+    setTo(finalTo)
+    setCc(finalCc)
+    setBcc(finalBcc)
+
+    const invalid = [finalTo, finalCc, finalBcc].map((f) => f.input).filter(Boolean).join(", ")
+    if (invalid) {
+      if (finalCc.input || finalBcc.input) setShowCcBcc(true)
+      notify.error({ title: "Revisa los destinatarios", description: `"${invalid}" no es un correo válido.` })
+      return
+    }
+
     setSending(true)
     try {
       await integrationService.sendGmailMessage(connectionId, {
-        to: recipients.join(", "),
+        to: finalTo.values.join(", "),
+        cc: finalCc.values.join(", ") || undefined,
+        bcc: finalBcc.values.join(", ") || undefined,
         subject: subject.trim(),
         body,
         signatureHtml,
@@ -189,7 +274,7 @@ function EmailComposer({ connectionId, userEmail, contactEmail, contactName, opp
           : undefined,
         opportunityId,
       })
-      notify.success({ title: "Correo enviado", description: `Se envió a ${recipients.join(", ")}.` })
+      notify.success({ title: "Correo enviado", description: `Se envió a ${finalTo.values.join(", ")}.` })
       resetComposer()
       onSent()
     } catch (error) {
@@ -201,8 +286,6 @@ function EmailComposer({ connectionId, userEmail, contactEmail, contactName, opp
       setSending(false)
     }
   }
-
-  const canSend = recipients.length > 0 && !!subject.trim() && !!body.trim() && !sending
 
   return (
     <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
@@ -228,31 +311,29 @@ function EmailComposer({ connectionId, userEmail, contactEmail, contactName, opp
         </span>
       </div>
 
-      {/* Para */}
-      <div className="flex min-h-10 flex-wrap items-center gap-1.5 border-b px-3.5 py-2">
-        <span className="shrink-0 text-xs font-medium text-muted-foreground">Para:</span>
-        {recipients.map((r) => (
-          <span
-            key={r}
-            className="flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium"
+      <RecipientField
+        label="Para:"
+        placeholder="Agregar destinatario..."
+        state={to}
+        onChange={setTo}
+        displayName={(r) => (r === contactEmail && contactName ? contactName : r)}
+        trailing={!showCcBcc && (
+          <button
+            type="button"
+            onClick={() => setShowCcBcc(true)}
+            className="shrink-0 text-xs text-muted-foreground hover:text-foreground hover:underline"
           >
-            {r === contactEmail && contactName ? contactName : r}
-            <button
-              onClick={() => removeRecipient(r)}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              <XIcon className="size-3" />
-            </button>
-          </span>
-        ))}
-        <input
-          className="min-w-28 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-          placeholder="Agregar destinatario..."
-          value={recipientInput}
-          onChange={(e) => setRecipientInput(e.target.value)}
-          onKeyDown={handleRecipientKeyDown}
-        />
-      </div>
+            CC CCO
+          </button>
+        )}
+      />
+
+      {showCcBcc && (
+        <>
+          <RecipientField label="CC:" placeholder="Agregar con copia..." state={cc} onChange={setCc} />
+          <RecipientField label="CCO:" placeholder="Agregar con copia oculta..." state={bcc} onChange={setBcc} />
+        </>
+      )}
 
       {/* Asunto */}
       <div className="flex items-center gap-2.5 border-b px-3.5 py-2.5">
@@ -495,6 +576,8 @@ function EmailDetail({
             <span className="shrink-0 text-xs text-muted-foreground">{formatEmailDate(email.created_at)}</span>
           </div>
           <p className="truncate text-xs text-muted-foreground">para {email.to}</p>
+          {email.cc && <p className="truncate text-xs text-muted-foreground">cc {email.cc}</p>}
+          {email.bcc && <p className="truncate text-xs text-muted-foreground">cco {email.bcc}</p>}
         </div>
       </div>
 
