@@ -25,10 +25,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { confirmDialog } from "@/lib/confirm"
 import { notify } from "@/lib/notify"
 import { aiConnectionService } from "@/services/aiConnection.service"
+import { useSessionStore } from "@/store/session.store"
 import type { AiConnection } from "@/types/ai-connection"
 import { ASSISTANT_LABEL, CreateConnectionSheet } from "./CreateConnectionSheet"
 
-const MCP_SERVER_URL = `${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/mcp`
+const MCP_BASE_URL = `${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/mcp`
 
 // Las conexiones hechas iniciando sesión desde el asistente no tienen una clave que mostrar.
 const OAUTH_KEY_PREFIX = "goxt_oat_"
@@ -102,6 +103,9 @@ export function AiAssistantsPanel() {
   const [connections, setConnections] = React.useState<AiConnection[]>([])
   const [loading, setLoading] = React.useState(true)
   const [sheetOpen, setSheetOpen] = React.useState(false)
+  // Cada workspace tiene su propia dirección: los asistentes no aceptan dos conectores con la misma.
+  const workspaceId = useSessionStore((s) => s.workspaceId)
+  const MCP_SERVER_URL = workspaceId ? `${MCP_BASE_URL}/w/${workspaceId}` : MCP_BASE_URL
 
   const loadConnections = React.useCallback(() => {
     aiConnectionService.all()
@@ -167,6 +171,9 @@ export function AiAssistantsPanel() {
             </div>
             <CopyButton text={MCP_SERVER_URL} />
           </div>
+          <p className="text-xs text-muted-foreground">
+            Esta dirección es de este workspace. Si trabajas en varios, cada uno tiene la suya y puedes agregarlos como conectores separados.
+          </p>
         </CardContent>
       </Card>
 

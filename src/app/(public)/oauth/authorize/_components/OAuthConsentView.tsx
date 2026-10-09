@@ -18,7 +18,13 @@ type Status = "loading" | "ready" | "invalid"
 const CAN_READ = "Buscar y leer contactos, organizaciones, oportunidades, actividades, cotizaciones, blog y campañas"
 const CAN_WRITE = "Crear y editar registros, agregar notas y enviar cotizaciones y campañas"
 
-export function OAuthConsentView({ request }: { request: OAuthRequest }) {
+interface Props {
+  request: OAuthRequest
+  // La dirección que se pegó en el asistente es la de un workspace: no se puede elegir otro.
+  lockedWorkspaceId: number | null
+}
+
+export function OAuthConsentView({ request, lockedWorkspaceId }: Props) {
   const router = useRouter()
   const [status, setStatus] = useState<Status>("loading")
   const [errorMessage, setErrorMessage] = useState("")
@@ -57,8 +63,14 @@ export function OAuthConsentView({ request }: { request: OAuthRequest }) {
 
       const sessionUser = session.user as User
       const active = (sessionUser.user_workspace ?? []).filter((w) => w.is_active && w.workspace)
+      if (lockedWorkspaceId && !active.some((w) => w.workspace_id === lockedWorkspaceId)) {
+        setErrorMessage(`La dirección que usaste es de un workspace al que ${sessionUser.email} no pertenece. Copia la dirección desde Asistentes de IA en tu workspace.`)
+        setStatus("invalid")
+        return
+      }
       setUser(sessionUser)
-      setWorkspaceId(active.find((w) => w.workspace_id === session.workspaceId)?.workspace_id ?? active[0]?.workspace_id ?? null)
+      setWorkspaceId(
+        lockedWorkspaceId ??active.find((w) => w.workspace_id === session.workspaceId)?.workspace_id ?? active[0]?.workspace_id ?? null)
       setStatus("ready")
     }
     load()
@@ -128,8 +140,8 @@ export function OAuthConsentView({ request }: { request: OAuthRequest }) {
               <>
                 <div className="space-y-1.5">
                   <Label htmlFor="oauth-workspace">Workspace</Label>
-                  {workspaces.length === 1 ? (
-                    <div className="rounded-lg border border-input bg-muted/50 px-3 py-2 text-sm">{workspaces[0].workspace?.name}</div>
+                  {workspaces.length === 1 || lockedWorkspaceId ? (
+                    <div className="rounded-lg border border-input bg-muted/50 px-3 py-2 text-sm">{selected?.workspace?.name}</div>
                   ) : (
                     <Select value={workspaceId ? String(workspaceId) : ""} onValueChange={(v) => setWorkspaceId(Number(v))}>
                       <SelectTrigger id="oauth-workspace" className="w-full">
