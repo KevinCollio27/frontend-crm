@@ -35,12 +35,14 @@ import {
   PlusCircleIcon,
   SearchIcon,
   SlidersHorizontalIcon,
+  Trash2Icon,
   XIcon,
 } from "lucide-react"
 import type { VisibilityState } from "@tanstack/react-table"
 import { cn } from "@/lib/utils"
 import { getInitials } from "@/lib/table-utils"
 import { notify } from "@/lib/notify"
+import { activityConfirm } from "@/lib/confirm"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -237,11 +239,12 @@ interface ActivityCardProps {
   onPreview: () => void
   onViewDetail: () => void
   onEdit: () => void
+  onDelete: () => void
   isDragging?: boolean
 }
 
 const ActivityCard = React.memo(function ActivityCard({
-  activity, onMove, onPreview, onViewDetail, onEdit, isDragging,
+  activity, onMove, onPreview, onViewDetail, onEdit, onDelete, isDragging,
 }: ActivityCardProps) {
   const priority   = PRIORITY_CONFIG[activity.priority]
   const typeConfig = getActivityTypeConfig(activity.type)
@@ -292,6 +295,10 @@ const ActivityCard = React.memo(function ActivityCard({
                 {stage.name}
               </DropdownMenuItem>
             ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={onDelete}>
+              <Trash2Icon /> Eliminar
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -342,12 +349,13 @@ const ActivityCard = React.memo(function ActivityCard({
 
 // ─── SortableCard ─────────────────────────────────────────────────────────────
 
-function SortableCard({ activity, onMove, onPreview, onViewDetail, onEdit }: {
+function SortableCard({ activity, onMove, onPreview, onViewDetail, onEdit, onDelete }: {
   activity: BoardActivity
   onMove: (activityId: string, stageId: string) => void
   onPreview: (activity: BoardActivity) => void
   onViewDetail: (activity: BoardActivity) => void
   onEdit: (activity: BoardActivity) => void
+  onDelete: (activity: BoardActivity) => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: activity.id,
@@ -358,6 +366,7 @@ function SortableCard({ activity, onMove, onPreview, onViewDetail, onEdit }: {
   const handlePreview    = React.useCallback(() => onPreview(activity), [activity, onPreview])
   const handleViewDetail = React.useCallback(() => onViewDetail(activity), [activity, onViewDetail])
   const handleEdit       = React.useCallback(() => onEdit(activity), [activity, onEdit])
+  const handleDelete     = React.useCallback(() => onDelete(activity), [activity, onDelete])
 
   return (
     <div
@@ -366,7 +375,7 @@ function SortableCard({ activity, onMove, onPreview, onViewDetail, onEdit }: {
       {...attributes}
       {...listeners}
     >
-      <ActivityCard activity={activity} onMove={handleMove} onPreview={handlePreview} onViewDetail={handleViewDetail} onEdit={handleEdit} />
+      <ActivityCard activity={activity} onMove={handleMove} onPreview={handlePreview} onViewDetail={handleViewDetail} onEdit={handleEdit} onDelete={handleDelete} />
     </div>
   )
 }
@@ -385,6 +394,7 @@ function DroppableColumn({
   onPreview,
   onViewDetail,
   onEdit,
+  onDelete,
 }: {
   stage: typeof BOARD_STAGES[number]
   activities: BoardActivity[]
@@ -397,6 +407,7 @@ function DroppableColumn({
   onPreview: (activity: BoardActivity) => void
   onViewDetail: (activity: BoardActivity) => void
   onEdit: (activity: BoardActivity) => void
+  onDelete: (activity: BoardActivity) => void
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: stage.id })
   const stageActivities = activities.filter((a) => a.stageId === stage.id)
@@ -419,6 +430,7 @@ function DroppableColumn({
             onPreview={onPreview}
             onViewDetail={onViewDetail}
             onEdit={onEdit}
+            onDelete={onDelete}
           />
         ))}
       </SortableContext>
@@ -702,6 +714,27 @@ export function ActivityKanban() {
     activityService.getById(activity.rawId)
       .then(setEditActivity)
       .catch(() => notify.error({ title: "No se pudo abrir la actividad", description: "Intenta de nuevo." }))
+  }, [])
+
+  const handleDelete = React.useCallback(async (activity: BoardActivity) => {
+    const confirmed = await activityConfirm.delete(activity.title)
+    if (!confirmed) return
+
+    setActivities((prev) => prev.filter((a) => a.id !== activity.id))
+    setStageCounts((prev) => ({
+      ...prev,
+      [activity.stageId]: Math.max(0, (prev[activity.stageId] ?? 0) - 1),
+    }))
+    if (isOverdue(activity)) setRealOverdueCount((n) => Math.max(0, n - 1))
+
+    activityService.delete(activity.rawId)
+      .then(() => {
+        notify.success({ title: "Actividad eliminada", description: `"${activity.title}" fue eliminada.` })
+      })
+      .catch(() => {
+        setRefreshKey((k) => k + 1)
+        notify.error({ title: "Algo salió mal", description: "No se pudo eliminar la actividad." })
+      })
   }, [])
 
   const handleViewDetail = React.useCallback((activity: BoardActivity) => {
@@ -1116,6 +1149,7 @@ export function ActivityKanban() {
                 onPreview={handlePreview}
                 onViewDetail={handleViewDetail}
                 onEdit={handleEdit}
+                onDelete={handleDelete}
               />
             ))}
           </KanbanBoard>
@@ -1128,6 +1162,7 @@ export function ActivityKanban() {
                 onPreview={() => {}}
                 onViewDetail={() => {}}
                 onEdit={() => {}}
+                onDelete={() => {}}
                 isDragging
               />
             )}
